@@ -61,15 +61,28 @@ if (!$queueId) {
             
             // Get all service points for this queue type to build complete timeline
             $stmt = $db->prepare("
-                SELECT sp.service_point_id, sp.point_name, sp.display_order
+                SELECT DISTINCT sp.service_point_id, sp.point_name, sp.display_order
                 FROM service_points sp
+                LEFT JOIN service_flows sf ON sp.service_point_id = sf.to_service_point_id 
+                    OR sp.service_point_id = sf.from_service_point_id
                 WHERE sp.is_active = 1 
-                AND (sp.queue_type_id = ? OR sp.queue_type_id IS NULL)
+                AND (sf.queue_type_id = ? OR sf.queue_type_id IS NULL)
                 ORDER BY sp.display_order ASC
             ");
-            
+
             if ($stmt && $stmt->execute([$queue['queue_type_id']])) {
                 $allServicePoints = $stmt->fetchAll();
+            } else {
+                // Fallback: get all active service points if the flow query fails
+                $stmt = $db->prepare("
+                    SELECT service_point_id, point_name, display_order
+                    FROM service_points 
+                    WHERE is_active = 1 
+                    ORDER BY display_order ASC
+                ");
+                if ($stmt && $stmt->execute()) {
+                    $allServicePoints = $stmt->fetchAll();
+                }
             }
         }
         

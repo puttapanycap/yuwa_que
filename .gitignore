@@ -1,0 +1,64 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
+*.cache
+
+# Uploads
+uploads/
+!uploads/.gitkeep
+
+# Backups
+backups/
+*.sql
+*.zip
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Composer
+vendor/
+composer.lock
+
+# Node modules (if using)
+node_modules/
+package-lock.json
+
+# Build files
+dist/
+build/
+
+# Database dumps
+*.dump
+*.backup
+
+# Configuration overrides
+config/local.php
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+
+# API keys and secrets
+keys/
+secrets/
