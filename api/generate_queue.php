@@ -53,19 +53,39 @@ try {
         throw new Exception('ไม่พบจุดบริการเริ่มต้น');
     }
     
+    // Insert/update patient info first
+    $stmt = $db->prepare("INSERT INTO patients (id_card_number) VALUES (?) ON DUPLICATE KEY UPDATE id_card_number = id_card_number");
+    $stmt->execute([$idCardNumber]);
+    
     // Insert queue
     $stmt = $db->prepare("INSERT INTO queues (queue_number, queue_type_id, patient_id_card_number, current_service_point_id, kiosk_id) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$queueNumber, $queueTypeId, $idCardNumber, $firstServicePoint['service_point_id'], 'KIOSK_01']);
     
     $queueId = $db->lastInsertId();
     
-    // Log queue creation
-    $stmt = $db->prepare("INSERT INTO service_flow_history (queue_id, to_service_point_id, action) VALUES (?, ?, 'created')");
-    $stmt->execute([$queueId, $firstServicePoint['service_point_id']]);
+    // Log queue creation in service flow history
+    // Note: staff_id is NULL for kiosk-generated queues
+    $stmt = $db->prepare("
+        INSERT INTO service_flow_history 
+        (queue_id, from_service_point_id, to_service_point_id, staff_id, action, notes, timestamp) 
+        VALUES (?, NULL, ?, NULL, 'created', 'สร้างคิวจาก Kiosk', NOW())
+    ");
+    $result = $stmt->execute([$queueId, $firstServicePoint['service_point_id']]);
     
-    // Insert/update patient info
-    $stmt = $db->prepare("INSERT INTO patients (id_card_number) VALUES (?) ON DUPLICATE KEY UPDATE id_card_number = id_card_number");
-    $stmt->execute([$idCardNumber]);
+    if (!$result) {
+        throw new Exception('ไม่สามารถบันทึก Service Flow History ได้');
+    }
+    
+    // Log activity in audit logs
+    $stmt = $db->prepare("
+        INSERT INTO audit_logs (staff_id, action_description, ip_address, user_agent, timestamp) 
+        VALUES (NULL, ?, ?, ?, NOW())
+    ");
+    $stmt->execute([
+        "สร้างคิว {$queueNumber} จาก Kiosk - บัตรประชาชน: " . substr($idCardNumber, 0, 4) . "****" . substr($idCardNumber, -4),
+        $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
+        $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
+    ]);
     
     $db->commit();
     
@@ -74,12 +94,28 @@ try {
         'queue' => [
             'queue_id' => $queueId,
             'queue_number' => $queueNumber,
-            'queue_type_id' => $queueTypeId
+            'queue_type_id' => $queueTypeId,
+            'service_point_name' => 'จุดคัดกรอง',
+            'creation_time' => date('Y-m-d H:i:s')
         ]
     ]);
     
 } catch (Exception $e) {
     $db->rollBack();
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    
+    // Log error for debugging
+    error_log("Generate Queue Error: " . $e->getMessage());
+    
+    echo json_encode([
+        'success' => false, 
+        'message' => $e->getMessage(),
+        'debug' => [
+            'queue_type_id' => $queueTypeId,
+            'id_card_number' => substr($idCardNumber, 0, 4) . "****" . substr($idCardNumber, -4),
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]
+    ]);
 }
 ?>
