@@ -61,11 +61,11 @@ if (!$queueId) {
             
             // Get all service points for this queue type to build complete timeline
             $stmt = $db->prepare("
-                SELECT sp.service_point_id, sp.point_name, sp.sequence_order
+                SELECT sp.service_point_id, sp.point_name, sp.display_order
                 FROM service_points sp
                 WHERE sp.is_active = 1 
                 AND (sp.queue_type_id = ? OR sp.queue_type_id IS NULL)
-                ORDER BY sp.sequence_order ASC
+                ORDER BY sp.display_order ASC
             ");
             
             if ($stmt && $stmt->execute([$queue['queue_type_id']])) {
@@ -503,13 +503,13 @@ if ($error_message) {
                     'point_name' => $sp['point_name'],
                     'status' => $status,
                     'timestamp' => $timestamp,
-                    'sequence_order' => $sp['sequence_order']
+                    'display_order' => $sp['display_order']
                 ];
             }
 
             // เรียงลำดับจากล่างขึ้นบน (sequence_order น้อยไปมาก)
             usort($timelineSteps, function($a, $b) {
-                return $a['sequence_order'] - $b['sequence_order'];
+                return $a['display_order'] - $b['display_order'];
             });
             
             // คำนวณความคืบหน้า
