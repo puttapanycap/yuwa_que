@@ -436,9 +436,9 @@ function getMailFromName() {
     return getSetting('mail_from_name', 'Queue System');
 }
 
-// Telegram Notify Configuration Functions (from admin settings)
-function isTelegramNotifyEnabled() {
-    return getSetting('telegram_notify_enabled', 'false') === 'true';
+// Telegram Configuration Functions (from admin settings)
+function isTelegramNotificationEnabled() {
+    return getSetting('telegram_notifications', 'false') === 'true';
 }
 
 function getTelegramBotToken() {
@@ -447,6 +447,14 @@ function getTelegramBotToken() {
 
 function getTelegramChatId() {
     return getSetting('telegram_chat_id', '');
+}
+
+function getTelegramAdminChatId() {
+    return getSetting('telegram_admin_chat_id', '');
+}
+
+function getTelegramGroupChatId() {
+    return getSetting('telegram_group_chat_id', '');
 }
 
 function getTelegramNotifyTemplate() {
