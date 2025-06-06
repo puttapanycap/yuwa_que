@@ -45,6 +45,74 @@ if (!$queueId) {
         if (!$queue) {
             $error_message = 'ไม่พบข้อมูลคิว ID: ' . htmlspecialchars($queueId);
         } else {
+            // คำนวณจำนวนคิวที่รออยู่ก่อนหน้า
+            $queuePosition = 0;
+            $totalQueuesAhead = 0;
+            $totalQueuesToday = 0;
+            $estimatedWaitTime = 0;
+
+            // นับจำนวนคิวที่รออยู่ก่อนหน้า (queue_number น้อยกว่า และยังไม่เสร็จสิ้น)
+            $stmt = $db->prepare("
+                SELECT COUNT(*) as queues_ahead
+                FROM queues 
+                WHERE queue_type_id = ? 
+                AND DATE(creation_time) = DATE(?)
+                AND queue_number < ?
+                AND current_status NOT IN ('completed', 'cancelled')
+            ");
+
+            if ($stmt && $stmt->execute([$queue['queue_type_id'], $queue['creation_time'], $queue['queue_number']])) {
+                $result = $stmt->fetch();
+                $totalQueuesAhead = $result['queues_ahead'];
+            }
+
+            // นับจำนวนคิวทั้งหมดในวันนี้ (ประเภทเดียวกัน)
+            $stmt = $db->prepare("
+                SELECT COUNT(*) as total_today
+                FROM queues 
+                WHERE queue_type_id = ? 
+                AND DATE(creation_time) = DATE(?)
+            ");
+
+            if ($stmt && $stmt->execute([$queue['queue_type_id'], $queue['creation_time']])) {
+                $result = $stmt->fetch();
+                $totalQueuesToday = $result['total_today'];
+            }
+
+            // คำนวณตำแหน่งของคิวปัจจุบัน
+            $stmt = $db->prepare("
+                SELECT COUNT(*) + 1 as position
+                FROM queues 
+                WHERE queue_type_id = ? 
+                AND DATE(creation_time) = DATE(?)
+                AND queue_number < ?
+            ");
+
+            if ($stmt && $stmt->execute([$queue['queue_type_id'], $queue['creation_time'], $queue['queue_number']])) {
+                $result = $stmt->fetch();
+                $queuePosition = $result['position'];
+            }
+
+            // คำนวณเวลารอโดยประมาณ (ใช้ข้อมูลเฉลี่ยจากการให้บริการในอดีต)
+            $stmt = $db->prepare("
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, creation_time, 
+                    CASE 
+                        WHEN current_status = 'completed' THEN updated_at
+                        ELSE NOW()
+                    END
+                )) as avg_service_time
+                FROM queues 
+                WHERE queue_type_id = ? 
+                AND DATE(creation_time) = DATE(NOW() - INTERVAL 7 DAY)
+                AND current_status = 'completed'
+                AND TIMESTAMPDIFF(MINUTE, creation_time, updated_at) BETWEEN 5 AND 120
+            ");
+
+            if ($stmt && $stmt->execute([$queue['queue_type_id']])) {
+                $result = $stmt->fetch();
+                $avgServiceTime = $result['avg_service_time'] ?? 15; // default 15 นาที
+                $estimatedWaitTime = $totalQueuesAhead * $avgServiceTime;
+            }
             // Get service flow history
             $stmt = $db->prepare("
                 SELECT sfh.*, sp_from.point_name as from_point_name, sp_to.point_name as to_point_name
@@ -63,15 +131,32 @@ if (!$queueId) {
             $stmt = $db->prepare("
                 SELECT DISTINCT sp.service_point_id, sp.point_name, sp.display_order
                 FROM service_points sp
-                LEFT JOIN service_flows sf ON sp.service_point_id = sf.to_service_point_id 
-                    OR sp.service_point_id = sf.from_service_point_id
+                INNER JOIN service_flows sf ON (sp.service_point_id = sf.to_service_point_id 
+                    OR sp.service_point_id = sf.from_service_point_id)
                 WHERE sp.is_active = 1 
-                AND (sf.queue_type_id = ? OR sf.queue_type_id IS NULL)
+                AND sf.queue_type_id = ?
+                AND sf.is_active = 1
                 ORDER BY sp.display_order ASC
             ");
 
             if ($stmt && $stmt->execute([$queue['queue_type_id']])) {
                 $allServicePoints = $stmt->fetchAll();
+                
+                // ถ้าไม่พบจุดบริการที่เกี่ยวข้อง ให้เพิ่มจุดบริการปัจจุบันเข้าไป
+                if (empty($allServicePoints) && !empty($queue['current_service_point_id'])) {
+                    $currentPointStmt = $db->prepare("
+                        SELECT service_point_id, point_name, display_order
+                        FROM service_points 
+                        WHERE service_point_id = ? AND is_active = 1
+                    ");
+                    
+                    if ($currentPointStmt && $currentPointStmt->execute([$queue['current_service_point_id']])) {
+                        $currentPoint = $currentPointStmt->fetch();
+                        if ($currentPoint) {
+                            $allServicePoints[] = $currentPoint;
+                        }
+                    }
+                }
             } else {
                 // Fallback: get all active service points if the flow query fails
                 $stmt = $db->prepare("
@@ -82,6 +167,31 @@ if (!$queueId) {
                 ");
                 if ($stmt && $stmt->execute()) {
                     $allServicePoints = $stmt->fetchAll();
+                }
+            }
+
+            // เพิ่มการตรวจสอบว่าจุดบริการปัจจุบันอยู่ใน allServicePoints หรือไม่
+            $currentPointExists = false;
+            foreach ($allServicePoints as $sp) {
+                if ($sp['service_point_id'] == $queue['current_service_point_id']) {
+                    $currentPointExists = true;
+                    break;
+                }
+            }
+
+            // ถ้าไม่มีจุดบริการปัจจุบันใน allServicePoints ให้เพิ่มเข้าไป
+            if (!$currentPointExists && !empty($queue['current_service_point_id'])) {
+                $currentPointStmt = $db->prepare("
+                    SELECT service_point_id, point_name, display_order
+                    FROM service_points 
+                    WHERE service_point_id = ?
+                ");
+                
+                if ($currentPointStmt && $currentPointStmt->execute([$queue['current_service_point_id']])) {
+                    $currentPoint = $currentPointStmt->fetch();
+                    if ($currentPoint) {
+                        $allServicePoints[] = $currentPoint;
+                    }
                 }
             }
         }
@@ -426,6 +536,169 @@ if ($error_message) {
             border-radius: 4px;
             transition: width 0.3s ease;
         }
+
+        @media (max-width: 768px) {
+            .timeline-container {
+                flex-direction: column;
+            }
+            
+            .timeline-section {
+                width: 100%;
+            }
+            
+            .queue-number {
+                font-size: 2.5rem;
+            }
+            
+            .status-badge {
+                font-size: 1rem;
+                padding: 0.4rem 0.8rem;
+            }
+            
+            .timeline::before {
+                left: 20px;
+            }
+            
+            .timeline-item {
+                padding-left: 3rem;
+            }
+            
+            .timeline-item::before {
+                left: 12px;
+                width: 16px;
+                height: 16px;
+            }
+            
+            .qr-code canvas {
+                width: 150px !important;
+                height: 150px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .status-container {
+                padding: 1rem;
+            }
+            
+            .queue-number {
+                font-size: 2rem;
+            }
+            
+            .timeline-item {
+                padding-left: 2.5rem;
+            }
+            
+            .timeline::before {
+                left: 15px;
+            }
+            
+            .timeline-item::before {
+                left: 7px;
+            }
+            
+            .timeline-title {
+                font-size: 1rem;
+            }
+            
+            .qr-code canvas {
+                width: 120px !important;
+                height: 120px !important;
+            }
+        }
+
+.queue-info-container {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.queue-info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.queue-info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.queue-info-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.queue-info-number {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.queue-info-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.queue-alert {
+    animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .queue-info-card {
+        padding: 0.75rem;
+    }
+    
+    .queue-info-number {
+        font-size: 1.5rem;
+    }
+    
+    .queue-info-label {
+        font-size: 0.8rem;
+    }
+    
+    .queue-info-icon {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .queue-info-container {
+        padding: 1rem;
+    }
+    
+    .queue-info-card {
+        padding: 0.5rem;
+    }
+    
+    .queue-info-number {
+        font-size: 1.3rem;
+    }
+    
+    .queue-info-label {
+        font-size: 0.75rem;
+    }
+}
     </style>
 </head>
 <body>
@@ -490,13 +763,18 @@ if ($error_message) {
                 }
             }
 
-            // สร้าง timeline จาก service points ทั้งหมด
+            // สร้าง timeline จาก service points ที่เกี่ยวข้องกับ flow ของคิวนี้
             foreach ($allServicePoints as $sp) {
+                // เช็คว่าจุดบริการนี้อยู่ใน flow ของคิวประเภทนี้หรือไม่
+                $isInFlow = false;
                 $status = 'pending';
                 $timestamp = null;
-
+                $isCurrentPoint = ($sp['service_point_id'] == $queue['current_service_point_id']);
+                
+                // ตรวจสอบว่าเป็นจุดที่ผ่านมาแล้วหรือไม่
                 if (in_array($sp['service_point_id'], $completedSteps)) {
-                    if ($sp['service_point_id'] == $currentStep) {
+                    $isInFlow = true;
+                    if ($isCurrentPoint) {
                         $status = 'current';
                     } else {
                         $status = 'completed';
@@ -509,15 +787,23 @@ if ($error_message) {
                             break;
                         }
                     }
+                } 
+                // ตรวจสอบว่าเป็นจุดปัจจุบันหรือไม่
+                else if ($isCurrentPoint) {
+                    $isInFlow = true;
+                    $status = 'current';
                 }
-
-                $timelineSteps[] = [
-                    'service_point_id' => $sp['service_point_id'],
-                    'point_name' => $sp['point_name'],
-                    'status' => $status,
-                    'timestamp' => $timestamp,
-                    'display_order' => $sp['display_order']
-                ];
+                
+                // เพิ่มเฉพาะจุดที่อยู่ใน flow หรือเป็นจุดปัจจุบัน
+                if ($isInFlow) {
+                    $timelineSteps[] = [
+                        'service_point_id' => $sp['service_point_id'],
+                        'point_name' => $sp['point_name'],
+                        'status' => $status,
+                        'timestamp' => $timestamp,
+                        'display_order' => $sp['display_order']
+                    ];
+                }
             }
 
             // เรียงลำดับจากล่างขึ้นบน (sequence_order น้อยไปมาก)
@@ -550,6 +836,89 @@ if ($error_message) {
                     <div class="progress-fill" style="width: <?php echo $progressPercentage; ?>%"></div>
                 </div>
                 <small class="text-muted"><?php echo number_format($progressPercentage, 1); ?>% เสร็จสิ้น</small>
+            </div>
+            
+            <!-- Queue Position Information -->
+            <div class="queue-info-container mt-3">
+                <div class="row g-3">
+                    <div class="col-md-3 col-6">
+                        <div class="queue-info-card">
+                            <div class="queue-info-icon">
+                                <i class="fas fa-users text-warning"></i>
+                            </div>
+                            <div class="queue-info-content">
+                                <div class="queue-info-number"><?php echo $totalQueuesAhead; ?></div>
+                                <div class="queue-info-label">คิวที่รออยู่ข้างหน้า</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 col-6">
+                        <div class="queue-info-card">
+                            <div class="queue-info-icon">
+                                <i class="fas fa-sort-numeric-up text-info"></i>
+                            </div>
+                            <div class="queue-info-content">
+                                <div class="queue-info-number"><?php echo $queuePosition; ?></div>
+                                <div class="queue-info-label">ลำดับที่</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 col-6">
+                        <div class="queue-info-card">
+                            <div class="queue-info-icon">
+                                <i class="fas fa-clock text-primary"></i>
+                            </div>
+                            <div class="queue-info-content">
+                                <div class="queue-info-number">
+                                    <?php 
+                                    if ($estimatedWaitTime > 60) {
+                                        echo floor($estimatedWaitTime / 60) . 'ชม ' . ($estimatedWaitTime % 60) . 'น';
+                                    } else {
+                                        echo $estimatedWaitTime . ' นาที';
+                                    }
+                                    ?>
+                                </div>
+                                <div class="queue-info-label">เวลารอโดยประมาณ</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 col-6">
+                        <div class="queue-info-card">
+                            <div class="queue-info-icon">
+                                <i class="fas fa-calendar-day text-success"></i>
+                            </div>
+                            <div class="queue-info-content">
+                                <div class="queue-info-number"><?php echo $totalQueuesToday; ?></div>
+                                <div class="queue-info-label">คิวทั้งหมดวันนี้</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <?php if ($totalQueuesAhead > 0): ?>
+                <div class="queue-alert mt-3">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>มีคิวรออยู่ข้างหน้า <?php echo $totalQueuesAhead; ?> คิว</strong><br>
+                            <small>คาดว่าจะถึงคิวของคุณในอีกประมาณ <?php echo $estimatedWaitTime; ?> นาที</small>
+                        </div>
+                    </div>
+                </div>
+                <?php elseif ($queue['current_status'] == 'waiting'): ?>
+                <div class="queue-alert mt-3">
+                    <div class="alert alert-success d-flex align-items-center">
+                        <i class="fas fa-star me-2"></i>
+                        <div>
+                            <strong>คิวของคุณถึงแล้ว!</strong><br>
+                            <small>กรุณาเตรียมตัวเข้ารับบริการ</small>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <div class="timeline-container">
@@ -609,14 +978,28 @@ if ($error_message) {
                     </h4>
                     
                     <?php if (!empty($flowHistory)): ?>
-                        <?php foreach ($flowHistory as $step): ?>
-                            <div class="flow-step <?php echo ($step['action'] == 'completed') ? 'completed' : (($step['to_service_point_id'] == $queue['current_service_point_id']) ? 'current' : 'pending'); ?>">
+                        <?php 
+                        // เรียงลำดับประวัติจากใหม่ไปเก่า
+                        $sortedHistory = array_reverse($flowHistory);
+                        foreach ($sortedHistory as $step): 
+                            // ข้ามรายการที่ไม่มีจุดบริการปลายทาง
+                            if (empty($step['to_point_name'])) continue;
+                            
+                            // กำหนดสถานะของขั้นตอน
+                            $stepStatus = 'pending';
+                            if ($step['action'] == 'completed') {
+                                $stepStatus = 'completed';
+                            } else if ($step['to_service_point_id'] == $queue['current_service_point_id']) {
+                                $stepStatus = 'current';
+                            }
+                        ?>
+                            <div class="flow-step <?php echo $stepStatus; ?>">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h6 class="mb-1">
-                                            <?php if ($step['action'] == 'completed'): ?>
+                                            <?php if ($stepStatus == 'completed'): ?>
                                                 <i class="fas fa-check-circle text-success me-2"></i>
-                                            <?php elseif ($step['to_service_point_id'] == $queue['current_service_point_id']): ?>
+                                            <?php elseif ($stepStatus == 'current'): ?>
                                                 <i class="fas fa-clock text-warning me-2"></i>
                                             <?php else: ?>
                                                 <i class="fas fa-circle text-muted me-2"></i>
@@ -638,32 +1021,33 @@ if ($error_message) {
                                                 case 'completed':
                                                     echo 'เสร็จสิ้น';
                                                     break;
+                                                case 'processing':
+                                                    echo 'กำลังให้บริการ';
+                                                    break;
+                                                case 'waiting':
+                                                    echo 'รอเรียก';
+                                                    break;
                                                 default:
-                                                    echo $step['action'];
+                                                    echo htmlspecialchars($step['action']);
                                             }
                                             ?>
                                         </small>
                                     </div>
-                                    <small class="text-muted">
-                                        <?php echo date('H:i', strtotime($step['timestamp'])); ?>
-                                    </small>
+                                    <div class="text-end">
+                                        <small class="text-muted d-block">
+                                            <?php echo date('H:i', strtotime($step['timestamp'])); ?>
+                                        </small>
+                                        <small class="text-muted d-block d-md-none">
+                                            <?php echo date('d/m/y', strtotime($step['timestamp'])); ?>
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div class="flow-step current">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1">
-                                        <i class="fas fa-clock text-warning me-2"></i>
-                                        <?php echo htmlspecialchars($queue['current_service_point_name']); ?>
-                                    </h6>
-                                    <small class="text-muted">รอเรียก</small>
-                                </div>
-                                <small class="text-muted">
-                                    <?php echo date('H:i', strtotime($queue['creation_time'])); ?>
-                                </small>
-                            </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            ไม่พบประวัติการให้บริการ
                         </div>
                     <?php endif; ?>
                 </div>
