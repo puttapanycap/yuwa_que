@@ -149,10 +149,10 @@ try {
             
             $data['chartData'] = [
                 'labels' => $labels,
-                'datasets' => [{
+                'datasets' => [[
                     'data' => $values,
                     'backgroundColor' => array_slice($colors, 0, count($values))
-                }]
+                ]]
             ];
             break;
             
