@@ -90,8 +90,8 @@ install.bat
 
 5. **Import Database**
    ```bash
-   mysql -u username -p database_name < database/schema.sql
-   mysql -u username -p database_name < database/default_settings.sql
+   mysql -u root -p yuwaprasart_queue < database/complete_schema.sql
+   mysql -u root -p yuwaprasart_queue < database/default_settings.sql
    ```
 
 ## ⚙️ Configuration
