@@ -90,8 +90,7 @@ install.bat
 
 5. **นำเข้าฐานข้อมูล**
    ```bash
-   mysql -u root -p yuwaprasart_queue < database/complete_schema.sql
-   mysql -u root -p yuwaprasart_queue < database/default_settings.sql
+   mysql -u root -p yuwaprasart_queue < database/schema.sql
    ```
 
 ## ⚙️ การกำหนดค่า
