@@ -93,13 +93,13 @@ try {
             
             $data['chartData'] = [
                 'labels' => $labels,
-                'datasets' => [{
+                'datasets' => [[
                     'label' => 'จำนวนคิว',
                     'data' => $values,
                     'borderColor' => 'rgb(102, 126, 234)',
                     'backgroundColor' => 'rgba(102, 126, 234, 0.1)',
                     'tension' => 0.4
-                }]
+                ]]
             ];
             break;
             
