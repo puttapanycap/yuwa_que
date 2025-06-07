@@ -43,7 +43,7 @@ A comprehensive, modern queue management system designed for hospitals and healt
 #### Option 1: Automated Installation (Recommended)
 
 **Linux/macOS:**
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 cd yuwaprasart-queue-system
@@ -53,46 +53,46 @@ chmod +x install.sh
 
 # Run installation
 ./install.sh
-\`\`\`
+```
 
 **Windows:**
-\`\`\`batch
+```batch
 # Clone the repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 cd yuwaprasart-queue-system
 
 # Run installation
 install.bat
-\`\`\`
+```
 
 #### Option 2: Manual Installation
 
 1. **Check System Requirements**
-   \`\`\`bash
+   ```bash
    php scripts/check-system-requirements.php
-   \`\`\`
+   ```
 
 2. **Install Dependencies**
-   \`\`\`bash
+   ```bash
    composer install --ignore-platform-req=ext-zip
-   \`\`\`
+   ```
 
 3. **Install Optional Packages**
-   \`\`\`bash
+   ```bash
    php scripts/install-optional-packages.php
-   \`\`\`
+   ```
 
 4. **Configure Environment**
-   \`\`\`bash
+   ```bash
    cp .env.example .env
    # Edit .env with your database credentials
-   \`\`\`
+   ```
 
 5. **Import Database**
-   \`\`\`bash
+   ```bash
    mysql -u username -p database_name < database/schema.sql
    mysql -u username -p database_name < database/default_settings.sql
-   \`\`\`
+   ```
 
 ## ⚙️ Configuration
 
@@ -100,7 +100,7 @@ install.bat
 
 Edit `.env` file with your database credentials:
 
-\`\`\`env
+```env
 # Database Configuration
 DB_HOST=localhost
 DB_NAME=yuwaprasart_queue
@@ -125,20 +125,20 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
-\`\`\`
+```
 
 ### Web Server Configuration
 
 #### Apache (.htaccess)
-\`\`\`apache
+```apache
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^api/(.*)$ api/$1.php [L]
-\`\`\`
+```
 
 #### Nginx
-\`\`\`nginx
+```nginx
 location /api/ {
     try_files $uri $uri.php $uri/ =404;
 }
@@ -148,7 +148,7 @@ location ~ \.php$ {
     fastcgi_index index.php;
     include fastcgi_params;
 }
-\`\`\`
+```
 
 ## 📱 Usage
 
@@ -171,7 +171,7 @@ location ~ \.php$ {
 ## 🔧 API Documentation
 
 ### Authentication
-\`\`\`http
+```http
 POST /api/mobile/auth.php
 Content-Type: application/json
 
@@ -179,10 +179,10 @@ Content-Type: application/json
   "username": "staff_user",
   "password": "password"
 }
-\`\`\`
+```
 
 ### Queue Management
-\`\`\`http
+```http
 # Generate new queue
 POST /api/generate_queue.php
 Content-Type: application/json
@@ -204,7 +204,7 @@ Content-Type: application/json
   "action": "call",
   "service_point_id": 1
 }
-\`\`\`
+```
 
 ## 🎨 Customization
 
@@ -246,7 +246,7 @@ Content-Type: application/json
 ## 📊 Monitoring & Maintenance
 
 ### Health Checks
-\`\`\`bash
+```bash
 # Check system health
 php admin/database_diagnostic.php
 
@@ -255,16 +255,16 @@ php api/validate_database_structure.php
 
 # Test queue status functionality
 php test_queue_status.php
-\`\`\`
+```
 
 ### Backup & Restore
-\`\`\`bash
+```bash
 # Create backup
 php api/backup_before_reset.php
 
 # Restore from backup
 # Use admin panel backup management interface
-\`\`\`
+```
 
 ### Log Management
 - **Application Logs**: `logs/app.log`
@@ -297,30 +297,30 @@ php api/backup_before_reset.php
 ### Common Issues
 
 #### Composer Installation Fails
-\`\`\`bash
+```bash
 # Missing ZIP extension
 composer install --ignore-platform-req=ext-zip
 
 # Check requirements
 php scripts/check-system-requirements.php
-\`\`\`
+```
 
 #### Database Connection Issues
-\`\`\`bash
+```bash
 # Test database connection
 php admin/database_diagnostic.php
 
 # Check credentials in .env file
 # Verify MySQL service is running
-\`\`\`
+```
 
 #### Permission Errors
-\`\`\`bash
+```bash
 # Set proper permissions
 chmod -R 755 .
 chmod -R 777 logs/
 chmod -R 777 uploads/
-\`\`\`
+```
 
 #### Audio System Not Working
 - Check browser audio permissions
@@ -336,7 +336,7 @@ chmod -R 777 uploads/
 ## 🤝 Contributing
 
 ### Development Setup
-\`\`\`bash
+```bash
 # Clone repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 
@@ -348,7 +348,7 @@ cp .env.example .env.dev
 
 # Run tests
 composer test
-\`\`\`
+```
 
 ### Code Standards
 - **PSR-12** coding standards

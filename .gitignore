@@ -17,7 +17,6 @@ uploads/
 
 # Backups
 backups/
-*.sql
 *.zip
 
 # Temporary files
