@@ -1,118 +1,118 @@
-# 🏥 Yuwaprasart Queue Management System
+# 🏥 ระบบจัดการคิวโรงพยาบาลยุวประสาท
 
-A comprehensive, modern queue management system designed for hospitals and healthcare facilities. Built with PHP, MySQL, and modern web technologies to provide efficient patient flow management.
+ระบบจัดการคิวที่ครอบคลุมและทันสมัย ออกแบบมาสำหรับโรงพยาบาลและสถานพยาบาล สร้างด้วย PHP, MySQL และเทคโนโลยีเว็บสมัยใหม่ เพื่อให้การจัดการผู้ป่วยมีประสิทธิภาพ
 
-## ✨ Features
+## ✨ คุณสมบัติ
 
-### 🎯 Core Features
-- **Multi-Service Queue Management** - Support for different service types and departments
-- **Real-time Status Tracking** - Live queue status updates and monitoring
-- **Staff Dashboard** - Comprehensive staff interface for queue management
-- **Admin Panel** - Full administrative control and system configuration
-- **Mobile-Responsive Design** - Works perfectly on all devices
-- **Audio Call System** - Text-to-speech queue calling with multiple voice options
-- **Multi-language Support** - Thai and English interface
+### 🎯 คุณสมบัติหลัก
+- **การจัดการคิวหลายบริการ** - รองรับประเภทบริการและแผนกต่างๆ
+- **การติดตามสถานะแบบเรียลไทม์** - อัปเดตสถานะคิวสดและการตรวจสอบ
+- **แดชบอร์ดเจ้าหน้าที่** - อินเทอร์เฟซเจ้าหน้าที่ที่ครอบคลุมสำหรับการจัดการคิว
+- **แผงควบคุมผู้ดูแลระบบ** - การควบคุมการดูแลระบบและการกำหนดค่าระบบอย่างเต็มรูปแบบ
+- **การออกแบบที่ตอบสนองต่อมือถือ** - ทำงานได้อย่างสมบูรณ์แบบบนอุปกรณ์ทั้งหมด
+- **ระบบเรียกคิวด้วยเสียง** - การเรียกคิวด้วยเสียงพูดพร้อมตัวเลือกเสียงที่หลากหลาย
+- **รองรับหลายภาษา** - อินเทอร์เฟซภาษาไทยและภาษาอังกฤษ
 
-### 📊 Advanced Features
-- **Analytics Dashboard** - Real-time analytics and performance metrics
-- **Advanced Reporting** - Customizable reports with multiple export formats
-- **Auto-Reset System** - Scheduled automatic queue number resets
-- **Notification Center** - Email and Telegram notifications
-- **Service Flow Management** - Configure complex multi-step service processes
-- **Role-Based Access Control** - Granular permissions and user management
-- **Audit Logging** - Complete activity tracking and security logs
-- **Backup & Restore** - Automated data backup and recovery
+### 📊 คุณสมบัติขั้นสูง
+- **แดชบอร์ดการวิเคราะห์** - การวิเคราะห์แบบเรียลไทม์และเมตริกประสิทธิภาพ
+- **การรายงานขั้นสูง** - รายงานที่ปรับแต่งได้พร้อมรูปแบบการส่งออกที่หลากหลาย
+- **ระบบรีเซ็ตอัตโนมัติ** - กำหนดการรีเซ็ตหมายเลขคิวอัตโนมัติ
+- **ศูนย์การแจ้งเตือน** - การแจ้งเตือนทางอีเมลและ Telegram
+- **การจัดการขั้นตอนการบริการ** - กำหนดค่ากระบวนการบริการหลายขั้นตอนที่ซับซ้อน
+- **การควบคุมการเข้าถึงตามบทบาท** - สิทธิ์และการจัดการผู้ใช้แบบละเอียด
+- **การบันทึกการตรวจสอบ** - การติดตามกิจกรรมที่สมบูรณ์และบันทึกความปลอดภัย
+- **สำรองและกู้คืน** - การสำรองและกู้คืนข้อมูลอัตโนมัติ
 
-### 🔧 Technical Features
-- **RESTful API** - Complete API for mobile app integration
-- **Database Diagnostics** - Built-in database health monitoring
-- **Environment Configuration** - Secure configuration management
-- **Composer Package Management** - Modern PHP dependency management
-- **Responsive UI** - Bootstrap-based responsive design
+### 🔧 คุณสมบัติทางเทคนิค
+- **RESTful API** - API ที่สมบูรณ์สำหรับการรวมแอปมือถือ
+- **การวินิจฉัยฐานข้อมูล** - การตรวจสอบสถานะฐานข้อมูลในตัว
+- **การกำหนดค่าสภาพแวดล้อม** - การจัดการการกำหนดค่าที่ปลอดภัย
+- **Composer Package Management** - การจัดการ Dependency ของ PHP สมัยใหม่
+- **Responsive UI** - การออกแบบที่ตอบสนองตาม Bootstrap
 
-## 🚀 Quick Start
+## 🚀 เริ่มต้นอย่างรวดเร็ว
 
-### Prerequisites
-- **PHP 8.0+** with extensions: `mysqli`, `json`, `curl`, `mbstring`
-- **MySQL 5.7+** or **MariaDB 10.3+**
+### ข้อกำหนดเบื้องต้น
+- **PHP 8.0+** พร้อมส่วนขยาย: `mysqli`, `json`, `curl`, `mbstring`
+- **MySQL 5.7+** หรือ **MariaDB 10.3+**
 - **Web Server** (Apache/Nginx)
-- **Composer** (for dependency management)
+- **Composer** (สำหรับการจัดการ Dependency)
 
-### Installation
+### การติดตั้ง
 
-#### Option 1: Automated Installation (Recommended)
+#### ตัวเลือกที่ 1: การติดตั้งอัตโนมัติ (แนะนำ)
 
 **Linux/macOS:**
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 cd yuwaprasart-queue-system
 
-# Make installation script executable
+# ทำให้สคริปต์การติดตั้งสามารถเรียกใช้งานได้
 chmod +x install.sh
 
-# Run installation
+# เรียกใช้งานการติดตั้ง
 ./install.sh
 ```
 
 **Windows:**
 ```batch
-# Clone the repository
+# Clone repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 cd yuwaprasart-queue-system
 
-# Run installation
+# เรียกใช้งานการติดตั้ง
 install.bat
 ```
 
-#### Option 2: Manual Installation
+#### ตัวเลือกที่ 2: การติดตั้งด้วยตนเอง
 
-1. **Check System Requirements**
+1. **ตรวจสอบข้อกำหนดของระบบ**
    ```bash
    php scripts/check-system-requirements.php
    ```
 
-2. **Install Dependencies**
+2. **ติดตั้ง Dependencies**
    ```bash
    composer install --ignore-platform-req=ext-zip
    ```
 
-3. **Install Optional Packages**
+3. **ติดตั้ง Packages เสริม**
    ```bash
    php scripts/install-optional-packages.php
    ```
 
-4. **Configure Environment**
+4. **กำหนดค่า Environment**
    ```bash
    cp .env.example .env
-   # Edit .env with your database credentials
+   # แก้ไข .env ด้วยข้อมูลรับรองฐานข้อมูลของคุณ
    ```
 
-5. **Import Database**
+5. **นำเข้าฐานข้อมูล**
    ```bash
    mysql -u root -p yuwaprasart_queue < database/complete_schema.sql
    mysql -u root -p yuwaprasart_queue < database/default_settings.sql
    ```
 
-## ⚙️ Configuration
+## ⚙️ การกำหนดค่า
 
-### Database Configuration
+### การกำหนดค่าฐานข้อมูล
 
-Edit `.env` file with your database credentials:
+แก้ไขไฟล์ `.env` ด้วยข้อมูลรับรองฐานข้อมูลของคุณ:
 
 ```env
-# Database Configuration
+# การกำหนดค่าฐานข้อมูล
 DB_HOST=localhost
 DB_NAME=yuwaprasart_queue
 DB_USER=your_username
 DB_PASS=your_password
 
-# Application Settings
+# การตั้งค่าแอปพลิเคชัน
 APP_NAME="Yuwaprasart Queue System"
 APP_URL=http://localhost/yuwaprasart-queue-system
 APP_TIMEZONE=Asia/Bangkok
 
-# Security
+# ความปลอดภัย
 JWT_SECRET=your-secret-key-here
 SESSION_LIFETIME=3600
 
@@ -120,14 +120,14 @@ SESSION_LIFETIME=3600
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_CHAT_ID=your-chat-id
 
-# Email Configuration (Optional)
+# การกำหนดค่าอีเมล (Optional)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ```
 
-### Web Server Configuration
+### การกำหนดค่า Web Server
 
 #### Apache (.htaccess)
 ```apache
@@ -150,27 +150,27 @@ location ~ \.php$ {
 }
 ```
 
-## 📱 Usage
+## 📱 การใช้งาน
 
-### For Patients
-1. **Get Queue Number** - Visit the main page and select service type
-2. **Check Status** - Use the provided QR code or link to check queue status
-3. **Real-time Updates** - Monitor your position and estimated waiting time
+### สำหรับผู้ป่วย
+1. **รับหมายเลขคิว** - เยี่ยมชมหน้าหลักและเลือกประเภทบริการ
+2. **ตรวจสอบสถานะ** - ใช้รหัส QR หรือลิงก์ที่ให้ไว้เพื่อตรวจสอบสถานะคิว
+3. **อัปเดตแบบเรียลไทม์** - ตรวจสอบตำแหน่งของคุณและเวลาที่รอโดยประมาณ
 
-### For Staff
-1. **Login** - Access staff dashboard at `/staff/`
-2. **Manage Queues** - Call, skip, or complete queue numbers
-3. **Monitor Service Points** - View real-time service point status
+### สำหรับเจ้าหน้าที่
+1. **เข้าสู่ระบบ** - เข้าถึงแดชบอร์ดเจ้าหน้าที่ที่ `/staff/`
+2. **จัดการคิว** - เรียก, ข้าม หรือทำหมายเลขคิวให้เสร็จสมบูรณ์
+3. **ตรวจสอบจุดบริการ** - ดูสถานะจุดบริการแบบเรียลไทม์
 
-### For Administrators
-1. **Admin Panel** - Access full admin interface at `/admin/`
-2. **User Management** - Create and manage staff accounts
-3. **System Configuration** - Configure service types, points, and flows
-4. **Reports & Analytics** - Generate comprehensive reports
+### สำหรับผู้ดูแลระบบ
+1. **แผงควบคุมผู้ดูแลระบบ** - เข้าถึงอินเทอร์เฟซผู้ดูแลระบบเต็มรูปแบบที่ `/admin/`
+2. **การจัดการผู้ใช้** - สร้างและจัดการบัญชีเจ้าหน้าที่
+3. **การกำหนดค่าระบบ** - กำหนดค่าประเภทบริการ จุด และขั้นตอน
+4. **รายงานและการวิเคราะห์** - สร้างรายงานที่ครอบคลุม
 
-## 🔧 API Documentation
+## 🔧 เอกสาร API
 
-### Authentication
+### การตรวจสอบสิทธิ์
 ```http
 POST /api/mobile/auth.php
 Content-Type: application/json
@@ -181,9 +181,9 @@ Content-Type: application/json
 }
 ```
 
-### Queue Management
+### การจัดการคิว
 ```http
-# Generate new queue
+# สร้างคิวใหม่
 POST /api/generate_queue.php
 Content-Type: application/json
 
@@ -192,10 +192,10 @@ Content-Type: application/json
   "patient_name": "John Doe"
 }
 
-# Get queue status
+# รับสถานะคิว
 GET /api/get_queues.php?service_type_id=1
 
-# Update queue status
+# อัปเดตสถานะคิว
 POST /api/queue_action.php
 Content-Type: application/json
 
@@ -206,182 +206,182 @@ Content-Type: application/json
 }
 ```
 
-## 🎨 Customization
+## 🎨 การปรับแต่ง
 
-### Themes and Styling
-- Edit `admin/globals.css` for global styles
-- Modify Bootstrap variables in `tailwind.config.ts`
-- Customize colors and branding in admin settings
+### ธีมและสไตล์
+- แก้ไข `admin/globals.css` สำหรับสไตล์สากล
+- แก้ไขตัวแปร Bootstrap ใน `tailwind.config.ts`
+- ปรับแต่งสีและการสร้างแบรนด์ในการตั้งค่าผู้ดูแลระบบ
 
-### Audio System
-- Upload custom audio files in admin panel
-- Configure TTS settings for different languages
-- Set up audio call sequences
+### ระบบเสียง
+- อัปโหลดไฟล์เสียงที่กำหนดเองในแผงควบคุมผู้ดูแลระบบ
+- กำหนดค่าการตั้งค่า TTS สำหรับภาษาต่างๆ
+- ตั้งค่าลำดับการโทรด้วยเสียง
 
-### Notifications
-- Configure Telegram bot for instant notifications
-- Set up email templates for automated messages
-- Customize notification triggers and recipients
+### การแจ้งเตือน
+- กำหนดค่า Telegram bot สำหรับการแจ้งเตือนทันที
+- ตั้งค่าเทมเพลตอีเมลสำหรับข้อความอัตโนมัติ
+- ปรับแต่งทริกเกอร์และผู้รับการแจ้งเตือน
 
-## 🔒 Security Features
+## 🔒 คุณสมบัติความปลอดภัย
 
-### Authentication & Authorization
-- **JWT Token-based Authentication** for API access
-- **Role-based Access Control** with granular permissions
-- **Session Management** with configurable timeouts
-- **Password Hashing** using PHP's password_hash()
+### การตรวจสอบสิทธิ์และการอนุญาต
+- **การตรวจสอบสิทธิ์ด้วย JWT Token** สำหรับการเข้าถึง API
+- **การควบคุมการเข้าถึงตามบทบาท** พร้อมสิทธิ์แบบละเอียด
+- **การจัดการ Session** พร้อมการหมดเวลาที่กำหนดค่าได้
+- **การแฮชรหัสผ่าน** โดยใช้ password_hash() ของ PHP
 
-### Data Protection
-- **SQL Injection Prevention** using prepared statements
-- **XSS Protection** with input sanitization
-- **CSRF Protection** for form submissions
-- **Audit Logging** for all administrative actions
+### การปกป้องข้อมูล
+- **การป้องกัน SQL Injection** โดยใช้ Prepared Statements
+- **การป้องกัน XSS** ด้วยการ Sanitization ข้อมูลนำเข้า
+- **การป้องกัน CSRF** สำหรับการส่งแบบฟอร์ม
+- **การบันทึกการตรวจสอบ** สำหรับการดำเนินการด้านการดูแลระบบทั้งหมด
 
-### System Security
-- **Environment Variable Protection** for sensitive data
-- **File Upload Restrictions** with type validation
-- **Rate Limiting** for API endpoints
-- **Secure Headers** implementation
+### ความปลอดภัยของระบบ
+- **การป้องกันตัวแปร Environment** สำหรับข้อมูลที่ละเอียดอ่อน
+- **ข้อจำกัดการอัปโหลดไฟล์** พร้อมการตรวจสอบประเภท
+- **การจำกัดอัตรา** สำหรับ API endpoints
+- **การใช้งาน Secure Headers**
 
-## 📊 Monitoring & Maintenance
+## 📊 การตรวจสอบและการบำรุงรักษา
 
-### Health Checks
+### การตรวจสอบสถานะ
 ```bash
-# Check system health
+# ตรวจสอบสถานะระบบ
 php admin/database_diagnostic.php
 
-# Validate database structure
+# ตรวจสอบโครงสร้างฐานข้อมูล
 php api/validate_database_structure.php
 
-# Test queue status functionality
+# ทดสอบฟังก์ชันการทำงานของสถานะคิว
 php test_queue_status.php
 ```
 
-### Backup & Restore
+### สำรองและกู้คืน
 ```bash
-# Create backup
+# สร้างข้อมูลสำรอง
 php api/backup_before_reset.php
 
-# Restore from backup
-# Use admin panel backup management interface
+# กู้คืนจากข้อมูลสำรอง
+# ใช้ส่วนต่อประสานการจัดการข้อมูลสำรองของแผงควบคุมผู้ดูแลระบบ
 ```
 
-### Log Management
+### การจัดการ Log
 - **Application Logs**: `logs/app.log`
 - **Error Logs**: `logs/error.log`
-- **Audit Logs**: Available in admin panel
+- **Audit Logs**: มีอยู่ในแผงควบคุมผู้ดูแลระบบ
 - **Auto-Reset Logs**: `logs/auto_reset.log`
 
-## 🚀 Performance Optimization
+## 🚀 การเพิ่มประสิทธิภาพ
 
-### Database Optimization
-- **Indexed Columns** for fast queries
-- **Query Optimization** with proper joins
-- **Connection Pooling** for high traffic
-- **Regular Maintenance** scripts included
+### การเพิ่มประสิทธิภาพฐานข้อมูล
+- **Indexed Columns** สำหรับการสืบค้นที่รวดเร็ว
+- **Query Optimization** พร้อมการ Join ที่เหมาะสม
+- **Connection Pooling** สำหรับปริมาณการใช้งานสูง
+- **Regular Maintenance** รวมสคริปต์
 
 ### Caching
-- **Browser Caching** for static assets
-- **Database Query Caching** for repeated queries
-- **Session Caching** for user data
-- **Redis Support** for advanced caching (optional)
+- **Browser Caching** สำหรับ Static Assets
+- **Database Query Caching** สำหรับการสืบค้นซ้ำ
+- **Session Caching** สำหรับข้อมูลผู้ใช้
+- **Redis Support** สำหรับ Caching ขั้นสูง (Optional)
 
-### Frontend Optimization
-- **Minified CSS/JS** for faster loading
-- **Responsive Images** for mobile optimization
-- **Lazy Loading** for better performance
-- **Progressive Web App** features
+### การเพิ่มประสิทธิภาพ Frontend
+- **Minified CSS/JS** เพื่อการโหลดที่เร็วขึ้น
+- **Responsive Images** เพื่อการเพิ่มประสิทธิภาพมือถือ
+- **Lazy Loading** เพื่อประสิทธิภาพที่ดีขึ้น
+- **Progressive Web App** คุณสมบัติ
 
-## 🔧 Troubleshooting
+## 🔧 การแก้ไขปัญหา
 
-### Common Issues
+### ปัญหาทั่วไป
 
-#### Composer Installation Fails
+#### การติดตั้ง Composer ล้มเหลว
 ```bash
 # Missing ZIP extension
 composer install --ignore-platform-req=ext-zip
 
-# Check requirements
+# ตรวจสอบข้อกำหนด
 php scripts/check-system-requirements.php
 ```
 
-#### Database Connection Issues
+#### ปัญหาการเชื่อมต่อฐานข้อมูล
 ```bash
-# Test database connection
+# ทดสอบการเชื่อมต่อฐานข้อมูล
 php admin/database_diagnostic.php
 
-# Check credentials in .env file
-# Verify MySQL service is running
+# ตรวจสอบข้อมูลรับรองในไฟล์ .env
+# ตรวจสอบว่าบริการ MySQL กำลังทำงานอยู่
 ```
 
-#### Permission Errors
+#### ข้อผิดพลาดเกี่ยวกับสิทธิ์
 ```bash
-# Set proper permissions
+# ตั้งค่าสิทธิ์ที่เหมาะสม
 chmod -R 755 .
 chmod -R 777 logs/
 chmod -R 777 uploads/
 ```
 
-#### Audio System Not Working
-- Check browser audio permissions
-- Verify TTS service configuration
-- Test audio files in admin panel
+#### ระบบเสียงไม่ทำงาน
+- ตรวจสอบสิทธิ์เสียงของเบราว์เซอร์
+- ตรวจสอบการกำหนดค่าบริการ TTS
+- ทดสอบไฟล์เสียงในแผงควบคุมผู้ดูแลระบบ
 
-### Getting Help
-- **Documentation**: Check inline code documentation
-- **Logs**: Review application and error logs
-- **Diagnostics**: Use built-in diagnostic tools
-- **Support**: Contact system administrator
+### การขอความช่วยเหลือ
+- **เอกสารประกอบ**: ตรวจสอบเอกสารประกอบโค้ด Inline
+- **Logs**: ตรวจสอบ Application และ Error Logs
+- **Diagnostics**: ใช้เครื่องมือวินิจฉัยในตัว
+- **Support**: ติดต่อผู้ดูแลระบบ
 
-## 🤝 Contributing
+## 🤝 การมีส่วนร่วม
 
-### Development Setup
+### การตั้งค่าการพัฒนา
 ```bash
 # Clone repository
 git clone https://github.com/your-repo/yuwaprasart-queue-system.git
 
-# Install dependencies
+# ติดตั้ง Dependencies
 composer install
 
-# Set up development environment
+# ตั้งค่าสภาพแวดล้อมการพัฒนา
 cp .env.example .env.dev
 
-# Run tests
+# เรียกใช้งานการทดสอบ
 composer test
 ```
 
-### Code Standards
-- **PSR-12** coding standards
-- **PHPDoc** documentation for all functions
-- **Unit Tests** for critical functionality
-- **Security Review** for all changes
+### มาตรฐานโค้ด
+- มาตรฐานการเขียนโค้ด **PSR-12**
+- เอกสารประกอบ **PHPDoc** สำหรับฟังก์ชันทั้งหมด
+- **Unit Tests** สำหรับฟังก์ชันการทำงานที่สำคัญ
+- **Security Review** สำหรับการเปลี่ยนแปลงทั้งหมด
 
-### Submitting Changes
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### การส่งการเปลี่ยนแปลง
+1. Fork repository
+2. สร้าง Feature Branch
+3. ทำการเปลี่ยนแปลงของคุณ
+4. เพิ่มการทดสอบหากมี
+5. ส่ง Pull Request
 
-## 📄 License
+## 📄 ใบอนุญาต
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+โปรเจ็กต์นี้ได้รับอนุญาตภายใต้ MIT License - ดูรายละเอียดในไฟล์ [LICENSE](LICENSE)
 
-## 🙏 Acknowledgments
+## 🙏 ขอขอบคุณ
 
-- **Bootstrap** for responsive UI framework
-- **Chart.js** for analytics visualization
-- **PHPMailer** for email functionality
-- **mPDF** for PDF generation
-- **Telegram Bot API** for notifications
+- **Bootstrap** สำหรับ Responsive UI Framework
+- **Chart.js** สำหรับการแสดงภาพการวิเคราะห์
+- **PHPMailer** สำหรับฟังก์ชันการทำงานของอีเมล
+- **mPDF** สำหรับการสร้าง PDF
+- **Telegram Bot API** สำหรับการแจ้งเตือน
 
-## 📞 Support
+## 📞 การสนับสนุน
 
-For technical support or questions:
-- **Email**: support@yuwaprasart.com
-- **Documentation**: [Wiki](https://github.com/your-repo/yuwaprasart-queue-system/wiki)
-- **Issues**: [GitHub Issues](https://github.com/your-repo/yuwaprasart-queue-system/issues)
+สำหรับการสนับสนุนด้านเทคนิคหรือคำถาม:
+- **อีเมล**: support@yuwaprasart.com
+- **เอกสารประกอบ**: [Wiki](https://github.com/puttapanycap/yuwa_que/wiki)
+- **Issues**: [GitHub Issues](https://github.com/puttapanycap/yuwa_que/issues)
 
 ---
 
-**Made with ❤️ for Yuwaprasart Hospital**
+**สร้างด้วย ❤️ สำหรับโรงพยาบาลยุวประสาท**
