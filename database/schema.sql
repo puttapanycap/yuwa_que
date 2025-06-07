@@ -731,6 +731,16 @@ setting_value = VALUES(setting_value),
 description = VALUES(description),
 updated_at = CURRENT_TIMESTAMP;
 
+-- ----------------------------
+-- Records of staff_service_point_access
+-- ----------------------------
+INSERT INTO `staff_service_point_access` VALUES (1, 1);
+INSERT INTO `staff_service_point_access` VALUES (1, 2);
+INSERT INTO `staff_service_point_access` VALUES (1, 3);
+INSERT INTO `staff_service_point_access` VALUES (1, 4);
+INSERT INTO `staff_service_point_access` VALUES (1, 5);
+INSERT INTO `staff_service_point_access` VALUES (1, 6);
+
 -- =====================================================
 -- SECTION 4: DATA MIGRATION/BACKFILL
 -- =====================================================
