@@ -59,6 +59,10 @@ try {
             ],
             $queueData['template_text']
         );
+        
+        // แปลงหมายเลขคิวให้อ่านแยกตัว
+        $message = processQueueNumberForSpeech($message, $queueData['queue_number']);
+        
     } else {
         $message = $customMessage;
         $queueData = null;
@@ -116,5 +120,28 @@ try {
         'success' => false,
         'message' => $e->getMessage()
     ]);
+}
+
+function processQueueNumberForSpeech($message, $queueNumber) {
+    // แยกตัวอักษรและตัวเลขในหมายเลขคิว
+    if (preg_match('/([A-Z]+)(\d+)/', $queueNumber, $matches)) {
+        $letters = $matches[1];
+        $numbers = $matches[2];
+        
+        // แยกตัวอักษร
+        $letterArray = str_split($letters);
+        $letterText = implode(' ', $letterArray);
+        
+        // แยกตัวเลข
+        $numberArray = str_split($numbers);
+        $numberText = implode(' ', $numberArray);
+        
+        $separatedQueueNumber = $letterText . ' ' . $numberText;
+        
+        // แทนที่หมายเลขคิวในข้อความ
+        $message = str_replace($queueNumber, $separatedQueueNumber, $message);
+    }
+    
+    return $message;
 }
 ?>
