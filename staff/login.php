@@ -126,52 +126,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="login-container">
-                    <div class="login-header">
-                        <i class="fas fa-user-shield fa-3x text-primary mb-3"></i>
-                        <h2 class="h4 text-primary">เข้าสู่ระบบเจ้าหน้าที่</h2>
-                        <p class="text-muted">ระบบเรียกคิวโรงพยาบาลยุวประสาทไวทโยปถัมภ์</p>
+            <div class="login-container">
+                <div class="login-header">
+                    <i class="fas fa-user-shield fa-3x text-primary mb-3"></i>
+                    <h2 class="h4 text-primary">เข้าสู่ระบบเจ้าหน้าที่</h2>
+                    <p class="text-muted">ระบบเรียกคิวโรงพยาบาลยุวประสาทไวทโยปถัมภ์</p>
+                </div>
+                
+                <?php if ($error): ?>
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i><?php echo $error; ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">ชื่อผู้ใช้</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input type="text" class="form-control" id="username" name="username" 
+                                    value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" required>
+                        </div>
                     </div>
                     
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger" role="alert">
-                            <i class="fas fa-exclamation-triangle me-2"></i><?php echo $error; ?>
+                    <div class="mb-4">
+                        <label for="password" class="form-label">รหัสผ่าน</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password" name="password" required>
                         </div>
-                    <?php endif; ?>
-                    
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">ชื่อผู้ใช้</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-user"></i>
-                                </span>
-                                <input type="text" class="form-control" id="username" name="username" 
-                                       value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" required>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label for="password" class="form-label">รหัสผ่าน</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-lock"></i>
-                                </span>
-                                <input type="password" class="form-control" id="password" name="password" required>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary btn-login w-100">
-                            <i class="fas fa-sign-in-alt me-2"></i>เข้าสู่ระบบ
-                        </button>
-                    </form>
-                    
-                    <div class="text-center mt-4">
-                        <a href="../index.php" class="text-decoration-none">
-                            <i class="fas fa-arrow-left me-2"></i>กลับหน้าแรก
-                        </a>
                     </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-login w-100">
+                        <i class="fas fa-sign-in-alt me-2"></i>เข้าสู่ระบบ
+                    </button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <a href="../index.php" class="text-decoration-none">
+                        <i class="fas fa-arrow-left me-2"></i>กลับหน้าแรก
+                    </a>
                 </div>
             </div>
         </div>
