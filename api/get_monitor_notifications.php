@@ -36,35 +36,38 @@ try {
     
     // Query สำหรับ active notifications
     $sql = "
-        SELECT 
-            n.notification_id,
-            n.type,
-            n.title,
-            n.message,
-            n.priority,
-            n.created_at,
-            n.expires_at,
-            n.metadata,
-            n.auto_dismiss_after,
-            nt.type_name,
-            nt.icon,
-            nt.color,
-            sp.point_name as service_point_name
-        FROM notifications n
-        LEFT JOIN notification_types nt ON n.type = nt.type_code
-        LEFT JOIN service_points sp ON n.service_point_id = sp.service_point_id
-        WHERE $whereClause
-        ORDER BY 
-            CASE n.priority 
-                WHEN 'urgent' THEN 1 
-                WHEN 'high' THEN 2 
-                WHEN 'normal' THEN 3 
-                WHEN 'low' THEN 4 
-                ELSE 5 
-            END,
-            n.created_at DESC
-        LIMIT 20
-    ";
+    SELECT 
+        n.notification_id,
+        n.notification_type as type,
+        n.title,
+        n.message,
+        n.priority,
+        n.created_at,
+        n.read_at,
+        n.metadata,
+        sp.point_name as service_point_name
+    FROM notifications n
+    LEFT JOIN service_points sp ON n.service_point_id = sp.service_point_id
+    WHERE n.notification_type IN ('queue_called', 'announcement', 'system_alert', 'emergency')
+    AND (n.service_point_id IS NULL OR n.service_point_id = ? OR ? IS NULL)
+    " . ($lastCheck ? "AND n.created_at > ?" : "") . "
+    ORDER BY 
+        CASE n.priority 
+            WHEN 'urgent' THEN 1 
+            WHEN 'high' THEN 2 
+            WHEN 'normal' THEN 3 
+            WHEN 'low' THEN 4 
+            ELSE 5 
+        END,
+        n.created_at DESC
+    LIMIT 20
+";
+    
+    // ปรับ parameters
+    $params = [$servicePointId, $servicePointId];
+    if ($lastCheck) {
+        $params[] = $lastCheck;
+    }
     
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
