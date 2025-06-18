@@ -940,5 +940,293 @@ GROUP BY sp.service_point_id, DATE(q.created_at);
 COMMIT;
 
 -- =====================================================
+-- STARTER DATA INSERTION
+-- =====================================================
+
+-- Insert default roles
+INSERT INTO `roles` (`role_id`, `role_name`, `role_description`, `permissions`, `is_active`) VALUES
+(1, 'admin', 'ผู้ดูแลระบบ', '{"all": true}', 1),
+(2, 'manager', 'ผู้จัดการ', '{"users": {"view": true, "create": true, "edit": true}, "queues": {"view": true, "manage": true}, "reports": {"view": true, "create": true}, "settings": {"view": true}}', 1),
+(3, 'staff', 'เจ้าหน้าที่', '{"queues": {"view": true, "manage": true}, "reports": {"view": true}}', 1),
+(4, 'viewer', 'ผู้ดูข้อมูล', '{"queues": {"view": true}, "reports": {"view": true}}', 1);
+
+-- Insert default admin user (username: admin, password: admin123)
+INSERT INTO `users` (`user_id`, `username`, `password`, `email`, `full_name`, `role_id`, `is_active`) VALUES
+(1, 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@yuwaprasart.com', 'ผู้ดูแลระบบ', 1, 1),
+(2, 'manager', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager@yuwaprasart.com', 'ผู้จัดการ', 2, 1),
+(3, 'staff1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff1@yuwaprasart.com', 'เจ้าหน้าที่ 1', 3, 1),
+(4, 'staff2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff2@yuwaprasart.com', 'เจ้าหน้าที่ 2', 3, 1);
+
+-- Insert default service types
+INSERT INTO `service_types` (`service_type_id`, `service_name`, `service_code`, `description`, `estimated_time`, `is_active`, `display_order`, `color`, `icon`) VALUES
+(1, 'แพทย์ทั่วไป', 'A', 'บริการตรวจรักษาโดยแพทย์ทั่วไป', 15, 1, 1, '#007bff', 'fas fa-user-md'),
+(2, 'แพทย์เฉพาะทาง', 'B', 'บริการตรวจรักษาโดยแพทย์เฉพาะทาง', 20, 1, 2, '#28a745', 'fas fa-stethoscope'),
+(3, 'ตรวจเลือด', 'C', 'บริการตรวจเลือดและตรวจสอบสุขภาพ', 10, 1, 3, '#dc3545', 'fas fa-vial'),
+(4, 'เอ็กซเรย์', 'D', 'บริการถ่ายภาพรังสี', 15, 1, 4, '#ffc107', 'fas fa-x-ray'),
+(5, 'ยา', 'E', 'บริการจ่ายยาและให้คำปรึกษา', 5, 1, 5, '#17a2b8', 'fas fa-pills'),
+(6, 'การเงิน', 'F', 'บริการชำระเงินและการเงิน', 10, 1, 6, '#6f42c1', 'fas fa-credit-card');
+
+-- Insert default service points
+INSERT INTO `service_points` (`service_point_id`, `point_name`, `point_code`, `description`, `is_active`, `display_order`, `location`) VALUES
+(1, 'ห้องตรวจ 1', 'R001', 'ห้องตรวจแพทย์ทั่วไป ห้องที่ 1', 1, 1, 'ชั้น 1'),
+(2, 'ห้องตรวจ 2', 'R002', 'ห้องตรวจแพทย์ทั่วไป ห้องที่ 2', 1, 2, 'ชั้น 1'),
+(3, 'ห้องตรวจ 3', 'R003', 'ห้องตรวจแพทย์เฉพาะทาง', 1, 3, 'ชั้น 2'),
+(4, 'ห้องเจาะเลือด', 'LAB1', 'ห้องเจาะเลือดและตรวจสอบ', 1, 4, 'ชั้น 1'),
+(5, 'ห้องเอ็กซเรย์', 'XRAY', 'ห้องถ่ายภาพรังสี', 1, 5, 'ชั้น 1'),
+(6, 'เคาน์เตอร์ยา', 'PHAR', 'เคาน์เตอร์จ่ายยา', 1, 6, 'ชั้น 1'),
+(7, 'เคาน์เตอร์การเงิน', 'CASH', 'เคาน์เตอร์ชำระเงิน', 1, 7, 'ชั้น 1');
+
+-- Insert service flows (mapping service types to service points)
+INSERT INTO `service_flows` (`service_type_id`, `service_point_id`, `flow_order`, `is_required`, `estimated_time`, `is_active`) VALUES
+-- แพทย์ทั่วไป -> ห้องตรวจ 1,2
+(1, 1, 1, 1, 15, 1),
+(1, 2, 1, 1, 15, 1),
+-- แพทย์เฉพาะทาง -> ห้องตรวจ 3
+(2, 3, 1, 1, 20, 1),
+-- ตรวจเลือด -> ห้องเจาะเลือด
+(3, 4, 1, 1, 10, 1),
+-- เอ็กซเรย์ -> ห้องเอ็กซเรย์
+(4, 5, 1, 1, 15, 1),
+-- ยา -> เคาน์เตอร์ยา
+(5, 6, 1, 1, 5, 1),
+-- การเงิน -> เคาน์เตอร์การเงิน
+(6, 7, 1, 1, 10, 1);
+
+-- Insert user service point assignments
+INSERT INTO `user_service_points` (`user_id`, `service_point_id`) VALUES
+-- Admin can access all service points
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
+-- Manager can access all service points
+(2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7),
+-- Staff1 assigned to examination rooms
+(3, 1), (3, 2), (3, 3),
+-- Staff2 assigned to lab and pharmacy
+(4, 4), (4, 6), (4, 7);
+
+-- Insert system settings
+INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`, `is_public`, `is_editable`) VALUES
+-- Application settings
+('app_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์', 'string', 'application', 'ชื่อแอปพลิเคชัน', 1, 1),
+('app_description', 'ระบบจัดการคิวโรงพยาบาล', 'string', 'application', 'คำอธิบายแอปพลิเคชัน', 1, 1),
+('app_version', '2.0.0', 'string', 'application', 'เวอร์ชันแอปพลิเคชัน', 1, 0),
+('app_timezone', 'Asia/Bangkok', 'string', 'application', 'เขตเวลา', 1, 1),
+('app_language', 'th', 'string', 'application', 'ภาษาเริ่มต้น', 1, 1),
+
+-- Queue settings
+('queue_prefix_length', '1', 'integer', 'queue', 'ความยาว Prefix คิว', 1, 1),
+('queue_number_length', '3', 'integer', 'queue', 'ความยาวหมายเลขคิว', 1, 1),
+('max_queue_per_day', '999', 'integer', 'queue', 'จำนวนคิวสูงสุดต่อวัน', 1, 1),
+('queue_timeout_minutes', '30', 'integer', 'queue', 'เวลาหมดอายุคิว (นาที)', 1, 1),
+('display_refresh_interval', '3', 'integer', 'queue', 'ความถี่ในการรีเฟรชหน้าจอ (วินาที)', 1, 1),
+('enable_priority_queue', 'true', 'boolean', 'queue', 'เปิดใช้งานคิวพิเศษ', 1, 1),
+('auto_forward_enabled', 'false', 'boolean', 'queue', 'ส่งต่อคิวอัตโนมัติ', 1, 1),
+
+-- Working hours
+('working_hours_start', '08:00', 'string', 'schedule', 'เวลาเปิดทำการ', 1, 1),
+('working_hours_end', '16:00', 'string', 'schedule', 'เวลาปิดทำการ', 1, 1),
+
+-- Audio/TTS settings
+('tts_enabled', 'true', 'boolean', 'audio', 'เปิดใช้งานระบบเสียงเรียกคิว', 1, 1),
+('tts_provider', 'browser', 'string', 'audio', 'ผู้ให้บริการ TTS', 1, 1),
+('tts_language', 'th-TH', 'string', 'audio', 'ภาษา TTS', 1, 1),
+('tts_speed', '1.0', 'string', 'audio', 'ความเร็วเสียง', 1, 1),
+('audio_volume', '1.0', 'string', 'audio', 'ระดับเสียง', 1, 1),
+('audio_repeat_count', '2', 'integer', 'audio', 'จำนวนครั้งที่เล่นซ้ำ', 1, 1),
+
+-- Email settings
+('email_notifications', 'false', 'boolean', 'email', 'เปิดใช้งานการแจ้งเตือนทางอีเมล', 0, 1),
+('mail_host', 'smtp.gmail.com', 'string', 'email', 'SMTP Host', 0, 1),
+('mail_port', '587', 'integer', 'email', 'SMTP Port', 0, 1),
+('mail_encryption', 'tls', 'string', 'email', 'การเข้ารหัส', 0, 1),
+('mail_from_address', 'noreply@yuwaprasart.com', 'string', 'email', 'อีเมลผู้ส่ง', 0, 1),
+('mail_from_name', 'Yuwaprasart Queue System', 'string', 'email', 'ชื่อผู้ส่ง', 0, 1),
+
+-- Telegram settings
+('telegram_notifications', 'false', 'boolean', 'telegram', 'เปิดใช้งานการแจ้งเตือนทาง Telegram', 0, 1),
+('telegram_notify_template', 'คิว {queue_number} กรุณามาที่จุดบริการ {service_point}', 'string', 'telegram', 'เทมเพลตข้อความ', 0, 1);
+
+-- Insert audio settings
+INSERT INTO `audio_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`, `is_active`) VALUES
+('enable_tts', 'true', 'boolean', 'tts', 'เปิดใช้งาน Text-to-Speech', 1),
+('tts_language', 'th-TH', 'string', 'tts', 'ภาษา TTS', 1),
+('tts_voice', 'Google Thai', 'string', 'tts', 'เสียง TTS', 1),
+('tts_rate', '1.0', 'string', 'tts', 'ความเร็วเสียง', 1),
+('tts_pitch', '1.0', 'string', 'tts', 'ระดับเสียง', 1),
+('audio_volume', '1.0', 'string', 'playback', 'ระดับเสียง', 1),
+('call_repeat', '2', 'integer', 'playback', 'จำนวนครั้งที่เล่นซ้ำ', 1),
+('enable_sound_effects', 'true', 'boolean', 'playback', 'เปิดใช้งานเสียงเอฟเฟกต์', 1),
+('read_letters_in_thai', 'true', 'boolean', 'tts', 'อ่านตัวอักษรเป็นภาษาไทย', 1),
+('separate_queue_characters', 'true', 'boolean', 'tts', 'แยกตัวอักษรและตัวเลข', 1),
+('pause_between_characters', '500', 'integer', 'tts', 'ช่วงหยุดระหว่างตัวอักษร (ms)', 1),
+('queue_number_repeat', '2', 'integer', 'tts', 'จำนวนครั้งที่อ่านหมายเลขคิว', 1);
+
+-- Insert notification types
+INSERT INTO `notification_types` (`type_code`, `type_name`, `description`, `icon`, `color`, `is_public`, `is_active`) VALUES
+('queue_called', 'เรียกคิว', 'แจ้งเตือนเมื่อมีการเรียกคิว', 'fas fa-bullhorn', '#28a745', 1, 1),
+('queue_completed', 'คิวเสร็จสิ้น', 'แจ้งเตือนเมื่อคิวเสร็จสิ้น', 'fas fa-check-circle', '#17a2b8', 0, 1),
+('queue_cancelled', 'ยกเลิกคิว', 'แจ้งเตือนเมื่อมีการยกเลิกคิว', 'fas fa-times-circle', '#dc3545', 0, 1),
+('system_alert', 'แจ้งเตือนระบบ', 'แจ้งเตือนเหตุการณ์สำคัญของระบบ', 'fas fa-exclamation-triangle', '#ffc107', 0, 1),
+('announcement', 'ประกาศ', 'ประกาศทั่วไป', 'fas fa-bell', '#007bff', 1, 1),
+('maintenance', 'บำรุงรักษา', 'แจ้งเตือนการบำรุงรักษาระบบ', 'fas fa-tools', '#6c757d', 1, 1);
+
+-- Insert dashboard widgets
+INSERT INTO `dashboard_widgets` (`widget_code`, `widget_name`, `widget_type`, `description`, `data_source`, `configuration`, `refresh_interval`, `is_active`) VALUES
+('today_queue_summary', 'สรุปคิววันนี้', 'metric', 'สรุปสถิติคิวของวันนี้', 'api/get_today_stats.php', '{"metrics": ["total", "waiting", "completed", "cancelled"]}', 30, 1),
+('queue_by_status', 'คิวตามสถานะ', 'chart', 'แผนภูมิแสดงการกระจายคิวตามสถานะ', 'api/get_dashboard_widgets.php', '{"chart_type": "pie", "widget": "queue_by_status"}', 60, 1),
+('service_point_status', 'สถานะจุดบริการ', 'table', 'สถานะปัจจุบันของจุดบริการทั้งหมด', 'api/get_service_points_status.php', '{"columns": ["point_name", "current_queue", "status", "wait_time"]}', 30, 1),
+('hourly_queue_trend', 'แนวโน้มคิวรายชั่วโมง', 'chart', 'แผนภูมิแสดงแนวโน้มการสร้างคิวรายชั่วโมง', 'api/get_dashboard_widgets.php', '{"chart_type": "line", "widget": "hourly_queue_trend"}', 300, 1),
+('recent_activity', 'กิจกรรมล่าสุด', 'table', 'กิจกรรมคิวล่าสุด', 'api/get_recent_activity.php', '{"limit": 10, "columns": ["time", "queue_number", "action", "service_point"]}', 30, 1),
+('avg_wait_time', 'เวลารอเฉลี่ย', 'chart', 'เวลารอเฉลี่ยตามประเภทบริการ', 'api/get_dashboard_widgets.php', '{"chart_type": "bar", "widget": "avg_wait_time"}', 300, 1);
+
+-- Insert report templates
+INSERT INTO `report_templates` (`template_code`, `template_name`, `description`, `category`, `sql_query`, `parameters`, `output_formats`, `is_public`, `is_active`) VALUES
+('daily_queue_summary', 'สรุปคิวรายวัน', 'รายงานสรุปสถิติคิวรายวัน', 'daily', 
+'SELECT DATE(q.created_at) as date, st.service_name, COUNT(*) as total_queues, 
+SUM(CASE WHEN q.status = "completed" THEN 1 ELSE 0 END) as completed,
+SUM(CASE WHEN q.status = "cancelled" THEN 1 ELSE 0 END) as cancelled,
+AVG(q.actual_wait_time) as avg_wait_time
+FROM queues q 
+JOIN service_types st ON q.service_type_id = st.service_type_id 
+WHERE DATE(q.created_at) BETWEEN :date_from AND :date_to 
+GROUP BY DATE(q.created_at), st.service_name 
+ORDER BY DATE(q.created_at), st.service_name',
+'{"date_from": {"type": "date", "required": true, "label": "วันที่เริ่มต้น"}, "date_to": {"type": "date", "required": true, "label": "วันที่สิ้นสุด"}}',
+'["csv", "excel", "pdf"]', 1, 1),
+
+('service_point_performance', 'ประสิทธิภาพจุดบริการ', 'รายงานประสิทธิภาพการทำงานของจุดบริการ', 'performance',
+'SELECT sp.point_name, COUNT(q.queue_id) as total_queues,
+AVG(q.service_duration) as avg_service_time,
+MAX(q.service_duration) as max_service_time,
+(SUM(CASE WHEN q.status = "completed" THEN 1 ELSE 0 END) / COUNT(q.queue_id) * 100) as completion_rate
+FROM service_points sp
+LEFT JOIN queues q ON sp.service_point_id = q.current_service_point_id
+WHERE DATE(q.created_at) BETWEEN :date_from AND :date_to
+GROUP BY sp.point_name ORDER BY sp.point_name',
+'{"date_from": {"type": "date", "required": true, "label": "วันที่เริ่มต้น"}, "date_to": {"type": "date", "required": true, "label": "วันที่สิ้นสุด"}}',
+'["csv", "excel", "pdf"]', 0, 1),
+
+('user_activity_report', 'รายงานกิจกรรมผู้ใช้', 'รายงานกิจกรรมการทำงานของผู้ใช้', 'activity',
+'SELECT u.username, u.full_name, COUNT(q.queue_id) as queues_processed,
+AVG(q.service_duration) as avg_service_time,
+SUM(CASE WHEN q.status = "completed" THEN 1 ELSE 0 END) as completed_queues
+FROM users u
+LEFT JOIN queues q ON u.user_id = q.updated_by
+WHERE q.status = "completed" AND DATE(q.completed_at) BETWEEN :date_from AND :date_to
+GROUP BY u.username, u.full_name
+ORDER BY COUNT(q.queue_id) DESC',
+'{"date_from": {"type": "date", "required": true, "label": "วันที่เริ่มต้น"}, "date_to": {"type": "date", "required": true, "label": "วันที่สิ้นสุด"}}',
+'["csv", "excel", "pdf"]', 0, 1);
+
+-- Insert auto reset schedules
+INSERT INTO `auto_reset_schedules` (`schedule_name`, `reset_type`, `reset_time`, `reset_days`, `service_type_ids`, `backup_before_reset`, `send_notification`, `is_active`, `created_by`) VALUES
+('รีเซ็ตคิวรายวัน', 'daily', '00:00:00', NULL, NULL, 1, 1, 1, 1),
+('รีเซ็ตคิวสัปดาห์', 'weekly', '00:00:00', '[1]', NULL, 1, 1, 0, 1),
+('รีเซ็ตคิวรายเดือน', 'monthly', '00:00:00', '[1]', NULL, 1, 1, 0, 1);
+
+-- Insert sample queues for testing (today's date)
+INSERT INTO `queues` (`queue_number`, `service_type_id`, `patient_name`, `phone`, `priority`, `status`, `current_service_point_id`, `created_by`, `created_at`) VALUES
+('A001', 1, 'สมชาย ใจดี', '0812345678', 'normal', 'completed', 1, 3, NOW() - INTERVAL 2 HOUR),
+('A002', 1, 'สมหญิง รักดี', '0823456789', 'normal', 'completed', 2, 3, NOW() - INTERVAL 1 HOUR),
+('A003', 1, 'สมศักดิ์ มีสุข', '0834567890', 'high', 'serving', 1, 3, NOW() - INTERVAL 30 MINUTE),
+('B001', 2, 'สมปอง สุขใจ', '0845678901', 'normal', 'waiting', NULL, 3, NOW() - INTERVAL 15 MINUTE),
+('C001', 3, 'สมใส ใสใจ', '0856789012', 'normal', 'called', 4, 4, NOW() - INTERVAL 10 MINUTE),
+('E001', 5, 'สมหมาย ดีใจ', '0867890123', 'normal', 'waiting', NULL, 4, NOW() - INTERVAL 5 MINUTE);
+
+-- Insert queue history for the sample queues
+INSERT INTO `queue_history` (`queue_id`, `action`, `old_status`, `new_status`, `service_point_id`, `user_id`, `notes`) VALUES
+(1, 'created', NULL, 'waiting', NULL, 3, 'สร้างคิวใหม่'),
+(1, 'called', 'waiting', 'called', 1, 3, 'เรียกคิว'),
+(1, 'served', 'called', 'serving', 1, 3, 'เริ่มให้บริการ'),
+(1, 'completed', 'serving', 'completed', 1, 3, 'เสร็จสิ้นการให้บริการ'),
+(2, 'created', NULL, 'waiting', NULL, 3, 'สร้างคิวใหม่'),
+(2, 'called', 'waiting', 'called', 2, 3, 'เรียกคิว'),
+(2, 'served', 'called', 'serving', 2, 3, 'เริ่มให้บริการ'),
+(2, 'completed', 'serving', 'completed', 2, 3, 'เสร็จสิ้นการให้บริการ'),
+(3, 'created', NULL, 'waiting', NULL, 3, 'สร้างคิวใหม่'),
+(3, 'called', 'waiting', 'called', 1, 3, 'เรียกคิว'),
+(3, 'served', 'called', 'serving', 1, 3, 'เริ่มให้บริการ'),
+(4, 'created', NULL, 'waiting', NULL, 3, 'สร้างคิวใหม่'),
+(5, 'created', NULL, 'waiting', NULL, 4, 'สร้างคิวใหม่'),
+(5, 'called', 'waiting', 'called', 4, 4, 'เรียกคิว'),
+(6, 'created', NULL, 'waiting', NULL, 4, 'สร้างคิวใหม่');
+
+-- Insert sample notifications
+INSERT INTO `notifications` (`notification_type`, `title`, `message`, `priority`, `is_public`, `service_point_id`, `created_by`) VALUES
+('queue_called', 'เรียกคิว A003', 'หมายเลข A003 กรุณามาที่ห้องตรวจ 1', 'high', 1, 1, 3),
+('queue_called', 'เรียกคิว C001', 'หมายเลข C001 กรุณามาที่ห้องเจาะเลือด', 'normal', 1, 4, 4),
+('announcement', 'ประกาศ', 'ระบบจะปิดปรับปรุงในวันอาทิตย์ที่ 21 มกราคม 2567 เวลา 08:00-12:00 น.', 'normal', 1, NULL, 1);
+
+-- Insert sample audio call history
+INSERT INTO `audio_call_history` (`queue_id`, `service_point_id`, `audio_type`, `message_text`, `tts_used`, `play_status`, `called_by`) VALUES
+(1, 1, 'queue_call', 'หมายเลข เอ ศูนย์ ศูนย์ หนึ่ง เชิญที่ห้องตรวจ 1', 1, 'completed', 3),
+(2, 2, 'queue_call', 'หมายเลข เอ ศูนย์ ศูนย์ สอง เชิญที่ห้องตรวจ 2', 1, 'completed', 3),
+(3, 1, 'queue_call', 'หมายเลข เอ ศูนย์ ศูนย์ สาม เชิญที่ห้องตรวจ 1', 1, 'completed', 3),
+(5, 4, 'queue_call', 'หมายเลข ซี ศูนย์ ศูนย์ หนึ่ง เชิญที่ห้องเจาะเลือด', 1, 'completed', 4);
+
+-- Insert sample daily performance summary
+INSERT INTO `daily_performance_summary` (`summary_date`, `service_type_id`, `service_point_id`, `total_queues`, `completed_queues`, `cancelled_queues`, `no_show_queues`, `average_wait_time`, `average_service_time`, `efficiency_rate`, `satisfaction_score`) VALUES
+(CURDATE(), 1, 1, 15, 12, 2, 1, 12.5, 8.3, 80.0, 4.2),
+(CURDATE(), 1, 2, 18, 15, 2, 1, 10.2, 7.8, 83.3, 4.5),
+(CURDATE(), 2, 3, 8, 7, 1, 0, 15.8, 12.5, 87.5, 4.3),
+(CURDATE(), 3, 4, 25, 23, 1, 1, 8.5, 5.2, 92.0, 4.6),
+(CURDATE(), 4, 5, 12, 11, 0, 1, 18.3, 15.2, 91.7, 4.1),
+(CURDATE(), 5, 6, 35, 33, 1, 1, 5.2, 3.8, 94.3, 4.7),
+(CURDATE(), 6, 7, 22, 20, 1, 1, 7.8, 6.2, 90.9, 4.4);
+
+-- Insert sample dashboard preferences for admin user
+INSERT INTO `dashboard_preferences` (`user_id`, `preference_key`, `preference_value`, `preference_type`) VALUES
+(1, 'default_dashboard', 'admin', 'string'),
+(1, 'refresh_interval', '30', 'integer'),
+(1, 'show_notifications', 'true', 'boolean'),
+(1, 'theme', 'light', 'string'),
+(1, 'language', 'th', 'string');
+
+-- Insert sample security log
+INSERT INTO `security_logs` (`event_type`, `severity`, `user_id`, `ip_address`, `description`) VALUES
+('login_success', 'low', 1, '127.0.0.1', 'ผู้ดูแลระบบเข้าสู่ระบบสำเร็จ'),
+('login_success', 'low', 3, '127.0.0.1', 'เจ้าหน้าที่เข้าสู่ระบบสำเร็จ'),
+('settings_changed', 'medium', 1, '127.0.0.1', 'มีการเปลี่ยนแปลงการตั้งค่าระบบ');
+
+-- Update queue numbers with actual wait and service times for completed queues
+UPDATE `queues` SET 
+    `actual_wait_time` = 15,
+    `service_duration` = 8,
+    `called_at` = `created_at` + INTERVAL 15 MINUTE,
+    `served_at` = `created_at` + INTERVAL 20 MINUTE,
+    `completed_at` = `created_at` + INTERVAL 28 MINUTE
+WHERE `queue_id` = 1;
+
+UPDATE `queues` SET 
+    `actual_wait_time` = 10,
+    `service_duration` = 12,
+    `called_at` = `created_at` + INTERVAL 10 MINUTE,
+    `served_at` = `created_at` + INTERVAL 15 MINUTE,
+    `completed_at` = `created_at` + INTERVAL 27 MINUTE
+WHERE `queue_id` = 2;
+
+UPDATE `queues` SET 
+    `actual_wait_time` = 25,
+    `called_at` = `created_at` + INTERVAL 25 MINUTE,
+    `served_at` = `created_at` + INTERVAL 30 MINUTE
+WHERE `queue_id` = 3;
+
+UPDATE `queues` SET 
+    `called_at` = `created_at` + INTERVAL 5 MINUTE
+WHERE `queue_id` = 5;
+
+-- Set next run times for auto reset schedules
+UPDATE `auto_reset_schedules` SET 
+    `next_run` = DATE_ADD(CURDATE() + INTERVAL 1 DAY, INTERVAL 0 HOUR)
+WHERE `reset_type` = 'daily';
+
+UPDATE `auto_reset_schedules` SET 
+    `next_run` = DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (7 - WEEKDAY(CURDATE())) DAY), INTERVAL 0 HOUR)
+WHERE `reset_type` = 'weekly';
+
+UPDATE `auto_reset_schedules` SET 
+    `next_run` = DATE_ADD(LAST_DAY(CURDATE()) + INTERVAL 1 DAY, INTERVAL 0 HOUR)
+WHERE `reset_type` = 'monthly';
+
+-- =====================================================
 -- END OF SCHEMA
 -- =====================================================
