@@ -1,345 +1,175 @@
 <?php
-// Notification System Component
-function renderNotificationSystem() {
-?>
-<div id="notificationSystem" class="notification-system">
-    <div class="notification-container" id="notificationContainer">
+// เพิ่มฟังก์ชันสำหรับ monitor display
+function renderMonitorNotificationSystem($servicePointId = null) {
+    ?>
+    <div id="monitorNotificationSystem" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;">
         <!-- Notifications will be inserted here -->
     </div>
     
-    <div class="notification-controls">
-        <button class="btn btn-sm btn-outline-secondary" onclick="toggleNotifications()">
-            <i class="fas fa-bell" id="notificationIcon"></i>
-            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
-        </button>
-    </div>
-</div>
-
-<style>
-.notification-system {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    max-width: 400px;
-}
-
-.notification-container {
-    max-height: 400px;
-    overflow-y: auto;
-    margin-bottom: 10px;
-}
-
-.notification-item {
-    background: white;
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-left: 4px solid #007bff;
-    animation: slideInRight 0.3s ease-out;
-    position: relative;
-}
-
-.notification-item.success {
-    border-left-color: #28a745;
-}
-
-.notification-item.warning {
-    border-left-color: #ffc107;
-}
-
-.notification-item.error {
-    border-left-color: #dc3545;
-}
-
-.notification-item.info {
-    border-left-color: #17a2b8;
-}
-
-.notification-header {
-    display: flex;
-    justify-content: between;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.notification-title {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: #333;
-}
-
-.notification-time {
-    font-size: 0.75rem;
-    color: #6c757d;
-}
-
-.notification-message {
-    font-size: 0.85rem;
-    color: #555;
-    line-height: 1.4;
-}
-
-.notification-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
-    border: none;
-    color: #6c757d;
-    cursor: pointer;
-    font-size: 0.8rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.notification-close:hover {
-    background: #f8f9fa;
-    color: #333;
-}
-
-.notification-controls {
-    text-align: right;
-}
-
-.notification-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: #dc3545;
-    color: white;
-    border-radius: 50%;
-    padding: 2px 6px;
-    font-size: 0.7rem;
-    min-width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-}
-
-.notification-item.fade-out {
-    animation: fadeOut 0.3s ease-out forwards;
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-    .notification-system {
-        top: 10px;
-        right: 10px;
-        left: 10px;
-        max-width: none;
-    }
-    
-    .notification-item {
-        padding: 10px 12px;
-    }
-}
-</style>
-
-<script>
-let notificationSystem = {
-    notifications: [],
-    isVisible: false,
-    
-    init: function() {
-        this.loadNotifications();
-        setInterval(() => this.loadNotifications(), 10000); // Check every 10 seconds
-    },
-    
-    loadNotifications: function() {
-        fetch('../api/get_notifications.php')
-            .then(response => response.json())
-            .then(data => {
-                if (data.notifications) {
-                    this.updateNotifications(data.notifications);
+    <script>
+    class MonitorNotificationSystem {
+        constructor(servicePointId = null) {
+            this.servicePointId = servicePointId;
+            this.container = document.getElementById('monitorNotificationSystem');
+            this.lastCheck = null;
+            this.checkInterval = 3000; // 3 วินาที
+            this.notifications = new Map();
+            
+            this.init();
+        }
+        
+        init() {
+            this.loadNotifications();
+            setInterval(() => this.loadNotifications(), this.checkInterval);
+        }
+        
+        async loadNotifications() {
+            try {
+                const url = new URL('../api/get_monitor_notifications.php', window.location.href);
+                if (this.servicePointId) {
+                    url.searchParams.set('service_point_id', this.servicePointId);
                 }
-            })
-            .catch(error => {
-                console.error('Failed to load notifications:', error);
+                if (this.lastCheck) {
+                    url.searchParams.set('last_check', this.lastCheck);
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.processNotifications(data.notifications);
+                    this.lastCheck = data.timestamp;
+                }
+            } catch (error) {
+                console.error('Failed to load monitor notifications:', error);
+            }
+        }
+        
+        processNotifications(notifications) {
+            notifications.forEach(notification => {
+                if (!this.notifications.has(notification.notification_id)) {
+                    this.showNotification(notification);
+                }
             });
-    },
-    
-    updateNotifications: function(newNotifications) {
-        // Check for new notifications
-        const existingIds = this.notifications.map(n => n.queue_id || n.message);
-        const reallyNew = newNotifications.filter(n => 
-            !existingIds.includes(n.queue_id || n.message)
-        );
-        
-        // Add new notifications
-        reallyNew.forEach(notification => {
-            this.addNotification(notification);
-        });
-        
-        // Update badge
-        this.updateBadge();
-    },
-    
-    addNotification: function(notification) {
-        this.notifications.unshift(notification);
-        
-        // Limit to 20 notifications
-        if (this.notifications.length > 20) {
-            this.notifications = this.notifications.slice(0, 20);
         }
         
-        // Show notification
-        this.showNotification(notification);
-        
-        // Auto-remove after 10 seconds for queue calls
-        if (notification.type === 'queue_called') {
+        showNotification(notification) {
+            const element = this.createNotificationElement(notification);
+            this.container.appendChild(element);
+            this.notifications.set(notification.notification_id, element);
+            
+            // Auto dismiss
+            const dismissTime = notification.display_duration || 5000;
             setTimeout(() => {
-                this.removeNotification(notification);
-            }, 10000);
+                this.dismissNotification(notification.notification_id);
+            }, dismissTime);
+            
+            // Animation
+            setTimeout(() => {
+                element.classList.add('show');
+            }, 100);
         }
-    },
-    
-    showNotification: function(notification) {
-        const container = document.getElementById('notificationContainer');
-        const notificationEl = this.createNotificationElement(notification);
         
-        container.insertBefore(notificationEl, container.firstChild);
+        createNotificationElement(notification) {
+            const div = document.createElement('div');
+            div.className = 'monitor-notification';
+            div.style.cssText = `
+                background: ${notification.bg_color || 'rgba(255,255,255,0.95)'};
+                border-left: 4px solid ${notification.color || '#007bff'};
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 10px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                backdrop-filter: blur(10px);
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+                opacity: 0;
+                color: #333;
+                font-family: 'Sarabun', sans-serif;
+            `;
+            
+            div.innerHTML = `
+                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <i class="${notification.icon}" style="color: ${notification.color}; font-size: 18px; margin-top: 2px;"></i>
+                    <div style="flex: 1;">
+                        ${notification.title ? `<div style="font-weight: 600; margin-bottom: 5px; color: ${notification.color};">${notification.title}</div>` : ''}
+                        <div style="font-size: 14px; line-height: 1.4;">${notification.formatted_message}</div>
+                        ${notification.service_point_name ? `<div style="font-size: 12px; color: #666; margin-top: 5px;">📍 ${notification.service_point_name}</div>` : ''}
+                    </div>
+                    <button onclick="monitorNotificationSystem.dismissNotification(${notification.notification_id})" 
+                            style="background: none; border: none; color: #999; cursor: pointer; font-size: 16px; padding: 0; width: 20px; height: 20px;">×</button>
+                </div>
+            `;
+            
+            // Add show class for animation
+            div.classList.add('monitor-notification');
+            
+            return div;
+        }
         
-        // Auto-hide after animation
-        setTimeout(() => {
-            if (notificationEl.parentNode) {
-                notificationEl.classList.add('fade-out');
+        dismissNotification(notificationId) {
+            const element = this.notifications.get(notificationId);
+            if (element) {
+                element.style.transform = 'translateX(100%)';
+                element.style.opacity = '0';
+                
                 setTimeout(() => {
-                    if (notificationEl.parentNode) {
-                        notificationEl.remove();
+                    if (element.parentNode) {
+                        element.parentNode.removeChild(element);
                     }
+                    this.notifications.delete(notificationId);
                 }, 300);
             }
-        }, 5000);
-    },
-    
-    createNotificationElement: function(notification) {
-        const div = document.createElement('div');
-        div.className = `notification-item ${notification.priority || 'info'}`;
-        
-        const icon = this.getNotificationIcon(notification.type);
-        const time = this.formatTime(notification.timestamp);
-        
-        div.innerHTML = `
-            <div class="notification-header">
-                <div class="notification-title">
-                    <i class="${icon} me-2"></i>
-                    ${this.getNotificationTitle(notification.type)}
-                </div>
-                <div class="notification-time">${time}</div>
-            </div>
-            <div class="notification-message">${notification.message}</div>
-            <button class="notification-close" onclick="this.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        return div;
-    },
-    
-    getNotificationIcon: function(type) {
-        switch (type) {
-            case 'queue_called': return 'fas fa-bullhorn text-primary';
-            case 'system_warning': return 'fas fa-exclamation-triangle text-warning';
-            case 'system_error': return 'fas fa-exclamation-circle text-danger';
-            case 'system_info': return 'fas fa-info-circle text-info';
-            default: return 'fas fa-bell text-secondary';
         }
-    },
-    
-    getNotificationTitle: function(type) {
-        switch (type) {
-            case 'queue_called': return 'เรียกคิว';
-            case 'system_warning': return 'คำเตือน';
-            case 'system_error': return 'ข้อผิดพลาด';
-            case 'system_info': return 'ข้อมูล';
-            default: return 'แจ้งเตือน';
-        }
-    },
-    
-    formatTime: function(timestamp) {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString('th-TH', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    },
-    
-    removeNotification: function(notification) {
-        this.notifications = this.notifications.filter(n => 
-            (n.queue_id || n.message) !== (notification.queue_id || notification.message)
-        );
-        this.updateBadge();
-    },
-    
-    updateBadge: function() {
-        const badge = document.getElementById('notificationBadge');
-        const count = this.notifications.length;
-        
-        if (count > 0) {
-            badge.textContent = count > 99 ? '99+' : count;
-            badge.style.display = 'flex';
-        } else {
-            badge.style.display = 'none';
-        }
-    },
-    
-    toggle: function() {
-        const container = document.getElementById('notificationContainer');
-        this.isVisible = !this.isVisible;
-        
-        if (this.isVisible) {
-            container.style.display = 'block';
-            this.renderAllNotifications();
-        } else {
-            container.style.display = 'none';
-        }
-    },
-    
-    renderAllNotifications: function() {
-        const container = document.getElementById('notificationContainer');
-        container.innerHTML = '';
-        
-        this.notifications.forEach(notification => {
-            const notificationEl = this.createNotificationElement(notification);
-            container.appendChild(notificationEl);
-        });
     }
-};
-
-function toggleNotifications() {
-    notificationSystem.toggle();
+    
+    // CSS for animations
+    const style = document.createElement('style');
+    style.textContent = `
+        .monitor-notification.show {
+            transform: translateX(0) !important;
+            opacity: 1 !important;
+        }
+        
+        .monitor-notification:hover {
+            transform: translateX(-5px) !important;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Initialize
+    window.monitorNotificationSystem = new MonitorNotificationSystem(<?php echo json_encode($servicePointId); ?>);
+    </script>
+    <?php
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    notificationSystem.init();
-});
-</script>
-<?php
+// เพิ่มฟังก์ชันสำหรับสร้าง public notification
+function createPublicNotification($type, $title, $message, $options = []) {
+    try {
+        $db = getDB();
+        
+        $sql = "INSERT INTO notifications (
+            type, title, message, priority, is_public, is_active,
+            service_point_id, expires_at, auto_dismiss_after, metadata, created_at
+        ) VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?, NOW())";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([
+            $type,
+            $title,
+            $message,
+            $options['priority'] ?? 'normal',
+            $options['service_point_id'] ?? null,
+            $options['expires_at'] ?? null,
+            $options['auto_dismiss_after'] ?? 5000,
+            isset($options['metadata']) ? json_encode($options['metadata']) : null
+        ]);
+        
+        return $db->lastInsertId();
+        
+    } catch (Exception $e) {
+        error_log("Failed to create public notification: " . $e->getMessage());
+        return false;
+    }
 }
-?>

@@ -497,7 +497,10 @@ $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {q
         </div>
     </div>
 
-    <?php include '../components/notification-system.php'; renderNotificationSystem(); ?>
+    <?php 
+include '../components/notification-system.php'; 
+renderMonitorNotificationSystem($servicePointId); 
+?>
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
@@ -1046,6 +1049,85 @@ $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {q
                 console.log('🔧 Debug button enabled');
             }
         });
+
+function loadQueueData() {
+    const url = servicePointId ? 
+        `../api/get_monitor_data.php?service_point_id=${servicePointId}` : 
+        '../api/get_monitor_data.php';
+        
+    $.get(url, function(data) {
+        displayCurrentQueue(data.current);
+        displayWaitingQueues(data.waiting);
+        updateLastUpdate();
+        
+        // Check for newly called queue or repeat call
+        if (data.current) {
+            const currentQueueId = data.current.queue_id;
+            const currentCalledCount = parseInt(data.current.called_count) || 1;
+            
+            // ตรวจสอบการเรียกคิวใหม่หรือเรียกซ้ำ
+            const isNewCall = currentQueueId !== lastCalledQueue;
+            const isRepeatCall = currentQueueId === lastCalledQueue && currentCalledCount > lastCalledCount;
+            
+            if (isNewCall || isRepeatCall) {
+                console.log('Queue call detected:', {
+                    isNewCall: isNewCall,
+                    isRepeatCall: isRepeatCall,
+                    queueId: currentQueueId,
+                    calledCount: currentCalledCount
+                });
+                
+                // สร้าง notification สำหรับการเรียกคิว
+                if (typeof monitorNotificationSystem !== 'undefined') {
+                    const notificationData = {
+                        notification_id: Date.now(), // ใช้ timestamp เป็น ID ชั่วคราว
+                        type: 'queue_called',
+                        title: 'เรียกคิวแล้ว',
+                        message: `หมายเลข ${data.current.queue_number} เชิญที่ ${data.current.service_point_name || 'จุดบริการ'}`,
+                        priority: 'high',
+                        color: '#28a745',
+                        bg_color: 'rgba(40, 167, 69, 0.1)',
+                        icon: 'fas fa-bullhorn',
+                        display_duration: 8000,
+                        formatted_message: `หมายเลข <strong>${data.current.queue_number}</strong> เชิญที่ <strong>${data.current.service_point_name || 'จุดบริการ'}</strong>`,
+                        service_point_name: data.current.service_point_name
+                    };
+                    
+                    monitorNotificationSystem.showNotification(notificationData);
+                }
+                
+                // ดึงการตั้งค่าปัจจุบันก่อนเล่นเสียง
+                refreshSettings().then(function(settings) {
+                    if (audioEnabled) {
+                        // หยุดเสียงที่อาจกำลังเล่นอยู่
+                        if (speechSynthesis && speechSynthesis.speaking) {
+                            speechSynthesis.cancel();
+                        }
+                        
+                        // รอสักครู่แล้วเล่นเสียงใหม่
+                        setTimeout(() => {
+                            announceQueue(data.current);
+                        }, 300);
+                    } else {
+                        // แสดงการประกาศแบบไม่มีเสียง
+                        announceQueue(data.current);
+                    }
+                });
+            }
+            
+            // อัปเดตค่าล่าสุด
+            lastCalledQueue = currentQueueId;
+            lastCalledCount = currentCalledCount;
+        } else {
+            // ไม่มีคิวปัจจุบัน
+            lastCalledQueue = null;
+            lastCalledCount = 0;
+        }
+    }).fail(function() {
+        console.error('Failed to load queue data');
+        showOfflineStatus();
+    });
+}
     </script>
 </body>
 </html>
