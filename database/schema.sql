@@ -1,767 +1,944 @@
 -- =====================================================
 -- Yuwaprasart Queue System - Complete Database Schema
--- โครงสร้างฐานข้อมูลสำหรับระบบเรียกคิวโรงพยาบาล
+-- Version: 2.0.0
+-- Created: 2024-01-15
 -- =====================================================
 
--- =====================================================
--- SECTION 1: TABLE CREATION
--- =====================================================
-
--- ตารางรูปแบบข้อความเสียงเรียก (Audio System)
-CREATE TABLE IF NOT EXISTS voice_templates (
-    template_id INT PRIMARY KEY AUTO_INCREMENT,
-    template_name VARCHAR(100) NOT NULL,
-    template_text TEXT NOT NULL,
-    is_default BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY (template_name)
-);
-
--- ตารางผู้ใช้งาน (เจ้าหน้าที่)
-CREATE TABLE IF NOT EXISTS staff_users (
-    staff_id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    full_name VARCHAR(100) NOT NULL,
-    role_id INT,
-    is_active BOOLEAN DEFAULT TRUE,
-    last_login TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_staff_users_username (username),
-    INDEX idx_staff_users_active (is_active)
-);
-
--- ตารางประเภทคิว (Core / Auto Reset)
-CREATE TABLE IF NOT EXISTS queue_types (
-    queue_type_id INT PRIMARY KEY AUTO_INCREMENT,
-    type_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    prefix_char VARCHAR(5) NOT NULL DEFAULT 'A',
-    is_active BOOLEAN DEFAULT TRUE,
-    current_number INT DEFAULT 0,
-    last_reset_date TIMESTAMP NULL,
-    last_reset_by INT NULL,
-    last_reset_type ENUM('manual', 'auto') DEFAULT 'manual',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY (type_name),
-    INDEX idx_queue_types_active (is_active),
-    INDEX idx_queue_types_prefix (prefix_char)
-);
-
--- ตารางจุดบริการ (Core / Audio)
-CREATE TABLE IF NOT EXISTS service_points (
-    service_point_id INT PRIMARY KEY AUTO_INCREMENT,
-    point_name VARCHAR(100) NOT NULL,
-    point_description TEXT,
-    position_key VARCHAR(50) UNIQUE NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    display_order INT DEFAULT 0,
-    queue_type_id INT NULL,
-    voice_template_id INT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_service_points_active (is_active),
-    INDEX idx_service_points_display_order (display_order),
-    INDEX idx_service_points_queue_type (queue_type_id)
-);
-
--- ตารางบทบาท
-CREATE TABLE IF NOT EXISTS roles (
-    role_id INT PRIMARY KEY AUTO_INCREMENT,
-    role_name VARCHAR(50) UNIQUE NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ตารางสิทธิ์
-CREATE TABLE IF NOT EXISTS permissions (
-    permission_id INT PRIMARY KEY AUTO_INCREMENT,
-    permission_name VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ตารางความสัมพันธ์ระหว่างบทบาทและสิทธิ์
-CREATE TABLE IF NOT EXISTS role_permissions (
-    role_id INT,
-    permission_id INT,
-    PRIMARY KEY (role_id, permission_id)
-);
-
--- ตารางสิทธิ์การเข้าถึงจุดบริการของเจ้าหน้าที่
-CREATE TABLE IF NOT EXISTS staff_service_point_access (
-    staff_id INT,
-    service_point_id INT,
-    PRIMARY KEY (staff_id, service_point_id)
-);
-
--- ตารางข้อมูลผู้ป่วยเบื้องต้น
-CREATE TABLE IF NOT EXISTS patients (
-    patient_id INT PRIMARY KEY AUTO_INCREMENT,
-    id_card_number VARCHAR(13) UNIQUE,
-    name VARCHAR(100),
-    phone VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_patients_id_card (id_card_number)
-);
-
--- ตารางคิว
-CREATE TABLE IF NOT EXISTS queues (
-    queue_id INT PRIMARY KEY AUTO_INCREMENT,
-    queue_number VARCHAR(20) NOT NULL,
-    queue_type_id INT,
-    patient_id_card_number VARCHAR(13),
-    kiosk_id VARCHAR(50),
-    creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    current_status ENUM('waiting', 'called', 'processing', 'forwarded', 'completed', 'cancelled') DEFAULT 'waiting',
-    current_service_point_id INT,
-    last_called_time TIMESTAMP NULL,
-    called_count INT DEFAULT 0,
-    priority_level INT DEFAULT 0,
-    estimated_wait_time INT DEFAULT 0,
-	updated_at datetime NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_queue_status (current_status),
-    INDEX idx_queue_service_point (current_service_point_id),
-    INDEX idx_creation_time (creation_time),
-    INDEX idx_queues_created_date (creation_time), -- FIXED
-    INDEX idx_queues_status_date (current_status, creation_time) -- FIXED
-);
-
--- ตารางประวัติการเคลื่อนไหวของคิว
-CREATE TABLE IF NOT EXISTS service_flow_history (
-    flow_id INT PRIMARY KEY AUTO_INCREMENT,
-    queue_id INT,
-    from_service_point_id INT NULL,
-    to_service_point_id INT NULL,
-    staff_id INT NULL,
-    action ENUM('created', 'called', 'forwarded', 'completed', 'recalled', 'skipped', 'cancelled', 'hold') NOT NULL,
-    notes TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_service_flow_queue_id (queue_id),
-    INDEX idx_service_flow_timestamp (timestamp),
-    INDEX idx_service_flow_action (action),
-    INDEX idx_queue_history_date (timestamp) -- FIXED
-);
-
--- ตารางการตั้งค่าระบบ
-CREATE TABLE IF NOT EXISTS settings (
-    setting_key VARCHAR(100) PRIMARY KEY,
-    setting_value TEXT,
-    description TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- ตารางบันทึกการใช้งานระบบ
-CREATE TABLE IF NOT EXISTS audit_logs (
-    log_id INT PRIMARY KEY AUTO_INCREMENT,
-    staff_id INT NULL,
-    action_description TEXT NOT NULL,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_audit_logs_date (timestamp) -- FIXED
-);
-
--- ตารางการตั้งค่า Flow การบริการ
-CREATE TABLE IF NOT EXISTS service_flows (
-    flow_id INT PRIMARY KEY AUTO_INCREMENT,
-    queue_type_id INT,
-    from_service_point_id INT,
-    to_service_point_id INT,
-    sequence_order INT DEFAULT 0,
-    is_optional BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE,
-    INDEX idx_service_flows_queue_type (queue_type_id),
-    INDEX idx_service_flows_active (is_active)
-);
-
--- AUTO RESET SYSTEM TABLES
-CREATE TABLE IF NOT EXISTS auto_reset_schedules (
-    schedule_id INT PRIMARY KEY AUTO_INCREMENT,
-    schedule_name VARCHAR(100) NOT NULL,
-    reset_type ENUM('all', 'by_type', 'by_service_point') NOT NULL DEFAULT 'all',
-    target_id INT NULL,
-    schedule_time TIME NOT NULL,
-    schedule_days VARCHAR(20) NOT NULL DEFAULT '1,2,3,4,5,6,7',
-    is_active BOOLEAN DEFAULT TRUE,
-    last_run_date DATE NULL,
-    last_run_status ENUM('success', 'failed', 'skipped') NULL,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS auto_reset_logs (
-    log_id INT PRIMARY KEY AUTO_INCREMENT,
-    schedule_id INT,
-    reset_type ENUM('all', 'by_type', 'by_service_point') NOT NULL,
-    target_id INT NULL,
-    reset_count INT DEFAULT 0,
-    affected_types TEXT,
-    status ENUM('success', 'failed', 'skipped') NOT NULL,
-    error_message TEXT NULL,
-    execution_time DECIMAL(5,3) DEFAULT 0,
-    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- NOTIFICATION SYSTEM TABLES
-CREATE TABLE IF NOT EXISTS notification_types (
-    type_id INT PRIMARY KEY AUTO_INCREMENT,
-    type_code VARCHAR(50) UNIQUE NOT NULL,
-    type_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    icon VARCHAR(50) DEFAULT 'bell',
-    default_priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
-    default_sound VARCHAR(100) DEFAULT 'notification.mp3',
-    is_system BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS notifications (
-    notification_id INT PRIMARY KEY AUTO_INCREMENT,
-    notification_type VARCHAR(50) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    message TEXT NOT NULL,
-    icon VARCHAR(50) DEFAULT 'info-circle',
-    priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
-    link VARCHAR(255) NULL,
-    is_system BOOLEAN DEFAULT FALSE,
-    is_read BOOLEAN DEFAULT FALSE,
-    is_dismissed BOOLEAN DEFAULT FALSE,
-    recipient_id INT NULL,
-    recipient_role VARCHAR(50) NULL,
-    sender_id INT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL,
-    INDEX idx_notification_recipient (recipient_id),
-    INDEX idx_notification_type (notification_type),
-    INDEX idx_notification_created (created_at)
-);
-
-CREATE TABLE IF NOT EXISTS notification_preferences (
-    preference_id INT PRIMARY KEY AUTO_INCREMENT,
-    staff_id INT NOT NULL,
-    notification_type VARCHAR(50) NOT NULL,
-    email_enabled BOOLEAN DEFAULT FALSE,
-    browser_enabled BOOLEAN DEFAULT TRUE,
-    telegram_enabled BOOLEAN DEFAULT FALSE, -- Merged from line_enabled/telegram_enabled
-    sound_enabled BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_staff_notification_type (staff_id, notification_type)
-);
-
-CREATE TABLE IF NOT EXISTS notification_deliveries (
-    delivery_id INT PRIMARY KEY AUTO_INCREMENT,
-    notification_id INT NOT NULL,
-    channel ENUM('browser', 'email', 'telegram', 'sms') NOT NULL, -- Merged from line/telegram
-    status ENUM('pending', 'sent', 'failed', 'delivered', 'read') DEFAULT 'pending',
-    error_message TEXT NULL,
-    sent_at TIMESTAMP NULL,
-    delivered_at TIMESTAMP NULL,
-    read_at TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_delivery_status (status),
-    INDEX idx_delivery_channel (channel)
-);
-
--- AUDIO SYSTEM TABLES
-CREATE TABLE IF NOT EXISTS audio_files (
-    audio_id INT PRIMARY KEY AUTO_INCREMENT,
-    file_name VARCHAR(100) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    audio_type ENUM('queue_number', 'service_point', 'message', 'system') NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS audio_call_history (
-    call_id INT PRIMARY KEY AUTO_INCREMENT,
-    queue_id INT,
-    service_point_id INT,
-    staff_id INT,
-    message TEXT,
-    call_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tts_used BOOLEAN DEFAULT FALSE,
-    audio_status ENUM('pending', 'played', 'failed') DEFAULT 'pending'
-);
-
--- MOBILE API TABLES
-CREATE TABLE IF NOT EXISTS mobile_app_registrations (
-    registration_id INT PRIMARY KEY AUTO_INCREMENT,
-    app_name VARCHAR(100) NOT NULL,
-    api_key VARCHAR(255) UNIQUE NOT NULL,
-    api_secret VARCHAR(255) NOT NULL,
-    app_version VARCHAR(20),
-    platform ENUM('ios', 'android', 'web', 'other') DEFAULT 'other',
-    bundle_id VARCHAR(255),
-    is_active BOOLEAN DEFAULT TRUE,
-    rate_limit_per_minute INT DEFAULT 60,
-    allowed_endpoints TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_used_at TIMESTAMP NULL,
-    expires_at TIMESTAMP NULL
-);
-
-CREATE TABLE IF NOT EXISTS api_usage_logs (
-    log_id INT PRIMARY KEY AUTO_INCREMENT,
-    registration_id INT,
-    endpoint VARCHAR(255) NOT NULL,
-    method ENUM('GET', 'POST', 'PUT', 'DELETE') NOT NULL,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    request_data TEXT,
-    response_code INT,
-    response_time_ms INT,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_endpoint (endpoint),
-    INDEX idx_created_at (created_at),
-    INDEX idx_registration_id (registration_id)
-);
-
-CREATE TABLE IF NOT EXISTS mobile_users (
-    mobile_user_id INT PRIMARY KEY AUTO_INCREMENT,
-    registration_id INT,
-    device_id VARCHAR(255) UNIQUE NOT NULL,
-    device_token VARCHAR(255),
-    platform ENUM('ios', 'android', 'web') NOT NULL,
-    app_version VARCHAR(20),
-    os_version VARCHAR(50),
-    device_model VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE,
-    last_login TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_device_id (device_id)
-);
-
-CREATE TABLE IF NOT EXISTS mobile_sessions (
-    session_id VARCHAR(255) PRIMARY KEY,
-    mobile_user_id INT,
-    registration_id INT,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_expires_at (expires_at),
-    INDEX idx_mobile_user_id (mobile_user_id)
-);
-
-CREATE TABLE IF NOT EXISTS push_notifications (
-    notification_id INT PRIMARY KEY AUTO_INCREMENT,
-    mobile_user_id INT,
-    title VARCHAR(255) NOT NULL,
-    body TEXT NOT NULL,
-    data JSON,
-    status ENUM('pending', 'sent', 'delivered', 'failed') DEFAULT 'pending',
-    sent_at TIMESTAMP NULL,
-    delivered_at TIMESTAMP NULL,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_status (status),
-    INDEX idx_mobile_user_id (mobile_user_id)
-);
-
-CREATE TABLE IF NOT EXISTS api_settings (
-    setting_key VARCHAR(100) PRIMARY KEY,
-    setting_value TEXT,
-    description TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- REPORTING & ANALYTICS TABLES
-CREATE TABLE IF NOT EXISTS report_templates (
-    template_id INT PRIMARY KEY AUTO_INCREMENT,
-    template_name VARCHAR(100) NOT NULL,
-    template_description TEXT,
-    report_type ENUM('queue_performance', 'service_point_analysis', 'staff_productivity', 'patient_flow', 'custom') NOT NULL,
-    template_config JSON,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
-);
-
-CREATE TABLE IF NOT EXISTS scheduled_reports (
-    schedule_id INT PRIMARY KEY AUTO_INCREMENT,
-    template_id INT NOT NULL,
-    schedule_name VARCHAR(100) NOT NULL,
-    schedule_frequency ENUM('daily', 'weekly', 'monthly', 'quarterly') NOT NULL,
-    schedule_time TIME NOT NULL,
-    schedule_day_of_week INT NULL,
-    schedule_day_of_month INT NULL,
-    recipients JSON,
-    last_run_at TIMESTAMP NULL,
-    next_run_at TIMESTAMP NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS report_execution_log (
-    execution_id INT PRIMARY KEY AUTO_INCREMENT,
-    schedule_id INT NULL,
-    template_id INT NOT NULL,
-    execution_type ENUM('manual', 'scheduled') NOT NULL,
-    parameters JSON,
-    status ENUM('running', 'completed', 'failed') NOT NULL,
-    file_path VARCHAR(255) NULL,
-    file_size INT NULL,
-    execution_time_seconds DECIMAL(10,2) NULL,
-    error_message TEXT NULL,
-    executed_by INT,
-    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP NULL
-);
-
-CREATE TABLE IF NOT EXISTS report_cache (
-    cache_id INT PRIMARY KEY AUTO_INCREMENT,
-    cache_key VARCHAR(255) UNIQUE NOT NULL,
-    report_data LONGTEXT,
-    parameters JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
-    INDEX idx_cache_key (cache_key),
-    INDEX idx_expires_at (expires_at)
-);
-
-CREATE TABLE IF NOT EXISTS daily_performance_summary (
-    summary_id INT PRIMARY KEY AUTO_INCREMENT,
-    summary_date DATE NOT NULL,
-    queue_type_id INT,
-    service_point_id INT,
-    total_queues INT DEFAULT 0,
-    completed_queues INT DEFAULT 0,
-    cancelled_queues INT DEFAULT 0,
-    avg_wait_time_minutes DECIMAL(10,2) DEFAULT 0,
-    avg_service_time_minutes DECIMAL(10,2) DEFAULT 0,
-    max_wait_time_minutes DECIMAL(10,2) DEFAULT 0,
-    peak_hour_start TIME,
-    peak_hour_end TIME,
-    peak_hour_queue_count INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_daily_summary (summary_date, queue_type_id, service_point_id),
-    INDEX idx_summary_date (summary_date)
-);
-
--- DASHBOARD ANALYTICS TABLES
-CREATE TABLE IF NOT EXISTS dashboard_widgets (
-    widget_id INT PRIMARY KEY AUTO_INCREMENT,
-    widget_name VARCHAR(100) NOT NULL,
-    widget_type ENUM('chart', 'counter', 'table', 'gauge', 'map') NOT NULL,
-    widget_config JSON,
-    display_order INT DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS dashboard_user_preferences (
-    preference_id INT PRIMARY KEY AUTO_INCREMENT,
-    staff_id INT,
-    widget_layout JSON,
-    refresh_interval INT DEFAULT 30,
-    theme VARCHAR(20) DEFAULT 'light',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS real_time_metrics (
-    metric_id INT PRIMARY KEY AUTO_INCREMENT,
-    metric_name VARCHAR(100) NOT NULL,
-    metric_value DECIMAL(10,2),
-    metric_data JSON,
-    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_metric_name_time (metric_name, recorded_at)
-);
-
-CREATE TABLE IF NOT EXISTS dashboard_alerts (
-    alert_id INT PRIMARY KEY AUTO_INCREMENT,
-    alert_type ENUM('warning', 'error', 'info', 'success') NOT NULL,
-    alert_title VARCHAR(200) NOT NULL,
-    alert_message TEXT,
-    alert_data JSON,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL,
-    INDEX idx_active_alerts (is_active, created_at)
-);
+SET FOREIGN_KEY_CHECKS = 0;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET AUTOCOMMIT = 0;
+START TRANSACTION;
+SET time_zone = "+00:00";
 
 -- =====================================================
--- SECTION 2: FOREIGN KEY CONSTRAINTS
+-- 1. CORE SYSTEM TABLES
 -- =====================================================
 
--- Constraints for staff_users, queue_types, service_points
-ALTER TABLE staff_users ADD CONSTRAINT fk_staff_role FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE SET NULL;
-ALTER TABLE queue_types ADD CONSTRAINT fk_qt_reset_by FOREIGN KEY (last_reset_by) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE service_points ADD CONSTRAINT fk_sp_queue_type FOREIGN KEY (queue_type_id) REFERENCES queue_types(queue_type_id) ON DELETE SET NULL;
-ALTER TABLE service_points ADD CONSTRAINT fk_sp_voice_template FOREIGN KEY (voice_template_id) REFERENCES voice_templates(template_id) ON DELETE SET NULL;
+-- Users table
+CREATE TABLE `users` (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `full_name` varchar(100) NOT NULL,
+  `role_id` int(11) NOT NULL DEFAULT 2,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_login` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_role` (`role_id`),
+  KEY `idx_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Constraints for role_permissions, staff_service_point_access
-ALTER TABLE role_permissions ADD CONSTRAINT fk_rp_role FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE CASCADE;
-ALTER TABLE role_permissions ADD CONSTRAINT fk_rp_permission FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE;
-ALTER TABLE staff_service_point_access ADD CONSTRAINT fk_sspa_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE CASCADE;
-ALTER TABLE staff_service_point_access ADD CONSTRAINT fk_sspa_sp FOREIGN KEY (service_point_id) REFERENCES service_points(service_point_id) ON DELETE CASCADE;
+-- Roles table
+CREATE TABLE `roles` (
+  `role_id` int(11) NOT NULL AUTO_INCREMENT,
+  `role_name` varchar(50) NOT NULL,
+  `role_description` text,
+  `permissions` json DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`role_id`),
+  UNIQUE KEY `role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Constraints for queues, service_flow_history, audit_logs, service_flows
-ALTER TABLE queues ADD CONSTRAINT fk_q_queue_type FOREIGN KEY (queue_type_id) REFERENCES queue_types(queue_type_id) ON DELETE SET NULL;
-ALTER TABLE queues ADD CONSTRAINT fk_q_service_point FOREIGN KEY (current_service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL;
-ALTER TABLE service_flow_history ADD CONSTRAINT fk_sfh_queue FOREIGN KEY (queue_id) REFERENCES queues(queue_id) ON DELETE CASCADE;
-ALTER TABLE service_flow_history ADD CONSTRAINT fk_sfh_from_sp FOREIGN KEY (from_service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL;
-ALTER TABLE service_flow_history ADD CONSTRAINT fk_sfh_to_sp FOREIGN KEY (to_service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL;
-ALTER TABLE service_flow_history ADD CONSTRAINT fk_sfh_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE audit_logs ADD CONSTRAINT fk_al_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE service_flows ADD CONSTRAINT fk_sf_queue_type FOREIGN KEY (queue_type_id) REFERENCES queue_types(queue_type_id) ON DELETE CASCADE;
-ALTER TABLE service_flows ADD CONSTRAINT fk_sf_from_sp FOREIGN KEY (from_service_point_id) REFERENCES service_points(service_point_id) ON DELETE CASCADE;
-ALTER TABLE service_flows ADD CONSTRAINT fk_sf_to_sp FOREIGN KEY (to_service_point_id) REFERENCES service_points(service_point_id) ON DELETE CASCADE;
+-- Service types table
+CREATE TABLE `service_types` (
+  `service_type_id` int(11) NOT NULL AUTO_INCREMENT,
+  `service_name` varchar(100) NOT NULL,
+  `service_code` varchar(10) NOT NULL,
+  `description` text,
+  `estimated_time` int(11) DEFAULT 15,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `display_order` int(11) DEFAULT 0,
+  `color` varchar(7) DEFAULT '#007bff',
+  `icon` varchar(50) DEFAULT 'fas fa-user-md',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`service_type_id`),
+  UNIQUE KEY `service_code` (`service_code`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_display_order` (`display_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Constraints for Auto Reset System
-ALTER TABLE auto_reset_schedules ADD CONSTRAINT fk_ars_created_by FOREIGN KEY (created_by) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE auto_reset_logs ADD CONSTRAINT fk_arl_schedule FOREIGN KEY (schedule_id) REFERENCES auto_reset_schedules(schedule_id) ON DELETE CASCADE;
+-- Service points table
+CREATE TABLE `service_points` (
+  `service_point_id` int(11) NOT NULL AUTO_INCREMENT,
+  `point_name` varchar(100) NOT NULL,
+  `point_code` varchar(10) NOT NULL,
+  `description` text,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `display_order` int(11) DEFAULT 0,
+  `location` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`service_point_id`),
+  UNIQUE KEY `point_code` (`point_code`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_display_order` (`display_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Constraints for Notification System
-ALTER TABLE notifications ADD CONSTRAINT fk_n_recipient FOREIGN KEY (recipient_id) REFERENCES staff_users(staff_id) ON DELETE CASCADE;
-ALTER TABLE notifications ADD CONSTRAINT fk_n_sender FOREIGN KEY (sender_id) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE notification_preferences ADD CONSTRAINT fk_np_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE CASCADE;
-ALTER TABLE notification_deliveries ADD CONSTRAINT fk_nd_notification FOREIGN KEY (notification_id) REFERENCES notifications(notification_id) ON DELETE CASCADE;
+-- Service flows table
+CREATE TABLE `service_flows` (
+  `flow_id` int(11) NOT NULL AUTO_INCREMENT,
+  `service_type_id` int(11) NOT NULL,
+  `service_point_id` int(11) NOT NULL,
+  `flow_order` int(11) NOT NULL DEFAULT 1,
+  `is_required` tinyint(1) NOT NULL DEFAULT 1,
+  `estimated_time` int(11) DEFAULT 15,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`flow_id`),
+  KEY `idx_service_type` (`service_type_id`),
+  KEY `idx_service_point` (`service_point_id`),
+  KEY `idx_flow_order` (`flow_order`),
+  CONSTRAINT `fk_service_flows_service_type` FOREIGN KEY (`service_type_id`) REFERENCES `service_types` (`service_type_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_service_flows_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Constraints for Audio System
-ALTER TABLE audio_call_history ADD CONSTRAINT fk_ach_queue FOREIGN KEY (queue_id) REFERENCES queues(queue_id) ON DELETE CASCADE;
-ALTER TABLE audio_call_history ADD CONSTRAINT fk_ach_sp FOREIGN KEY (service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL;
-ALTER TABLE audio_call_history ADD CONSTRAINT fk_ach_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-
--- Constraints for Mobile API
-ALTER TABLE api_usage_logs ADD CONSTRAINT fk_aul_reg FOREIGN KEY (registration_id) REFERENCES mobile_app_registrations(registration_id) ON DELETE CASCADE;
-ALTER TABLE mobile_users ADD CONSTRAINT fk_mu_reg FOREIGN KEY (registration_id) REFERENCES mobile_app_registrations(registration_id) ON DELETE CASCADE;
-ALTER TABLE mobile_sessions ADD CONSTRAINT fk_ms_user FOREIGN KEY (mobile_user_id) REFERENCES mobile_users(mobile_user_id) ON DELETE CASCADE;
-ALTER TABLE mobile_sessions ADD CONSTRAINT fk_ms_reg FOREIGN KEY (registration_id) REFERENCES mobile_app_registrations(registration_id) ON DELETE CASCADE;
-ALTER TABLE push_notifications ADD CONSTRAINT fk_pn_user FOREIGN KEY (mobile_user_id) REFERENCES mobile_users(mobile_user_id) ON DELETE CASCADE;
-
--- Constraints for Reporting & Analytics
-ALTER TABLE report_templates ADD CONSTRAINT fk_rt_created_by FOREIGN KEY (created_by) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE scheduled_reports ADD CONSTRAINT fk_sr_template FOREIGN KEY (template_id) REFERENCES report_templates(template_id) ON DELETE CASCADE;
-ALTER TABLE scheduled_reports ADD CONSTRAINT fk_sr_created_by FOREIGN KEY (created_by) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE report_execution_log ADD CONSTRAINT fk_rel_schedule FOREIGN KEY (schedule_id) REFERENCES scheduled_reports(schedule_id) ON DELETE SET NULL;
-ALTER TABLE report_execution_log ADD CONSTRAINT fk_rel_template FOREIGN KEY (template_id) REFERENCES report_templates(template_id) ON DELETE CASCADE;
-ALTER TABLE report_execution_log ADD CONSTRAINT fk_rel_executed_by FOREIGN KEY (executed_by) REFERENCES staff_users(staff_id) ON DELETE SET NULL;
-ALTER TABLE daily_performance_summary ADD CONSTRAINT fk_dps_queue_type FOREIGN KEY (queue_type_id) REFERENCES queue_types(queue_type_id) ON DELETE SET NULL;
-ALTER TABLE daily_performance_summary ADD CONSTRAINT fk_dps_sp FOREIGN KEY (service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL;
-
--- Constraints for Dashboard
-ALTER TABLE dashboard_user_preferences ADD CONSTRAINT fk_dup_staff FOREIGN KEY (staff_id) REFERENCES staff_users(staff_id) ON DELETE CASCADE;
-
--- =====================================================
--- SECTION 3: DEFAULT DATA INSERTION (IDEMPOTENT)
--- =====================================================
-
--- ข้อมูลเริ่มต้นสำหรับบทบาท
-INSERT IGNORE INTO roles (role_id, role_name, description) VALUES
-(1, 'Admin', 'ผู้ดูแลระบบ'),
-(2, 'Staff-Screening', 'เจ้าหน้าที่จุดคัดกรอง'),
-(3, 'Staff-Doctor', 'เจ้าหน้าที่ห้องตรวจแพทย์'),
-(4, 'Staff-Pharmacy', 'เจ้าหน้าที่เภสัช'),
-(5, 'Staff-Cashier', 'เจ้าหน้าที่การเงิน'),
-(6, 'Staff-Records', 'เจ้าหน้าที่เวชระเบียน');
-
--- ข้อมูลเริ่มต้นสำหรับสิทธิ์
-INSERT IGNORE INTO permissions (permission_id, permission_name, description) VALUES
-(1, 'manage_users', 'จัดการบัญชีผู้ใช้'),
-(2, 'manage_settings', 'จัดการการตั้งค่าระบบ'),
-(3, 'manage_queues', 'จัดการคิว'),
-(4, 'call_queue', 'เรียกคิว'),
-(5, 'forward_queue', 'ส่งต่อคิว'),
-(6, 'cancel_queue', 'ยกเลิกคิว'),
-(7, 'view_reports', 'ดูรายงาน'),
-(8, 'manage_service_points', 'จัดการจุดบริการ'),
-(9, 'manage_audio_system', 'จัดการระบบเสียงเรียกคิว');
-
--- สร้างบัญชี Admin เริ่มต้น (password: admin123)
-INSERT IGNORE INTO staff_users (staff_id, username, password_hash, full_name, role_id) VALUES
-(1, 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ผู้ดูแลระบบ', 1);
-
--- กำหนดสิทธิ์ทั้งหมดให้ Admin
-INSERT IGNORE INTO role_permissions (role_id, permission_id) 
-SELECT 1, p.permission_id FROM permissions p;
-
--- กำหนดสิทธิ์พื้นฐานให้ Staff (สิทธิ์จัดการ, เรียก, ส่งต่อคิว)
-INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
-(2, 3), (2, 4), (2, 5),
-(3, 3), (3, 4), (3, 5),
-(4, 3), (4, 4), (4, 5),
-(5, 3), (5, 4), (5, 5),
-(6, 3), (6, 4), (6, 5);
-
--- ข้อมูลเริ่มต้นสำหรับประเภทคิว
-INSERT IGNORE INTO queue_types (type_name, description, prefix_char) VALUES
-('คิวทั่วไป', 'คิวสำหรับผู้ป่วยทั่วไป', 'A'),
-('คิวนัดหมาย', 'คิวสำหรับผู้ป่วยที่มีการนัดหมาย', 'B'),
-('คิวเร่งด่วน', 'คิวสำหรับผู้ป่วยเร่งด่วน', 'C'),
-('คิวผู้สูงอายุ/พิการ', 'คิวสำหรับผู้สูงอายุและผู้พิการ', 'D');
-
--- ข้อมูลเริ่มต้นสำหรับจุดบริการ
-INSERT IGNORE INTO service_points (point_name, point_description, position_key, display_order) VALUES
-('จุดคัดกรอง', 'จุดคัดกรองผู้ป่วยเบื้องต้น', 'SCREENING_01', 1),
-('ห้องตรวจ 1', 'ห้องตรวจแพทย์ห้องที่ 1', 'DOCTOR_01', 2),
-('ห้องตรวจ 2', 'ห้องตรวจแพทย์ห้องที่ 2', 'DOCTOR_02', 3),
-('ห้องเภสัช', 'จุดรับยา', 'PHARMACY_01', 4),
-('การเงิน', 'จุดชำระเงิน', 'CASHIER_01', 5),
-('เวชระเบียน', 'จุดบริการเวชระเบียน', 'RECORDS_01', 6);
-
--- ข้อมูลเริ่มต้นสำหรับรูปแบบข้อความเสียงเรียก
-INSERT IGNORE INTO voice_templates (template_name, template_text, is_default) VALUES
-('เรียกคิวมาตรฐาน', 'หมายเลข {queue_number} เชิญที่ {service_point_name}', TRUE),
-('เรียกคิวแบบสั้น', 'คิว {queue_number} ที่ {service_point_name}', FALSE),
-('เรียกคิวแบบมีชื่อ', 'คุณ {patient_name} หมายเลข {queue_number} เชิญที่ {service_point_name}', FALSE);
-
--- ข้อมูลเริ่มต้นสำหรับประเภทการแจ้งเตือน
-INSERT IGNORE INTO notification_types (type_code, type_name, description, icon, default_priority, is_system) VALUES
-('queue_called', 'เรียกคิว', 'แจ้งเตือนเมื่อมีการเรียกคิว', 'bullhorn', 'high', TRUE),
-('queue_completed', 'คิวเสร็จสิ้น', 'แจ้งเตือนเมื่อคิวเสร็จสิ้น', 'check-circle', 'normal', TRUE),
-('queue_forwarded', 'คิวถูกส่งต่อ', 'แจ้งเตือนเมื่อคิวถูกส่งต่อไปยังจุดบริการอื่น', 'arrow-right', 'normal', TRUE),
-('queue_waiting_long', 'คิวรอนาน', 'แจ้งเตือนเมื่อมีคิวรอนานเกินกำหนด', 'clock', 'high', TRUE),
-('system_alert', 'การแจ้งเตือนระบบ', 'แจ้งเตือนจากระบบ', 'exclamation-triangle', 'high', TRUE),
-('auto_reset', 'Auto Reset', 'แจ้งเตือนเกี่ยวกับการ Reset คิวอัตโนมัติ', 'sync', 'normal', TRUE),
-('staff_message', 'ข้อความจากเจ้าหน้าที่', 'ข้อความจากเจ้าหน้าที่คนอื่น', 'comment', 'normal', FALSE),
-('system_update', 'อัปเดตระบบ', 'แจ้งเตือนเมื่อมีการอัปเดตระบบ', 'download', 'normal', TRUE),
-('backup_complete', 'สำรองข้อมูลเสร็จสิ้น', 'แจ้งเตือนเมื่อการสำรองข้อมูลเสร็จสิ้น', 'database', 'low', TRUE),
-('user_login', 'การเข้าสู่ระบบ', 'แจ้งเตือนเมื่อมีการเข้าสู่ระบบ', 'sign-in-alt', 'low', TRUE);
-
--- ตัวอย่างการตั้งค่า Auto Reset
-INSERT IGNORE INTO auto_reset_schedules (schedule_name, reset_type, schedule_time, schedule_days, created_by) VALUES
-('Reset รายวัน - เที่ยงคืน', 'all', '00:00:00', '1,2,3,4,5,6,7', 1),
-('Reset คิวทั่วไป - เช้า', 'by_type', '06:00:00', '1,2,3,4,5', 1);
-
--- สร้าง API Key เริ่มต้นสำหรับทดสอบ
-INSERT IGNORE INTO mobile_app_registrations (app_name, api_key, api_secret, platform, allowed_endpoints) VALUES 
-('Hospital Queue Mobile App','test_api_key_12345',SHA2('test_secret_67890', 256),'android','["queue", "status", "types", "notifications"]');
-
--- Insert default report templates
-INSERT IGNORE INTO report_templates (template_name, template_description, report_type, template_config, created_by) VALUES
-('รายงานประสิทธิภาพคิวรายวัน', 'รายงานสรุปประสิทธิภาพการให้บริการรายวัน', 'queue_performance', '{"period": "daily", "metrics": ["total_queues", "avg_wait_time", "completion_rate"], "groupBy": "queue_type"}', 1),
-('รายงานการใช้งานจุดบริการ', 'วิเคราะห์การใช้งานจุดบริการต่างๆ', 'service_point_analysis', '{"period": "weekly", "metrics": ["utilization_rate", "avg_service_time", "peak_hours"], "groupBy": "service_point"}', 1),
-('รายงานผลิตภาพเจ้าหน้าที่', 'ประเมินผลิตภาพการทำงานของเจ้าหน้าที่', 'staff_productivity', '{"period": "monthly", "metrics": ["queues_served", "avg_service_time", "efficiency_score"], "groupBy": "staff"}', 1),
-('รายงานการไหลของผู้ป่วย', 'วิเคราะห์เส้นทางการให้บริการผู้ป่วย', 'patient_flow', '{"period": "weekly", "metrics": ["flow_completion_rate", "bottlenecks", "avg_flow_time"], "groupBy": "service_flow"}', 1),
-('รายงานสรุปรายเดือน', 'รายงานสรุปภาพรวมประจำเดือน', 'queue_performance', '{"period": "monthly", "metrics": ["all"], "groupBy": "month", "includeCharts": true}', 1);
-
--- Insert default widgets
-INSERT IGNORE INTO dashboard_widgets (widget_name, widget_type, widget_config, display_order) VALUES
-('คิวรอทั้งหมด', 'counter', '{"color": "primary", "icon": "fas fa-users", "query": "waiting_queues"}', 1),
-('คิวที่เสร็จสิ้นวันนี้', 'counter', '{"color": "success", "icon": "fas fa-check-circle", "query": "completed_today"}', 2),
-('เวลารอเฉลี่ย', 'gauge', '{"color": "warning", "icon": "fas fa-clock", "query": "avg_wait_time", "max": 60}', 3),
-('จุดบริการที่ใช้งาน', 'counter', '{"color": "info", "icon": "fas fa-map-marker-alt", "query": "active_service_points"}', 4),
-('กราฟคิวรายชั่วโมง', 'chart', '{"type": "line", "query": "hourly_queues", "height": 300}', 5),
-('สถานะจุดบริการ', 'table', '{"query": "service_point_status", "height": 400}', 6),
-('การกระจายประเภทคิว', 'chart', '{"type": "doughnut", "query": "queue_type_distribution", "height": 300}', 7),
-('คิวล่าสุด', 'table', '{"query": "recent_queues", "height": 400}', 8);
-
--- Insert default settings for admin-managed configurations
-INSERT INTO settings (setting_key, setting_value, description) VALUES
-('app_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์', 'ชื่อแอปพลิเคชัน'),
-('app_description', 'ระบบจัดการคิวโรงพยาบาล', 'คำอธิบายแอปพลิเคชัน'),
-('app_logo', '', 'โลโก้แอปพลิเคชัน'),
-('app_timezone', 'Asia/Bangkok', 'เขตเวลาของแอปพลิเคชัน'),
-('app_language', 'th', 'ภาษาของแอปพลิเคชัน'),
-('queue_prefix_length', '1', 'ความยาวของ prefix คิว'),
-('queue_number_length', '3', 'ความยาวของหมายเลขคิว'),
-('max_queue_per_day', '999', 'จำนวนคิวสูงสุดต่อวัน'),
-('queue_timeout_minutes', '30', 'เวลา timeout ของคิว (นาที)'),
-('display_refresh_interval', '3', 'ช่วงเวลาการรีเฟรชหน้าจอ (วินาที)'),
-('enable_priority_queue', 'true', 'เปิดใช้งานคิวพิเศษ'),
-('auto_forward_enabled', 'false', 'เปิดใช้งานการส่งต่ออัตโนมัติ'),
-('working_hours_start', '08:00', 'เวลาเริ่มทำงาน'),
-('working_hours_end', '16:00', 'เวลาสิ้นสุดการทำงาน'),
-('tts_enabled', 'true', 'เปิดใช้งาน TTS'),
-('tts_provider', 'google', 'ผู้ให้บริการ TTS'),
-('tts_api_url', '', 'URL API ของ TTS'),
-('tts_language', 'th-TH', 'ภาษาของ TTS'),
-('tts_voice', 'th-TH-Standard-A', 'เสียงของ TTS'),
-('tts_speed', '1.0', 'ความเร็วของ TTS'),
-('tts_pitch', '0', 'ระดับเสียงของ TTS'),
-('audio_volume', '1.0', 'ระดับเสียง'),
-('audio_repeat_count', '1', 'จำนวนครั้งที่เล่นซ้ำ'),
-('sound_notification_before', 'true', 'เล่นเสียงแจ้งเตือนก่อน'),
-('google_cloud_project_id', '', 'Google Cloud Project ID'),
-('google_cloud_key_file', '', 'Google Cloud Key File'),
-('azure_speech_key', '', 'Azure Speech Service Key'),
-('azure_speech_region', '', 'Azure Speech Service Region'),
-('aws_access_key_id', '', 'AWS Access Key ID'),
-('aws_secret_access_key', '', 'AWS Secret Access Key'),
-('aws_region', '', 'AWS Region'),
-('email_notifications', 'false', 'เปิดใช้งานการแจ้งเตือนทางอีเมล'),
-('mail_host', 'smtp.gmail.com', 'SMTP Host'),
-('mail_port', '587', 'SMTP Port'),
-('mail_username', '', 'SMTP Username'),
-('mail_password', '', 'SMTP Password'),
-('mail_encryption', 'tls', 'SMTP Encryption'),
-('mail_from_address', 'noreply@hospital.com', 'ที่อยู่อีเมลผู้ส่ง'),
-('mail_from_name', 'Queue System', 'ชื่อผู้ส่งอีเมล'),
-('telegram_notifications', 'false', 'เปิดใช้งาน Telegram Notifications'),
-('telegram_bot_token', '', 'Telegram Bot Token'),
-('telegram_chat_id', '', 'Telegram Chat ID (ทั่วไป)'),
-('telegram_admin_chat_id', '', 'Telegram Admin Chat ID'),
-('telegram_group_chat_id', '', 'Telegram Group Chat ID'),
-('telegram_notify_template', 'คิว {queue_number} กรุณามาที่จุดบริการ {service_point}', 'เทมเพลตข้อความ Telegram'),
-('auto_reset_enabled', 'false', 'เปิดใช้งานการรีเซ็ตอัตโนมัติ'),
-('auto_reset_notification', 'true', 'แจ้งเตือนเมื่อรีเซ็ต'),
-('auto_reset_backup_before', 'true', 'สำรองข้อมูลก่อนรีเซ็ต'),
-('auto_reset_max_retries', '3', 'จำนวนครั้งสูงสุดในการลองใหม่'),
-('notification_enabled', 'true', 'เปิดใช้งานระบบแจ้งเตือน'),
-('backup_enabled', 'true', 'เปิดใช้งานการสำรองข้อมูล'),
-('backup_retention_days', '30', 'จำนวนวันเก็บข้อมูลสำรอง'),
-('auto_backup_enabled', 'false', 'เปิดใช้งานการสำรองอัตโนมัติ'),
-('auto_backup_time', '02:00', 'เวลาสำรองข้อมูลอัตโนมัติ'),
-('report_cache_enabled', 'true', 'เปิดใช้งาน cache สำหรับรายงาน'),
-('report_cache_ttl', '1800', 'เวลา cache รายงาน (วินาที)'),
-('daily_summary_enabled', 'true', 'เปิดใช้งานสรุปรายวัน'),
-('daily_summary_time', '23:30', 'เวลาสร้างสรุปรายวัน'),
-('api_enabled', '1', 'เปิดใช้งาน Mobile API'),
-('api_version', '1.0', 'เวอร์ชัน API ปัจจุบัน'),
-('rate_limit_enabled', '1', 'เปิดใช้งานการจำกัดอัตราการเรียกใช้'),
-('default_rate_limit', '60', 'จำนวนการเรียกใช้สูงสุดต่อนาที'),
-('session_timeout', '3600', 'เวลาหมดอายุเซสชัน (วินาที)'),
-('push_notification_enabled', '1', 'เปิดใช้งาน Push Notification'),
-('api_documentation_url', '/api/docs', 'URL เอกสาร API'),
-('api_support_email', 'support@hospital.com', 'อีเมลสำหรับการสนับสนุน API')
-ON DUPLICATE KEY UPDATE 
-setting_value = VALUES(setting_value),
-description = VALUES(description),
-updated_at = CURRENT_TIMESTAMP;
-
--- ----------------------------
--- Records of staff_service_point_access
--- ----------------------------
-INSERT INTO `staff_service_point_access` VALUES (1, 1);
-INSERT INTO `staff_service_point_access` VALUES (1, 2);
-INSERT INTO `staff_service_point_access` VALUES (1, 3);
-INSERT INTO `staff_service_point_access` VALUES (1, 4);
-INSERT INTO `staff_service_point_access` VALUES (1, 5);
-INSERT INTO `staff_service_point_access` VALUES (1, 6);
+-- User service points table
+CREATE TABLE `user_service_points` (
+  `user_id` int(11) NOT NULL,
+  `service_point_id` int(11) NOT NULL,
+  `assigned_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`, `service_point_id`),
+  KEY `idx_service_point` (`service_point_id`),
+  CONSTRAINT `fk_user_service_points_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_service_points_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- SECTION 4: DATA MIGRATION/BACKFILL
+-- 2. QUEUE MANAGEMENT TABLES
 -- =====================================================
 
--- เพิ่มข้อมูล service flow history สำหรับคิวที่สร้างไปแล้วแต่ยังไม่มีประวัติ
-INSERT INTO service_flow_history (queue_id, to_service_point_id, action, notes, timestamp)
+-- Queues table
+CREATE TABLE `queues` (
+  `queue_id` int(11) NOT NULL AUTO_INCREMENT,
+  `queue_number` varchar(20) NOT NULL,
+  `service_type_id` int(11) NOT NULL,
+  `patient_name` varchar(100) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `citizen_id` varchar(13) DEFAULT NULL,
+  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  `status` enum('waiting','called','serving','completed','cancelled','no_show') NOT NULL DEFAULT 'waiting',
+  `current_service_point_id` int(11) DEFAULT NULL,
+  `called_at` datetime DEFAULT NULL,
+  `served_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `notes` text,
+  `estimated_wait_time` int(11) DEFAULT NULL,
+  `actual_wait_time` int(11) DEFAULT NULL,
+  `service_duration` int(11) DEFAULT NULL,
+  `rating` tinyint(1) DEFAULT NULL,
+  `feedback` text,
+  `created_by` int(11) DEFAULT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`queue_id`),
+  UNIQUE KEY `queue_number_date` (`queue_number`, `created_at`),
+  KEY `idx_service_type` (`service_type_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_priority` (`priority`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_current_service_point` (`current_service_point_id`),
+  KEY `idx_phone` (`phone`),
+  CONSTRAINT `fk_queues_service_type` FOREIGN KEY (`service_type_id`) REFERENCES `service_types` (`service_type_id`),
+  CONSTRAINT `fk_queues_service_point` FOREIGN KEY (`current_service_point_id`) REFERENCES `service_points` (`service_point_id`),
+  CONSTRAINT `fk_queues_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_queues_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Queue history table
+CREATE TABLE `queue_history` (
+  `history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `queue_id` int(11) NOT NULL,
+  `action` varchar(50) NOT NULL,
+  `old_status` varchar(20) DEFAULT NULL,
+  `new_status` varchar(20) DEFAULT NULL,
+  `service_point_id` int(11) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `notes` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`history_id`),
+  KEY `idx_queue_id` (`queue_id`),
+  KEY `idx_action` (`action`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_queue_history_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_queue_history_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`),
+  CONSTRAINT `fk_queue_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Queue flow tracking table
+CREATE TABLE `queue_flow_tracking` (
+  `tracking_id` int(11) NOT NULL AUTO_INCREMENT,
+  `queue_id` int(11) NOT NULL,
+  `service_point_id` int(11) NOT NULL,
+  `flow_order` int(11) NOT NULL,
+  `status` enum('pending','in_progress','completed','skipped') NOT NULL DEFAULT 'pending',
+  `started_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `duration` int(11) DEFAULT NULL,
+  `notes` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`tracking_id`),
+  KEY `idx_queue_id` (`queue_id`),
+  KEY `idx_service_point` (`service_point_id`),
+  KEY `idx_status` (`status`),
+  CONSTRAINT `fk_queue_flow_tracking_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_queue_flow_tracking_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 3. AUDIO SYSTEM TABLES
+-- =====================================================
+
+-- Audio settings table
+CREATE TABLE `audio_settings` (
+  `setting_id` int(11) NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` text,
+  `setting_type` enum('boolean','integer','string','json') NOT NULL DEFAULT 'string',
+  `description` text,
+  `category` varchar(50) DEFAULT 'general',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`setting_id`),
+  UNIQUE KEY `setting_key` (`setting_key`),
+  KEY `idx_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Audio files table
+CREATE TABLE `audio_files` (
+  `file_id` int(11) NOT NULL AUTO_INCREMENT,
+  `file_name` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `file_path` varchar(500) NOT NULL,
+  `file_size` int(11) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `duration` decimal(10,2) DEFAULT NULL,
+  `file_type` enum('system','custom','tts') NOT NULL DEFAULT 'custom',
+  `category` varchar(50) DEFAULT 'general',
+  `description` text,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`file_id`),
+  KEY `idx_file_type` (`file_type`),
+  KEY `idx_category` (`category`),
+  KEY `idx_active` (`is_active`),
+  CONSTRAINT `fk_audio_files_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Audio call history table
+CREATE TABLE `audio_call_history` (
+  `call_id` int(11) NOT NULL AUTO_INCREMENT,
+  `queue_id` int(11) DEFAULT NULL,
+  `service_point_id` int(11) DEFAULT NULL,
+  `audio_type` enum('queue_call','announcement','system') NOT NULL DEFAULT 'queue_call',
+  `message_text` text,
+  `audio_file_id` int(11) DEFAULT NULL,
+  `tts_used` tinyint(1) NOT NULL DEFAULT 0,
+  `voice_settings` json DEFAULT NULL,
+  `play_status` enum('pending','playing','completed','failed') NOT NULL DEFAULT 'pending',
+  `play_duration` decimal(10,2) DEFAULT NULL,
+  `error_message` text,
+  `called_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `played_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`call_id`),
+  KEY `idx_queue_id` (`queue_id`),
+  KEY `idx_service_point` (`service_point_id`),
+  KEY `idx_audio_type` (`audio_type`),
+  KEY `idx_play_status` (`play_status`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_audio_call_history_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`),
+  CONSTRAINT `fk_audio_call_history_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`),
+  CONSTRAINT `fk_audio_call_history_audio_file` FOREIGN KEY (`audio_file_id`) REFERENCES `audio_files` (`file_id`),
+  CONSTRAINT `fk_audio_call_history_called_by` FOREIGN KEY (`called_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- TTS cache table
+CREATE TABLE `tts_cache` (
+  `cache_id` int(11) NOT NULL AUTO_INCREMENT,
+  `text_hash` varchar(64) NOT NULL,
+  `original_text` text NOT NULL,
+  `processed_text` text NOT NULL,
+  `voice_settings` json DEFAULT NULL,
+  `audio_file_path` varchar(500) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `duration` decimal(10,2) DEFAULT NULL,
+  `usage_count` int(11) NOT NULL DEFAULT 1,
+  `last_used` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`cache_id`),
+  UNIQUE KEY `text_hash` (`text_hash`),
+  KEY `idx_last_used` (`last_used`),
+  KEY `idx_usage_count` (`usage_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 4. NOTIFICATION SYSTEM TABLES
+-- =====================================================
+
+-- Notification types table
+CREATE TABLE `notification_types` (
+  `type_id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_code` varchar(50) NOT NULL,
+  `type_name` varchar(100) NOT NULL,
+  `description` text,
+  `icon` varchar(50) DEFAULT 'fas fa-bell',
+  `color` varchar(7) DEFAULT '#007bff',
+  `is_public` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`type_id`),
+  UNIQUE KEY `type_code` (`type_code`),
+  KEY `idx_is_public` (`is_public`),
+  KEY `idx_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Notifications table
+CREATE TABLE `notifications` (
+  `notification_id` int(11) NOT NULL AUTO_INCREMENT,
+  `notification_type` varchar(50) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `message` text NOT NULL,
+  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  `is_public` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `expires_at` datetime DEFAULT NULL,
+  `auto_dismiss_after` int(11) DEFAULT 5000,
+  `service_point_id` int(11) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `queue_id` int(11) DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `read_at` datetime DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`notification_id`),
+  KEY `idx_notification_type` (`notification_type`),
+  KEY `idx_priority` (`priority`),
+  KEY `idx_is_public` (`is_public`, `is_active`, `created_at`),
+  KEY `idx_service_point` (`service_point_id`, `created_at`),
+  KEY `idx_user_id` (`user_id`, `read_at`),
+  KEY `idx_expires_at` (`expires_at`),
+  CONSTRAINT `fk_notifications_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`),
+  CONSTRAINT `fk_notifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_notifications_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`),
+  CONSTRAINT `fk_notifications_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Notification preferences table
+CREATE TABLE `notification_preferences` (
+  `preference_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `notification_type` varchar(50) NOT NULL,
+  `email_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `sms_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `push_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `telegram_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `line_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`preference_id`),
+  UNIQUE KEY `user_notification_type` (`user_id`, `notification_type`),
+  CONSTRAINT `fk_notification_preferences_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Notification deliveries table
+CREATE TABLE `notification_deliveries` (
+  `delivery_id` int(11) NOT NULL AUTO_INCREMENT,
+  `notification_id` int(11) NOT NULL,
+  `delivery_method` enum('email','sms','push','telegram','line','system') NOT NULL,
+  `recipient` varchar(255) NOT NULL,
+  `status` enum('pending','sent','delivered','failed','bounced') NOT NULL DEFAULT 'pending',
+  `sent_at` datetime DEFAULT NULL,
+  `delivered_at` datetime DEFAULT NULL,
+  `error_message` text,
+  `retry_count` int(11) NOT NULL DEFAULT 0,
+  `metadata` json DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`delivery_id`),
+  KEY `idx_notification_id` (`notification_id`),
+  KEY `idx_delivery_method` (`delivery_method`),
+  KEY `idx_status` (`status`),
+  KEY `idx_sent_at` (`sent_at`),
+  CONSTRAINT `fk_notification_deliveries_notification` FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`notification_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 5. AUTO RESET SYSTEM TABLES
+-- =====================================================
+
+-- Auto reset schedules table
+CREATE TABLE `auto_reset_schedules` (
+  `schedule_id` int(11) NOT NULL AUTO_INCREMENT,
+  `schedule_name` varchar(100) NOT NULL,
+  `reset_type` enum('daily','weekly','monthly','custom') NOT NULL DEFAULT 'daily',
+  `reset_time` time NOT NULL DEFAULT '00:00:00',
+  `reset_days` json DEFAULT NULL,
+  `service_type_ids` json DEFAULT NULL,
+  `backup_before_reset` tinyint(1) NOT NULL DEFAULT 1,
+  `send_notification` tinyint(1) NOT NULL DEFAULT 1,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_run` datetime DEFAULT NULL,
+  `next_run` datetime DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`schedule_id`),
+  KEY `idx_reset_type` (`reset_type`),
+  KEY `idx_is_active` (`is_active`),
+  KEY `idx_next_run` (`next_run`),
+  CONSTRAINT `fk_auto_reset_schedules_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Auto reset logs table
+CREATE TABLE `auto_reset_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `schedule_id` int(11) DEFAULT NULL,
+  `reset_type` varchar(50) NOT NULL,
+  `service_type_ids` json DEFAULT NULL,
+  `queues_reset` int(11) NOT NULL DEFAULT 0,
+  `backup_created` tinyint(1) NOT NULL DEFAULT 0,
+  `backup_file` varchar(255) DEFAULT NULL,
+  `status` enum('success','failed','partial') NOT NULL DEFAULT 'success',
+  `error_message` text,
+  `execution_time` decimal(10,3) DEFAULT NULL,
+  `triggered_by` enum('schedule','manual','api') NOT NULL DEFAULT 'schedule',
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_schedule_id` (`schedule_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_triggered_by` (`triggered_by`),
+  CONSTRAINT `fk_auto_reset_logs_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `auto_reset_schedules` (`schedule_id`),
+  CONSTRAINT `fk_auto_reset_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 6. REPORTING SYSTEM TABLES
+-- =====================================================
+
+-- Report templates table
+CREATE TABLE `report_templates` (
+  `template_id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_name` varchar(100) NOT NULL,
+  `template_code` varchar(50) NOT NULL,
+  `description` text,
+  `category` varchar(50) DEFAULT 'general',
+  `sql_query` text NOT NULL,
+  `parameters` json DEFAULT NULL,
+  `output_formats` json DEFAULT NULL,
+  `is_public` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`template_id`),
+  UNIQUE KEY `template_code` (`template_code`),
+  KEY `idx_category` (`category`),
+  KEY `idx_is_active` (`is_active`),
+  CONSTRAINT `fk_report_templates_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Scheduled reports table
+CREATE TABLE `scheduled_reports` (
+  `schedule_id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `schedule_name` varchar(100) NOT NULL,
+  `frequency` enum('daily','weekly','monthly','quarterly','yearly') NOT NULL DEFAULT 'daily',
+  `schedule_time` time NOT NULL DEFAULT '08:00:00',
+  `schedule_days` json DEFAULT NULL,
+  `parameters` json DEFAULT NULL,
+  `output_format` varchar(20) NOT NULL DEFAULT 'pdf',
+  `recipients` json DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_run` datetime DEFAULT NULL,
+  `next_run` datetime DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`schedule_id`),
+  KEY `idx_template_id` (`template_id`),
+  KEY `idx_frequency` (`frequency`),
+  KEY `idx_is_active` (`is_active`),
+  KEY `idx_next_run` (`next_run`),
+  CONSTRAINT `fk_scheduled_reports_template` FOREIGN KEY (`template_id`) REFERENCES `report_templates` (`template_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_scheduled_reports_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Report execution logs table
+CREATE TABLE `report_execution_logs` (
+  `execution_id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) DEFAULT NULL,
+  `schedule_id` int(11) DEFAULT NULL,
+  `report_name` varchar(100) NOT NULL,
+  `parameters` json DEFAULT NULL,
+  `output_format` varchar(20) NOT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `execution_time` decimal(10,3) DEFAULT NULL,
+  `status` enum('pending','running','completed','failed') NOT NULL DEFAULT 'pending',
+  `error_message` text,
+  `generated_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`execution_id`),
+  KEY `idx_template_id` (`template_id`),
+  KEY `idx_schedule_id` (`schedule_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_report_execution_logs_template` FOREIGN KEY (`template_id`) REFERENCES `report_templates` (`template_id`),
+  CONSTRAINT `fk_report_execution_logs_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `scheduled_reports` (`schedule_id`),
+  CONSTRAINT `fk_report_execution_logs_generated_by` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Daily performance summary table
+CREATE TABLE `daily_performance_summary` (
+  `summary_id` int(11) NOT NULL AUTO_INCREMENT,
+  `summary_date` date NOT NULL,
+  `service_type_id` int(11) DEFAULT NULL,
+  `service_point_id` int(11) DEFAULT NULL,
+  `total_queues` int(11) NOT NULL DEFAULT 0,
+  `completed_queues` int(11) NOT NULL DEFAULT 0,
+  `cancelled_queues` int(11) NOT NULL DEFAULT 0,
+  `no_show_queues` int(11) NOT NULL DEFAULT 0,
+  `average_wait_time` decimal(10,2) DEFAULT NULL,
+  `average_service_time` decimal(10,2) DEFAULT NULL,
+  `peak_hour` varchar(5) DEFAULT NULL,
+  `efficiency_rate` decimal(5,2) DEFAULT NULL,
+  `satisfaction_score` decimal(3,2) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`summary_id`),
+  UNIQUE KEY `unique_daily_summary` (`summary_date`, `service_type_id`, `service_point_id`),
+  KEY `idx_summary_date` (`summary_date`),
+  KEY `idx_service_type` (`service_type_id`),
+  KEY `idx_service_point` (`service_point_id`),
+  CONSTRAINT `fk_daily_performance_summary_service_type` FOREIGN KEY (`service_type_id`) REFERENCES `service_types` (`service_type_id`),
+  CONSTRAINT `fk_daily_performance_summary_service_point` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 7. DASHBOARD ANALYTICS TABLES
+-- =====================================================
+
+-- Dashboard widgets table
+CREATE TABLE `dashboard_widgets` (
+  `widget_id` int(11) NOT NULL AUTO_INCREMENT,
+  `widget_code` varchar(50) NOT NULL,
+  `widget_name` varchar(100) NOT NULL,
+  `widget_type` enum('chart','metric','table','custom') NOT NULL DEFAULT 'metric',
+  `description` text,
+  `data_source` varchar(100) NOT NULL,
+  `configuration` json DEFAULT NULL,
+  `refresh_interval` int(11) NOT NULL DEFAULT 30,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`widget_id`),
+  UNIQUE KEY `widget_code` (`widget_code`),
+  KEY `idx_widget_type` (`widget_type`),
+  KEY `idx_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dashboard layouts table
+CREATE TABLE `dashboard_layouts` (
+  `layout_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `dashboard_type` enum('admin','staff','monitor') NOT NULL DEFAULT 'admin',
+  `layout_name` varchar(100) NOT NULL,
+  `layout_config` json NOT NULL,
+  `is_default` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`layout_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_dashboard_type` (`dashboard_type`),
+  CONSTRAINT `fk_dashboard_layouts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dashboard preferences table
+CREATE TABLE `dashboard_preferences` (
+  `preference_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `preference_key` varchar(100) NOT NULL,
+  `preference_value` text,
+  `preference_type` enum('boolean','integer','string','json') NOT NULL DEFAULT 'string',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`preference_id`),
+  UNIQUE KEY `user_preference` (`user_id`, `preference_key`),
+  CONSTRAINT `fk_dashboard_preferences_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dashboard alerts table
+CREATE TABLE `dashboard_alerts` (
+  `alert_id` int(11) NOT NULL AUTO_INCREMENT,
+  `alert_type` varchar(50) NOT NULL,
+  `alert_title` varchar(255) NOT NULL,
+  `alert_message` text NOT NULL,
+  `severity` enum('info','warning','error','critical') NOT NULL DEFAULT 'info',
+  `conditions` json DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `triggered_at` datetime DEFAULT NULL,
+  `acknowledged_at` datetime DEFAULT NULL,
+  `acknowledged_by` int(11) DEFAULT NULL,
+  `auto_resolve` tinyint(1) NOT NULL DEFAULT 0,
+  `resolve_after` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`alert_id`),
+  KEY `idx_alert_type` (`alert_type`),
+  KEY `idx_severity` (`severity`),
+  KEY `idx_is_active` (`is_active`),
+  KEY `idx_triggered_at` (`triggered_at`),
+  CONSTRAINT `fk_dashboard_alerts_acknowledged_by` FOREIGN KEY (`acknowledged_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 8. MOBILE API TABLES
+-- =====================================================
+
+-- API access tokens table
+CREATE TABLE `api_access_tokens` (
+  `token_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `token_hash` varchar(255) NOT NULL,
+  `token_name` varchar(100) DEFAULT NULL,
+  `permissions` json DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `last_used_at` datetime DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`token_id`),
+  UNIQUE KEY `token_hash` (`token_hash`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_is_active` (`is_active`),
+  CONSTRAINT `fk_api_access_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Mobile app sessions table
+CREATE TABLE `mobile_app_sessions` (
+  `session_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `device_id` varchar(255) DEFAULT NULL,
+  `device_type` enum('ios','android','web') NOT NULL DEFAULT 'web',
+  `app_version` varchar(20) DEFAULT NULL,
+  `fcm_token` varchar(255) DEFAULT NULL,
+  `session_token` varchar(255) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_activity` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`session_id`),
+  UNIQUE KEY `session_token` (`session_token`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_device_id` (`device_id`),
+  KEY `idx_expires_at` (`expires_at`),
+  CONSTRAINT `fk_mobile_app_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- API request logs table
+CREATE TABLE `api_request_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `endpoint` varchar(255) NOT NULL,
+  `method` varchar(10) NOT NULL,
+  `request_data` json DEFAULT NULL,
+  `response_code` int(11) NOT NULL,
+  `response_time` decimal(10,3) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text,
+  `error_message` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_endpoint` (`endpoint`),
+  KEY `idx_response_code` (`response_code`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_api_request_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 9. SECURITY TABLES
+-- =====================================================
+
+-- Security logs table
+CREATE TABLE `security_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `event_type` varchar(50) NOT NULL,
+  `severity` enum('low','medium','high','critical') NOT NULL DEFAULT 'medium',
+  `user_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text,
+  `event_data` json DEFAULT NULL,
+  `description` text,
+  `is_resolved` tinyint(1) NOT NULL DEFAULT 0,
+  `resolved_by` int(11) DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_event_type` (`event_type`),
+  KEY `idx_severity` (`severity`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_is_resolved` (`is_resolved`),
+  CONSTRAINT `fk_security_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_security_logs_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Two factor auth table
+CREATE TABLE `two_factor_auth` (
+  `tfa_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `secret_key` varchar(255) NOT NULL,
+  `backup_codes` json DEFAULT NULL,
+  `is_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `last_used` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`tfa_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_two_factor_auth_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Password history table
+CREATE TABLE `password_history` (
+  `history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`history_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_password_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- User sessions table
+CREATE TABLE `user_sessions` (
+  `session_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `session_token` varchar(255) NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text,
+  `expires_at` datetime NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_activity` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`session_id`),
+  UNIQUE KEY `session_token` (`session_token`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_is_active` (`is_active`),
+  CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- File upload logs table
+CREATE TABLE `file_upload_logs` (
+  `upload_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `original_filename` varchar(255) NOT NULL,
+  `stored_filename` varchar(255) NOT NULL,
+  `file_path` varchar(500) NOT NULL,
+  `file_size` int(11) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `upload_type` varchar(50) DEFAULT 'general',
+  `scan_status` enum('pending','clean','infected','error') DEFAULT 'pending',
+  `scan_result` text,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`upload_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_upload_type` (`upload_type`),
+  KEY `idx_scan_status` (`scan_status`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_file_upload_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 10. AUDIT LOGS TABLE
+-- =====================================================
+
+-- Audit logs table
+CREATE TABLE `audit_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `action` varchar(100) NOT NULL,
+  `table_name` varchar(100) DEFAULT NULL,
+  `record_id` int(11) DEFAULT NULL,
+  `old_values` json DEFAULT NULL,
+  `new_values` json DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_action` (`action`),
+  KEY `idx_table_name` (`table_name`),
+  KEY `idx_record_id` (`record_id`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_audit_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 11. SYSTEM SETTINGS TABLE
+-- =====================================================
+
+-- System settings table
+CREATE TABLE `system_settings` (
+  `setting_id` int(11) NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` longtext,
+  `setting_type` enum('boolean','integer','string','json','text') NOT NULL DEFAULT 'string',
+  `category` varchar(50) NOT NULL DEFAULT 'general',
+  `description` text,
+  `is_public` tinyint(1) NOT NULL DEFAULT 0,
+  `is_editable` tinyint(1) NOT NULL DEFAULT 1,
+  `validation_rules` json DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`setting_id`),
+  UNIQUE KEY `setting_key` (`setting_key`),
+  KEY `idx_category` (`category`),
+  KEY `idx_is_public` (`is_public`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- FOREIGN KEY CONSTRAINTS
+-- =====================================================
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================================================
+-- INDEXES FOR PERFORMANCE
+-- =====================================================
+
+-- Additional composite indexes for better performance
+CREATE INDEX idx_queues_status_created ON queues(status, created_at);
+CREATE INDEX idx_queues_service_type_status ON queues(service_type_id, status);
+CREATE INDEX idx_queue_history_queue_created ON queue_history(queue_id, created_at);
+CREATE INDEX idx_notifications_public_active ON notifications(is_public, is_active, created_at);
+CREATE INDEX idx_audio_call_history_created ON audio_call_history(created_at, audio_type);
+CREATE INDEX idx_daily_summary_date_service ON daily_performance_summary(summary_date, service_type_id);
+
+-- =====================================================
+-- TRIGGERS FOR AUDIT LOGGING
+-- =====================================================
+
+DELIMITER $$
+
+-- Trigger for users table
+CREATE TRIGGER tr_users_audit_insert AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+    INSERT INTO audit_logs (user_id, action, table_name, record_id, new_values, ip_address)
+    VALUES (NEW.user_id, 'INSERT', 'users', NEW.user_id, 
+            JSON_OBJECT('username', NEW.username, 'email', NEW.email, 'full_name', NEW.full_name, 'role_id', NEW.role_id),
+            @user_ip);
+END$$
+
+CREATE TRIGGER tr_users_audit_update AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+    INSERT INTO audit_logs (user_id, action, table_name, record_id, old_values, new_values, ip_address)
+    VALUES (NEW.user_id, 'UPDATE', 'users', NEW.user_id,
+            JSON_OBJECT('username', OLD.username, 'email', OLD.email, 'full_name', OLD.full_name, 'role_id', OLD.role_id),
+            JSON_OBJECT('username', NEW.username, 'email', NEW.email, 'full_name', NEW.full_name, 'role_id', NEW.role_id),
+            @user_ip);
+END$$
+
+-- Trigger for queues table
+CREATE TRIGGER tr_queues_audit_insert AFTER INSERT ON queues
+FOR EACH ROW
+BEGIN
+    INSERT INTO audit_logs (user_id, action, table_name, record_id, new_values, ip_address)
+    VALUES (NEW.created_by, 'INSERT', 'queues', NEW.queue_id,
+            JSON_OBJECT('queue_number', NEW.queue_number, 'service_type_id', NEW.service_type_id, 'status', NEW.status),
+            @user_ip);
+END$$
+
+CREATE TRIGGER tr_queues_audit_update AFTER UPDATE ON queues
+FOR EACH ROW
+BEGIN
+    INSERT INTO audit_logs (user_id, action, table_name, record_id, old_values, new_values, ip_address)
+    VALUES (NEW.updated_by, 'UPDATE', 'queues', NEW.queue_id,
+            JSON_OBJECT('status', OLD.status, 'current_service_point_id', OLD.current_service_point_id),
+            JSON_OBJECT('status', NEW.status, 'current_service_point_id', NEW.current_service_point_id),
+            @user_ip);
+END$$
+
+DELIMITER ;
+
+-- =====================================================
+-- VIEWS FOR COMMON QUERIES
+-- =====================================================
+
+-- View for queue statistics
+CREATE VIEW v_queue_statistics AS
+SELECT 
+    DATE(created_at) as queue_date,
+    service_type_id,
+    COUNT(*) as total_queues,
+    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_queues,
+    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_queues,
+    SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) as no_show_queues,
+    AVG(CASE WHEN actual_wait_time IS NOT NULL THEN actual_wait_time END) as avg_wait_time,
+    AVG(CASE WHEN service_duration IS NOT NULL THEN service_duration END) as avg_service_time
+FROM queues 
+GROUP BY DATE(created_at), service_type_id;
+
+-- View for current queue status
+CREATE VIEW v_current_queue_status AS
 SELECT 
     q.queue_id,
+    q.queue_number,
+    q.service_type_id,
+    st.service_name,
+    q.patient_name,
+    q.status,
+    q.priority,
     q.current_service_point_id,
-    'created',
-    'Created (Backfilled History)',
-    q.creation_time
-FROM 
-    queues q
-WHERE 
-    NOT EXISTS (
-        SELECT 1 
-        FROM service_flow_history sfh 
-        WHERE sfh.queue_id = q.queue_id AND sfh.action = 'created'
-    );
+    sp.point_name as service_point_name,
+    q.created_at,
+    q.called_at,
+    q.estimated_wait_time
+FROM queues q
+LEFT JOIN service_types st ON q.service_type_id = st.service_type_id
+LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
+WHERE DATE(q.created_at) = CURDATE()
+AND q.status IN ('waiting', 'called', 'serving');
+
+-- View for service point performance
+CREATE VIEW v_service_point_performance AS
+SELECT 
+    sp.service_point_id,
+    sp.point_name,
+    DATE(q.created_at) as performance_date,
+    COUNT(q.queue_id) as total_served,
+    AVG(q.service_duration) as avg_service_time,
+    SUM(CASE WHEN q.status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+    (SUM(CASE WHEN q.status = 'completed' THEN 1 ELSE 0 END) / COUNT(q.queue_id) * 100) as completion_rate
+FROM service_points sp
+LEFT JOIN queues q ON sp.service_point_id = q.current_service_point_id
+WHERE q.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY sp.service_point_id, DATE(q.created_at);
+
+COMMIT;
 
 -- =====================================================
--- END OF SCRIPT
+-- END OF SCHEMA
 -- =====================================================
