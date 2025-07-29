@@ -20,8 +20,9 @@ if ($servicePointId) {
 }
 
 $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
-$ttsEnabled = getSetting('tts_enabled', '1');
-$queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
+// These settings will be fetched dynamically via API for real-time updates
+// $ttsEnabled = getSetting('tts_enabled', '1');
+// $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
 ?>
 
 <!DOCTYPE html>
@@ -508,16 +509,16 @@ renderMonitorNotificationSystem($servicePointId);
         let servicePointId = <?php echo json_encode($servicePointId); ?>;
         let lastCalledQueue = null;
         let lastCalledCount = 0; // เพิ่มตัวแปรเก็บจำนวนครั้งที่เรียกล่าสุด
-        let audioEnabled = <?php echo $ttsEnabled == '1' ? 'true' : 'false'; ?>;
+        let audioEnabled = false; // Default to false, will be set by settings
         let speechSynthesisReady = false;
         let voices = [];
-        let queueCallTemplate = <?php echo json_encode($queueCallTemplate); ?>;
-        let ttsApiUrl = <?php echo json_encode(getSetting('tts_api_url', '')); ?>;
-        
-        // เพิ่มตัวแปร debug
-        let debugMode = true;
+        let currentTTSProvider = 'browser'; // 'browser' or 'api'
         let audioContext = null;
         let speechSynthesisSupported = false;
+        let isSpeaking = false; // Flag to prevent overlapping speech
+
+        // Debug mode toggle
+        let debugMode = false; // Set to true for development, false for production
 
         function debugLog(message, data = null) {
             if (debugMode) {
@@ -536,20 +537,15 @@ renderMonitorNotificationSystem($servicePointId);
             // Refresh queue data every 3 seconds
             setInterval(loadQueueData, 3000);
 
-            // เพิ่มใน $(document).ready()
+            // Check Speech Synthesis status periodically
             setInterval(function() {
-                // ตรวจสอบสถานะ Speech Synthesis ทุก 10 วินาที
-                if (audioEnabled && speechSynthesis) {
-                    const voices = speechSynthesis.getVoices();
-                    if (voices.length === 0 && speechSynthesisReady) {
-                        console.log('Voices lost, reinitializing...');
-                        speechSynthesisReady = false;
-                        initializeAudio();
-                    }
+                if (audioEnabled && speechSynthesisSupported && !speechSynthesisReady) {
+                    debugLog('Voices lost or not ready, reinitializing...');
+                    initializeAudio();
                 }
             }, 10000);
 
-            // เพิ่มการจัดการ user interaction สำหรับ unlock audio
+            // Add user interaction handling for unlocking audio
             let audioUnlocked = false;
             
             function unlockAudio() {
@@ -559,7 +555,7 @@ renderMonitorNotificationSystem($servicePointId);
                     // Unlock AudioContext
                     unlockAudioContext();
                     
-                    // เตรียม Speech Synthesis
+                    // Prepare Speech Synthesis if not ready
                     if (speechSynthesisSupported && !speechSynthesisReady) {
                         initializeAudio();
                     }
@@ -569,35 +565,32 @@ renderMonitorNotificationSystem($servicePointId);
                 }
             }
             
-            // เพิ่ม event listeners สำหรับ unlock audio
+            // Add event listeners for unlock audio
             document.addEventListener('click', unlockAudio, { once: true });
             document.addEventListener('touchstart', unlockAudio, { once: true });
             document.addEventListener('keydown', unlockAudio, { once: true });
             
-            // แสดงข้อความแนะนำ
-            if (!audioUnlocked) {
-                setTimeout(() => {
-                    if (audioEnabled && !audioUnlocked) {
-                        console.log('💡 คลิกที่หน้าจอเพื่อเปิดใช้งานเสียง');
-                    }
-                }, 2000);
+            // Load audio settings from localStorage
+            const savedAudioEnabled = localStorage.getItem('audioEnabled');
+            if (savedAudioEnabled !== null) {
+                audioEnabled = savedAudioEnabled === 'true';
             }
+            updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
         });
         
-        // ฟังก์ชันสำหรับดึงการตั้งค่าปัจจุบัน
+        // Function to fetch current settings
         function refreshSettings() {
             return $.get('../api/get_settings.php').then(function(settings) {
-                // อัปเดตการตั้งค่าทั้งหมด
+                // Update all relevant settings
                 audioEnabled = settings.tts_enabled == '1';
-                queueCallTemplate = settings.queue_call_template || 'หมายเลข {queue_number} เชิญที่ {service_point_name}';
-                ttsApiUrl = settings.tts_api_url || '';
+                currentTTSProvider = settings.tts_provider || 'browser';
                 
-                console.log('Settings refreshed:', {
+                debugLog('Settings refreshed:', {
                     audioEnabled: audioEnabled,
-                    ttsApiUrl: ttsApiUrl,
-                    queueCallTemplate: queueCallTemplate
+                    currentTTSProvider: currentTTSProvider
                 });
                 
+                updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
                 return settings;
             }).fail(function() {
                 console.error('Failed to refresh settings');
@@ -605,83 +598,63 @@ renderMonitorNotificationSystem($servicePointId);
             });
         }
         
-        // ปรับปรุงฟังก์ชัน initializeAudio
+        // Initialize Audio System
         function initializeAudio() {
             debugLog('Initializing audio system...');
             
-            // ตรวจสอบการรองรับ Speech Synthesis
+            // Check for Speech Synthesis support
             if (!window.speechSynthesis) {
-                audioEnabled = false;
                 speechSynthesisSupported = false;
                 updateAudioStatus('ไม่รองรับเสียง', 'disabled');
                 debugLog('Speech Synthesis not supported');
-                return;
+            } else {
+                speechSynthesisSupported = true;
+                debugLog('Speech Synthesis supported');
+                
+                // Wait for voices to load
+                function loadVoices() {
+                    voices = speechSynthesis.getVoices();
+                    debugLog('Available voices:', voices.length);
+                    
+                    if (voices.length > 0) {
+                        speechSynthesisReady = true;
+                        debugLog('Voices loaded successfully', voices.map(v => v.name));
+                        // Auto-test audio after voices loaded if enabled
+                        if (audioEnabled) {
+                            debugLog('Auto-testing audio after voices loaded');
+                            testAudioQuiet();
+                        }
+                    } else {
+                        debugLog('No voices available, retrying...');
+                        setTimeout(loadVoices, 500);
+                    }
+                }
+                
+                speechSynthesis.onvoiceschanged = loadVoices;
+                loadVoices(); // Call immediately in case voices are already ready
             }
             
-            speechSynthesisSupported = true;
-            debugLog('Speech Synthesis supported');
-            
-            // สร้าง AudioContext สำหรับ unlock audio
+            // Create AudioContext for playing fetched audio
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 debugLog('AudioContext created', audioContext.state);
             } catch (e) {
                 debugLog('AudioContext creation failed', e);
             }
-            
-            // รอให้ voices โหลดเสร็จ
-            function loadVoices() {
-                voices = speechSynthesis.getVoices();
-                debugLog('Available voices:', voices.length);
-                
-                if (voices.length > 0) {
-                    speechSynthesisReady = true;
-                    updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
-                    debugLog('Voices loaded successfully', voices.map(v => v.name));
-                    
-                    // ทดสอบเสียงอัตโนมัติหลังจากโหลด voices เสร็จ
-                    setTimeout(() => {
-                        if (audioEnabled) {
-                            debugLog('Auto-testing audio after voices loaded');
-                            testAudioQuiet();
-                        }
-                    }, 1000);
-                } else {
-                    debugLog('No voices available, retrying...');
-                    setTimeout(loadVoices, 500);
-                }
-            }
-            
-            // Event listener สำหรับการโหลด voices
-            speechSynthesis.onvoiceschanged = loadVoices;
-            
-            // เรียกทันทีในกรณีที่ voices พร้อมแล้ว
-            loadVoices();
-            
-            // เตรียม speechSynthesis ด้วยการเล่นเสียงเงียบ
-            prepareSpeechSynthesis();
         }
 
-        // เพิ่มฟังก์ชันทดสอบเสียงแบบเงียบ
+        // Function to test audio quietly (for initialization)
         function testAudioQuiet() {
             debugLog('Testing audio quietly...');
             try {
-                const utterance = new SpeechSynthesisUtterance('ทดสอบ');
+                const utterance = new SpeechSynthesisUtterance(' '); // Use a silent utterance
                 utterance.volume = 0.01;
                 utterance.rate = 10;
                 utterance.pitch = 1;
                 
-                utterance.onstart = function() {
-                    debugLog('Quiet test audio started');
-                };
-                
-                utterance.onend = function() {
-                    debugLog('Quiet test audio ended - system ready');
-                };
-                
-                utterance.onerror = function(event) {
-                    debugLog('Quiet test audio error:', event.error);
-                };
+                utterance.onstart = function() { debugLog('Quiet test audio started'); };
+                utterance.onend = function() { debugLog('Quiet test audio ended - system ready'); };
+                utterance.onerror = function(event) { debugLog('Quiet test audio error:', event.error); };
                 
                 speechSynthesis.speak(utterance);
             } catch (error) {
@@ -689,43 +662,7 @@ renderMonitorNotificationSystem($servicePointId);
             }
         }
         
-        // ปรับปรุงฟังก์ชัน prepareSpeechSynthesis
-        function prepareSpeechSynthesis() {
-            debugLog('Preparing speech synthesis...');
-            
-            try {
-                if (!speechSynthesis) {
-                    debugLog('Speech Synthesis not available');
-                    return;
-                }
-
-                // ยกเลิกการพูดที่อาจค้างอยู่
-                speechSynthesis.cancel();
-                
-                // รอสักครู่แล้วสร้าง utterance เงียบ
-                setTimeout(() => {
-                    const utterance = new SpeechSynthesisUtterance(' ');
-                    utterance.volume = 0.01;
-                    utterance.rate = 10;
-                    utterance.pitch = 1;
-                    
-                    utterance.onend = function() {
-                        debugLog('Speech synthesis prepared successfully');
-                    };
-                    
-                    utterance.onerror = function(event) {
-                        debugLog('Preparation error:', event.error);
-                    };
-                    
-                    speechSynthesis.speak(utterance);
-                }, 100);
-                
-            } catch (error) {
-                debugLog('Failed to prepare speech synthesis:', error);
-            }
-        }
-        
-        // เพิ่มฟังก์ชัน unlock audio context
+        // Function to unlock audio context (required by browsers for autoplay)
         function unlockAudioContext() {
             if (audioContext && audioContext.state === 'suspended') {
                 debugLog('Unlocking audio context...');
@@ -737,40 +674,159 @@ renderMonitorNotificationSystem($servicePointId);
             }
         }
 
-        // ปรับปรุงฟังก์ชัน testAudio
-        function testAudio() {
-            debugLog('Manual audio test triggered');
+        // Main function to speak text (handles both browser TTS and API TTS)
+        function speakText(text, ttsUrl = null, ttsParams = null) {
+            if (isSpeaking) {
+                debugLog('Already speaking, queuing new speech.');
+                // Optionally queue speech here, or just ignore
+                return;
+            }
+            isSpeaking = true;
+            debugLog('Starting speakText:', { text, ttsUrl, ttsParams });
             
-            // Unlock audio context ก่อน
-            unlockAudioContext();
-            
-            // ดึงการตั้งค่าปัจจุบันก่อนทดสอบ
-            refreshSettings().then(function(settings) {
-                debugLog('Settings refreshed for test', settings);
-                
-                if (!speechSynthesisReady || !audioEnabled) {
-                    if (!speechSynthesisReady) {
-                        alert('ระบบเสียงยังไม่พร้อม กรุณารอสักครู่');
-                        debugLog('Audio not ready - reinitializing');
-                        initializeAudio();
-                    } else {
-                        alert('เสียงถูกปิดอยู่ กรุณาเปิดเสียงก่อน');
-                        debugLog('Audio disabled by user');
+            unlockAudioContext(); // Ensure audio context is unlocked
+
+            const onSpeechEnd = () => {
+                isSpeaking = false;
+                debugLog('Speech ended.');
+                updateAudioStatus('เสียงพร้อม', 'enabled');
+            };
+
+            const onSpeechError = (error) => {
+                isSpeaking = false;
+                debugLog('Speech error:', error);
+                updateAudioStatus('เกิดข้อผิดพลาด', 'disabled');
+            };
+
+            if (ttsUrl && currentTTSProvider === 'api') {
+                // Use API for TTS
+                debugLog('Using API for TTS:', ttsUrl);
+                $.ajax({
+                    url: ttsUrl,
+                    type: 'POST',
+                    data: ttsParams,
+                    xhrFields: {
+                        responseType: 'blob' // Expecting audio blob
+                    },
+                    success: function(blob) {
+                        debugLog('Audio blob received, playing...');
+                        const audioUrl = URL.createObjectURL(blob);
+                        const audio = new Audio(audioUrl);
+                        audio.volume = 1.0; // Can be controlled by a setting
+                        audio.onended = onSpeechEnd;
+                        audio.onerror = (e) => onSpeechError(e.message || 'Audio playback error');
+                        audio.play().catch(e => onSpeechError('Audio play failed: ' + e.message));
+                        updateAudioStatus('กำลังพูด...', 'enabled');
+                    },
+                    error: function(xhr, status, error) {
+                        onSpeechError('API TTS failed: ' + error);
+                        // Fallback to browser TTS if API fails
+                        debugLog('API TTS failed, falling back to browser TTS.');
+                        speakWithBrowser(text, onSpeechEnd, onSpeechError);
                     }
-                    return;
+                });
+            } else {
+                // Fallback to browser TTS
+                debugLog('Using browser TTS.');
+                speakWithBrowser(text, onSpeechEnd, onSpeechError);
+            }
+        }
+
+        // Function to speak using browser's SpeechSynthesis
+        function speakWithBrowser(text, onEndCallback, onErrorCallback) {
+            debugLog('Speaking with browser TTS:', text);
+            
+            if (!speechSynthesisSupported || !speechSynthesisReady) {
+                onErrorCallback('Speech Synthesis not ready or supported.');
+                return;
+            }
+
+            if (speechSynthesis.speaking) {
+                debugLog('Cancelling previous browser speech.');
+                speechSynthesis.cancel();
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'th-TH';
+            utterance.rate = 0.8; // Default rate, can be from settings
+            utterance.pitch = 1; // Default pitch, can be from settings
+            utterance.volume = 0.9; // Default volume, can be from settings
+            
+            const thaiVoice = voices.find(voice => 
+                voice.lang.includes('th') || 
+                voice.name.toLowerCase().includes('thai')
+            );
+            
+            if (thaiVoice) {
+                utterance.voice = thaiVoice;
+                debugLog('Using Thai voice:', thaiVoice.name);
+            } else {
+                debugLog('No Thai voice found, using default.');
+            }
+            
+            utterance.onstart = function() {
+                debugLog('Browser speech started successfully.');
+                updateAudioStatus('กำลังพูด...', 'enabled');
+            };
+            
+            utterance.onend = function() {
+                debugLog('Browser speech ended successfully.');
+                if (onEndCallback) onEndCallback();
+            };
+            
+            utterance.onerror = function(event) {
+                debugLog('Browser speech error:', event.error);
+                if (onErrorCallback) onErrorCallback(event.error);
+            };
+            
+            try {
+                speechSynthesis.speak(utterance);
+            } catch (error) {
+                debugLog('Failed to speak with browser TTS:', error);
+                if (onErrorCallback) onErrorCallback(error.message);
+            }
+        }
+
+        // Function to play a short notification sound
+        function playNotificationSound() {
+            debugLog('Playing notification sound.');
+            unlockAudioContext();
+            const audio = new Audio('../assets/audio/notification.mp3'); // Ensure this path is correct
+            audio.volume = 0.5; // Can be controlled by a setting
+            audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
+        }
+
+        // Function to orchestrate audio sequence (notification + main announcement + repeats)
+        function playAudioSequence(message, ttsEnabled, ttsUrl, ttsParams, repeatCount, notificationBefore) {
+            if (!audioEnabled) {
+                debugLog('Audio is disabled, skipping audio sequence.');
+                return;
+            }
+
+            let currentRepeat = 0;
+
+            const playNext = () => {
+                if (currentRepeat < repeatCount) {
+                    debugLog(`Playing audio repeat ${currentRepeat + 1}/${repeatCount}`);
+                    speakText(message, ttsUrl, ttsParams);
+                    currentRepeat++;
+                    // Wait for speech to end before next repeat (simple delay for now)
+                    setTimeout(playNext, (message.length * 80) + 1000); // Estimate speech duration + 1 sec pause
+                } else {
+                    debugLog('Audio sequence completed.');
                 }
-                
-                // Reset ก่อนทดสอบ
-                resetSpeechSynthesis();
-                
-                setTimeout(() => {
-                    const testMessage = 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1';
-                    debugLog('Speaking test message:', testMessage);
-                    speakText(testMessage);
-                }, 500);
-            });
+            };
+
+            if (notificationBefore) {
+                debugLog('Playing notification sound before announcement.');
+                playNotificationSound();
+                setTimeout(playNext, 1000); // Wait for notification sound to finish
+            } else {
+                playNext();
+            }
         }
         
+        // Update audio status display and toggle button
         function updateAudioStatus(text, status) {
             debugLog('Audio status updated:', { text, status });
             
@@ -794,146 +850,70 @@ renderMonitorNotificationSystem($servicePointId);
                 icon.removeClass('fa-volume-up fa-volume-mute').addClass('fa-volume-off');
             }
             
-            // เพิ่มการแสดงสถานะใน console
             debugLog(`Audio Status: ${text} (${status})`);
         }
         
+        // Toggle audio on/off
         function toggleAudio() {
-            if (!speechSynthesisReady) {
-                alert('ระบบเสียงยังไม่พร้อม กรุณารอสักครู่');
+            if (!speechSynthesisSupported && currentTTSProvider === 'browser') {
+                alert('เบราว์เซอร์ของคุณไม่รองรับระบบเสียง');
                 return;
             }
             
             audioEnabled = !audioEnabled;
             updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
             
-            // บันทึกการตั้งค่าใน localStorage
-            localStorage.setItem('audioEnabled', audioEnabled);
+            localStorage.setItem('audioEnabled', audioEnabled); // Save setting
             
             if (audioEnabled) {
-                // ทดสอบเสียงเมื่อเปิด
-                testAudio();
+                testAudio(); // Test audio when enabled
+            } else {
+                if (speechSynthesis && speechSynthesis.speaking) {
+                    speechSynthesis.cancel(); // Stop any ongoing speech
+                }
+                isSpeaking = false;
             }
         }
         
-        function resetSpeechSynthesis() {
-            try {
-                // หยุดการพูดทั้งหมด
-                speechSynthesis.cancel();
-                
-                // รอสักครู่แล้วเตรียมใหม่
-                setTimeout(() => {
-                    prepareSpeechSynthesis();
-                    console.log('Speech synthesis reset completed');
-                }, 300);
-                
-            } catch (error) {
-                console.error('Failed to reset speech synthesis:', error);
-            }
-        }
-        
-        // ปรับปรุงฟังก์ชัน speakWithBrowser
-        function speakWithBrowser(text) {
-            debugLog('Speaking with browser TTS:', text);
+        // Manual audio test
+        function testAudio() {
+            debugLog('Manual audio test triggered');
             
-            try {
-                // ตรวจสอบสถานะ Speech Synthesis
-                if (!speechSynthesis) {
-                    debugLog('Speech Synthesis not available');
+            unlockAudioContext();
+            
+            refreshSettings().then(function(settings) {
+                debugLog('Settings refreshed for test', settings);
+                
+                if (!audioEnabled) {
+                    alert('เสียงถูกปิดอยู่ กรุณาเปิดเสียงก่อน');
+                    debugLog('Audio disabled by user, cannot test.');
                     return;
                 }
-
-                // หยุดการพูดที่อาจกำลังทำงานอยู่
-                if (speechSynthesis.speaking) {
-                    debugLog('Cancelling previous speech');
-                    speechSynthesis.cancel();
-                }
-
-                // รอให้ Speech Synthesis พร้อม
-                const speakWhenReady = () => {
-                    const currentVoices = speechSynthesis.getVoices();
-                    debugLog('Current voices count:', currentVoices.length);
-                    
-                    if (currentVoices.length === 0) {
-                        debugLog('Voices not ready, retrying...');
-                        setTimeout(speakWhenReady, 200);
-                        return;
-                    }
-
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'th-TH';
-                    utterance.rate = 0.8;
-                    utterance.pitch = 1;
-                    utterance.volume = 0.9;
-                    
-                    // หา Thai voice ถ้ามี
-                    const thaiVoice = currentVoices.find(voice => 
-                        voice.lang.includes('th') || 
-                        voice.name.toLowerCase().includes('thai')
-                    );
-                    
-                    if (thaiVoice) {
-                        utterance.voice = thaiVoice;
-                        debugLog('Using Thai voice:', thaiVoice.name);
-                    } else {
-                        debugLog('No Thai voice found, using default');
-                    }
-                    
-                    // Event handlers
-                    utterance.onstart = function() {
-                        debugLog('Browser speech started successfully');
-                        updateAudioStatus('กำลังพูด...', 'enabled');
-                    };
-                    
-                    utterance.onend = function() {
-                        debugLog('Browser speech ended successfully');
-                        updateAudioStatus('เสียงพร้อม', 'enabled');
-                    };
-                    
-                    utterance.onerror = function(event) {
-                        debugLog('Browser speech error:', event.error);
-                        updateAudioStatus('เกิดข้อผิดพลาด: ' + event.error, 'disabled');
-                        
-                        // ลองใหม่ด้วยการตั้งค่าพื้นฐาน
-                        if (event.error === 'network' || event.error === 'synthesis-failed') {
-                            debugLog('Retrying with basic settings...');
-                            setTimeout(() => {
-                                const basicUtterance = new SpeechSynthesisUtterance(text);
-                                basicUtterance.lang = 'th';
-                                basicUtterance.rate = 1;
-                                basicUtterance.pitch = 1;
-                                basicUtterance.volume = 1;
-                                speechSynthesis.speak(basicUtterance);
-                            }, 1000);
+                
+                // Call the backend API to get test audio parameters
+                $.post('../api/play_queue_audio.php', { custom_message: 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', service_point_id: servicePointId || 1 })
+                    .done(function(response) {
+                        if (response.success) {
+                            debugLog('Test audio API response:', response);
+                            playAudioSequence(
+                                response.message,
+                                response.tts_enabled,
+                                response.tts_url,
+                                response.tts_params,
+                                response.repeat_count,
+                                response.notification_before
+                            );
+                        } else {
+                            alert('เกิดข้อผิดพลาดในการทดสอบเสียง: ' + response.message);
+                            debugLog('Test audio API error response:', response.message);
                         }
-                    };
-                    
-                    utterance.onpause = function() {
-                        debugLog('Browser speech paused');
-                    };
-                    
-                    utterance.onresume = function() {
-                        debugLog('Browser speech resumed');
-                    };
-                    
-                    // เล่นเสียง
-                    try {
-                        debugLog('Starting speech synthesis...');
-                        speechSynthesis.speak(utterance);
-                    } catch (error) {
-                        debugLog('Failed to speak:', error);
-                        updateAudioStatus('เกิดข้อผิดพลาด', 'disabled');
-                    }
-                };
-
-        // เริ่มการพูดหลังจาก delay เล็กน้อย
-        setTimeout(speakWhenReady, 100);
-        
-    } catch (error) {
-        debugLog('Browser speech synthesis error:', error);
-        updateAudioStatus('เกิดข้อผิดพลาด', 'disabled');
-    }
-}
+                    })
+                    .fail(function(xhr, status, error) {
+                        alert('ไม่สามารถเชื่อมต่อกับบริการเสียงได้: ' + error);
+                        debugLog('Test audio AJAX failed:', error);
+                    });
+            });
+        }
         
         function formatTime(timeString) {
             if (!timeString) return '-';
@@ -953,14 +933,6 @@ renderMonitorNotificationSystem($servicePointId);
         function showOfflineStatus() {
             $('.status-indicator').removeClass('status-online').css('background-color', '#dc3545');
         }
-        
-        // โหลดการตั้งค่าเสียงจาก localStorage
-        $(document).ready(function() {
-            const savedAudioEnabled = localStorage.getItem('audioEnabled');
-            if (savedAudioEnabled !== null) {
-                audioEnabled = savedAudioEnabled === 'true';
-            }
-        });
         
         // Handle page visibility change
         document.addEventListener('visibilitychange', function() {
@@ -983,6 +955,7 @@ renderMonitorNotificationSystem($servicePointId);
         document.addEventListener('keydown', function(e) {
             // F11 for fullscreen
             if (e.key === 'F11') {
+                e.preventDefault(); // Prevent default browser fullscreen
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
                 } else {
@@ -1008,13 +981,6 @@ renderMonitorNotificationSystem($servicePointId);
             }
         });
         
-        // Click anywhere to enable audio (required by browsers)
-        document.addEventListener('click', function() {
-            if (!speechSynthesisReady) {
-                initializeAudio();
-            }
-        }, { once: true });
-
         function toggleDebug() {
             debugMode = !debugMode;
             const btn = document.getElementById('debugToggle');
@@ -1023,7 +989,7 @@ renderMonitorNotificationSystem($servicePointId);
                 btn.innerHTML = '<i class="fas fa-bug me-1"></i>Debug ON';
                 console.log('🔧 Debug mode enabled');
                 
-                // แสดงข้อมูล debug
+                // Display debug info
                 console.log('Audio Debug Info:', {
                     audioEnabled,
                     speechSynthesisReady,
@@ -1042,7 +1008,7 @@ renderMonitorNotificationSystem($servicePointId);
             }
         }
 
-        // แสดงปุ่ม debug เมื่อกด Ctrl+Shift+D
+        // Show debug button on Ctrl+Shift+D
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.shiftKey && e.key === 'D') {
                 document.getElementById('debugToggle').style.display = 'inline-block';
@@ -1050,84 +1016,152 @@ renderMonitorNotificationSystem($servicePointId);
             }
         });
 
-function loadQueueData() {
-    const url = servicePointId ? 
-        `../api/get_monitor_data.php?service_point_id=${servicePointId}` : 
-        '../api/get_monitor_data.php';
-        
-    $.get(url, function(data) {
-        displayCurrentQueue(data.current);
-        displayWaitingQueues(data.waiting);
-        updateLastUpdate();
-        
-        // Check for newly called queue or repeat call
-        if (data.current) {
-            const currentQueueId = data.current.queue_id;
-            const currentCalledCount = parseInt(data.current.called_count) || 1;
-            
-            // ตรวจสอบการเรียกคิวใหม่หรือเรียกซ้ำ
-            const isNewCall = currentQueueId !== lastCalledQueue;
-            const isRepeatCall = currentQueueId === lastCalledQueue && currentCalledCount > lastCalledCount;
-            
-            if (isNewCall || isRepeatCall) {
-                console.log('Queue call detected:', {
-                    isNewCall: isNewCall,
-                    isRepeatCall: isRepeatCall,
-                    queueId: currentQueueId,
-                    calledCount: currentCalledCount
+        function displayCurrentQueue(queue) {
+            const currentQueueDisplay = $('#currentQueueDisplay');
+            if (queue) {
+                currentQueueDisplay.html(`
+                    <div class="current-queue-number calling-animation">${htmlspecialchars(queue.queue_number)}</div>
+                    <div class="current-queue-info">
+                        <i class="fas fa-user me-2"></i>${htmlspecialchars(queue.patient_name || 'ไม่ระบุชื่อ')}
+                    </div>
+                    <div class="current-queue-info">
+                        <i class="fas fa-clinic-medical me-2"></i>${htmlspecialchars(queue.service_point_name || 'จุดบริการ')}
+                    </div>
+                    <div class="current-queue-info">
+                        <i class="fas fa-tag me-2"></i>${htmlspecialchars(queue.type_name || 'ไม่ระบุประเภท')}
+                    </div>
+                `);
+            } else {
+                currentQueueDisplay.html(`
+                    <div class="no-current-queue">
+                        <i class="fas fa-clock me-2"></i>
+                        รอการเรียกคิว
+                    </div>
+                `);
+            }
+        }
+
+        function displayWaitingQueues(queues) {
+            const waitingQueuesList = $('#waitingQueuesList');
+            waitingQueuesList.empty();
+            if (queues && queues.length > 0) {
+                queues.forEach((queue, index) => {
+                    waitingQueuesList.append(`
+                        <div class="waiting-queue-item">
+                            <div>
+                                <div class="waiting-queue-number">${htmlspecialchars(queue.queue_number)}</div>
+                                <div class="waiting-queue-type">${htmlspecialchars(queue.type_name || 'ไม่ระบุประเภท')}</div>
+                            </div>
+                            <div class="queue-position">คิวที่ ${index + 1}</div>
+                        </div>
+                    `);
                 });
+            } else {
+                waitingQueuesList.html(`
+                    <div class="text-center text-muted mt-4">
+                        <i class="fas fa-box-open me-2"></i>
+                        ไม่มีคิวรอ
+                    </div>
+                `);
+            }
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            $('#currentTime').text(timeString);
+        }
+
+        function htmlspecialchars(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+
+        function loadQueueData() {
+            const url = servicePointId ? 
+                `../api/get_monitor_data.php?service_point_id=${servicePointId}` : 
+                '../api/get_monitor_data.php';
                 
-                // สร้าง notification สำหรับการเรียกคิว
-                if (typeof monitorNotificationSystem !== 'undefined') {
-                    const notificationData = {
-                        notification_id: Date.now(), // ใช้ timestamp เป็น ID ชั่วคราว
-                        type: 'queue_called',
-                        title: 'เรียกคิวแล้ว',
-                        message: `หมายเลข ${data.current.queue_number} เชิญที่ ${data.current.service_point_name || 'จุดบริการ'}`,
-                        priority: 'high',
-                        color: '#28a745',
-                        bg_color: 'rgba(40, 167, 69, 0.1)',
-                        icon: 'fas fa-bullhorn',
-                        display_duration: 8000,
-                        formatted_message: `หมายเลข <strong>${data.current.queue_number}</strong> เชิญที่ <strong>${data.current.service_point_name || 'จุดบริการ'}</strong>`,
-                        service_point_name: data.current.service_point_name
-                    };
+            $.get(url, function(data) {
+                displayCurrentQueue(data.current);
+                displayWaitingQueues(data.waiting);
+                updateLastUpdate();
+                
+                // Check for newly called queue or repeat call
+                if (data.current) {
+                    const currentQueueId = data.current.queue_id;
+                    const currentCalledCount = parseInt(data.current.called_count) || 1;
                     
-                    monitorNotificationSystem.showNotification(notificationData);
-                }
-                
-                // ดึงการตั้งค่าปัจจุบันก่อนเล่นเสียง
-                refreshSettings().then(function(settings) {
-                    if (audioEnabled) {
-                        // หยุดเสียงที่อาจกำลังเล่นอยู่
-                        if (speechSynthesis && speechSynthesis.speaking) {
-                            speechSynthesis.cancel();
+                    // Check if it's a new call or a repeat call
+                    const isNewCall = currentQueueId !== lastCalledQueue;
+                    const isRepeatCall = currentQueueId === lastCalledQueue && currentCalledCount > lastCalledCount;
+                    
+                    if (isNewCall || isRepeatCall) {
+                        debugLog('Queue call detected:', {
+                            isNewCall: isNewCall,
+                            isRepeatCall: isRepeatCall,
+                            queueId: currentQueueId,
+                            calledCount: currentCalledCount
+                        });
+                        
+                        // Create notification for queue call
+                        if (typeof monitorNotificationSystem !== 'undefined') {
+                            const notificationData = {
+                                notification_id: Date.now(), // Use timestamp as temporary ID
+                                type: 'queue_called',
+                                title: 'เรียกคิวแล้ว',
+                                message: `หมายเลข ${data.current.queue_number} เชิญที่ ${data.current.service_point_name || 'จุดบริการ'}`,
+                                priority: 'high',
+                                color: '#28a745',
+                                bg_color: 'rgba(40, 167, 69, 0.1)',
+                                icon: 'fas fa-bullhorn',
+                                display_duration: 8000,
+                                formatted_message: `หมายเลข <strong>${htmlspecialchars(data.current.queue_number)}</strong> เชิญที่ <strong>${htmlspecialchars(data.current.service_point_name || 'จุดบริการ')}</strong>`,
+                                service_point_name: data.current.service_point_name
+                            };
+                            
+                            monitorNotificationSystem.showNotification(notificationData);
                         }
                         
-                        // รอสักครู่แล้วเล่นเสียงใหม่
-                        setTimeout(() => {
-                            announceQueue(data.current);
-                        }, 300);
-                    } else {
-                        // แสดงการประกาศแบบไม่มีเสียง
-                        announceQueue(data.current);
+                        // Fetch audio parameters from backend API
+                        $.post('../api/play_queue_audio.php', { queue_id: currentQueueId, service_point_id: servicePointId })
+                            .done(function(response) {
+                                if (response.success) {
+                                    debugLog('Audio API response for queue:', response);
+                                    playAudioSequence(
+                                        response.message,
+                                        response.tts_enabled,
+                                        response.tts_url,
+                                        response.tts_params,
+                                        response.repeat_count,
+                                        response.notification_before
+                                    );
+                                } else {
+                                    console.error('Failed to get audio parameters from API:', response.message);
+                                }
+                            })
+                            .fail(function(xhr, status, error) {
+                                console.error('AJAX call to play_queue_audio.php failed:', error);
+                            });
                     }
-                });
-            }
-            
-            // อัปเดตค่าล่าสุด
-            lastCalledQueue = currentQueueId;
-            lastCalledCount = currentCalledCount;
-        } else {
-            // ไม่มีคิวปัจจุบัน
-            lastCalledQueue = null;
-            lastCalledCount = 0;
+                    
+                    // Update last values
+                    lastCalledQueue = currentQueueId;
+                    lastCalledCount = currentCalledCount;
+                } else {
+                    // No current queue
+                    lastCalledQueue = null;
+                    lastCalledCount = 0;
+                }
+            }).fail(function() {
+                console.error('Failed to load queue data');
+                showOfflineStatus();
+            });
         }
-    }).fail(function() {
-        console.error('Failed to load queue data');
-        showOfflineStatus();
-    });
-}
     </script>
 </body>
 </html>
