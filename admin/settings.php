@@ -11,10 +11,28 @@ $messageType = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $settings = $_POST['settings'] ?? [];
+        $settingsToUpdate = $_POST['settings'] ?? [];
         
-        foreach ($settings as $key => $value) {
+        // Define all boolean settings that need explicit handling
+        $booleanSettings = [
+            'enable_priority_queue',
+            'auto_forward_enabled',
+            'tts_enabled',
+            'sound_notification_before', // Added this setting
+            'email_notifications',
+            'telegram_notifications'
+        ];
+
+        foreach ($settingsToUpdate as $key => $value) {
             setSetting($key, $value);
+        }
+
+        // Explicitly handle boolean settings (checkboxes)
+        foreach ($booleanSettings as $key) {
+            if (!isset($settingsToUpdate[$key])) {
+                // If the checkbox value is not in the POST data, it means it was unchecked
+                setSetting($key, 'false');
+            }
         }
         
         logActivity("อัปเดตการตั้งค่าระบบ");
@@ -51,7 +69,7 @@ $currentSettings = [
     
     // Audio/TTS Configuration
     'tts_enabled' => getSetting('tts_enabled', 'true'),
-    'tts_provider' => getSetting('tts_provider', 'google'),
+    'tts_provider' => getSetting('tts_provider', 'browser'), // Changed default to 'browser' as per previous fix
     'tts_api_url' => getSetting('tts_api_url', ''),
     'tts_language' => getSetting('tts_language', 'th-TH'),
     'tts_voice' => getSetting('tts_voice', 'th-TH-Standard-A'),
@@ -59,7 +77,7 @@ $currentSettings = [
     'tts_pitch' => getSetting('tts_pitch', '0'),
     'audio_volume' => getSetting('audio_volume', '1.0'),
     'audio_repeat_count' => getSetting('audio_repeat_count', '1'),
-    'sound_notification_before' => getSetting('sound_notification_before', 'true'),
+    'sound_notification_before' => getSetting('sound_notification_before', 'true'), // Added this setting
     
     // Google Cloud TTS
     'google_cloud_project_id' => getSetting('google_cloud_project_id', ''),
@@ -88,7 +106,6 @@ $currentSettings = [
     'telegram_notifications' => getSetting('telegram_notifications', 'false'),
     'telegram_bot_token' => getSetting('telegram_bot_token', ''),
     'telegram_chat_id' => getSetting('telegram_chat_id', ''),
-    'telegram_notify_template' => getSetting('telegram_notify_template', 'คิว {queue_number} กรุณามาที่จุดบริการ {service_point}'),
     'telegram_admin_chat_id' => getSetting('telegram_admin_chat_id', ''),
     'telegram_group_chat_id' => getSetting('telegram_group_chat_id', ''),
 ];
@@ -385,6 +402,12 @@ $currentSettings = [
                                            value="true" <?php echo $currentSettings['tts_enabled'] == 'true' ? 'checked' : ''; ?>>
                                     <label class="form-check-label">เปิดใช้งานระบบเสียงเรียกคิว</label>
                                 </div>
+
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]" 
+                                           value="true" <?php echo $currentSettings['sound_notification_before'] == 'true' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
+                                </div>
                                 
                                 <div class="row">
                                     <div class="col-md-6">
@@ -677,7 +700,7 @@ $currentSettings = [
         function toggleTTSProviderSettings() {
             const provider = $('#tts_provider').val();
             $('.provider-settings').hide();
-            if (provider !== 'browser') {
+            if (provider !== 'browser') { // 'browser' provider doesn't have specific API settings
                 $('#' + provider + '_settings').show();
             }
         }
@@ -704,9 +727,12 @@ $currentSettings = [
             const language = $('select[name="settings[tts_language]"]').val();
             const speed = $('#tts_speed').val();
             const volume = $('#audio_volume').val();
-            
             const message = "ทดสอบระบบเสียงเรียกคิว หมายเลข A001 เชิญที่ห้องตรวจ 1";
             
+            // Disable button during test
+            const testButton = $('button[onclick="testTTS()"]');
+            testButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังทดสอบ...');
+
             if (provider === 'browser') {
                 // Use browser TTS
                 if (window.speechSynthesis) {
@@ -714,9 +740,19 @@ $currentSettings = [
                     utterance.lang = language;
                     utterance.rate = parseFloat(speed);
                     utterance.volume = parseFloat(volume);
+                    
+                    utterance.onend = function() {
+                        alert('ทดสอบเสียงสำเร็จ');
+                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
+                    };
+                    utterance.onerror = function(event) {
+                        alert('เกิดข้อผิดพลาดในการทดสอบ: ' + event.error);
+                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
+                    };
                     speechSynthesis.speak(utterance);
                 } else {
                     alert('เบราว์เซอร์ไม่รองรับระบบเสียง');
+                    testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
                 }
             } else {
                 // Use API
@@ -730,10 +766,6 @@ $currentSettings = [
                         speed: speed,
                         volume: volume
                     },
-                    beforeSend: function() {
-                        $('button[onclick="testTTS()"]').prop('disabled', true)
-                            .html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังทดสอบ...');
-                    },
                     success: function(response) {
                         if (response.success) {
                             alert('ทดสอบเสียงสำเร็จ');
@@ -745,8 +777,7 @@ $currentSettings = [
                         alert('เกิดข้อผิดพลาดในการทดสอบ');
                     },
                     complete: function() {
-                        $('button[onclick="testTTS()"]').prop('disabled', false)
-                            .html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
+                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
                     }
                 });
             }
