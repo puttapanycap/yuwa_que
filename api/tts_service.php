@@ -146,19 +146,25 @@ function generateGoogleTTS($text, $language, $voice, $speed, $pitch) {
     // This is a placeholder for Google Cloud Text-to-Speech integration
     // You would need to implement actual Google Cloud TTS API calls here
     // For now, return false to indicate TTS is not available
-    return false;
+    http_response_code(501);
+    echo json_encode(['error' => 'Google TTS not implemented']);
+    exit;
 }
 
 function generateAzureTTS($text, $language, $voice, $speed, $pitch) {
     // This is a placeholder for Azure Speech Service integration
     // You would need to implement actual Azure Speech API calls here
-    return false;
+    http_response_code(501);
+    echo json_encode(['error' => 'Azure TTS not implemented']);
+    exit;
 }
 
 function generateAmazonTTS($text, $language, $voice, $speed, $pitch) {
     // This is a placeholder for Amazon Polly integration
     // You would need to implement actual Amazon Polly API calls here
-    return false;
+    http_response_code(501);
+    echo json_encode(['error' => 'Amazon TTS not implemented']);
+    exit;
 }
 
 function generateCustomTTS($text, $language, $voice, $speed, $pitch, $apiUrl) {

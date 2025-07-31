@@ -513,10 +513,10 @@ if (!$hasAccess) {
                 
                 container.html(`
                     <div class="queue-card current-queue fade-in">
-                        <div class="card-body">
+                        <div class="card-body px-4 py-2">
                             <div class="row align-items-center">
                                 <div class="col-md-3">
-                                    <div class="queue-number pulse">${queue.queue_number}</div>
+                                    <div class="text-white queue-number pulse">${queue.queue_number}</div>
                                     <small class="text-light">${queue.type_name}</small>
                                 </div>
                                 <div class="col-md-6">
@@ -575,7 +575,7 @@ if (!$hasAccess) {
             queues.forEach(function(queue, index) {
                 html += `
                     <div class="queue-card waiting-queue">
-                        <div class="card-body">
+                        <div class="card-body px-4 py-2">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
                                     <div class="queue-number" style="color: #6c757d;">${queue.queue_number}</div>

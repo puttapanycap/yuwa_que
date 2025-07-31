@@ -23,7 +23,7 @@ if (env('APP_DEBUG', false)) {
 require_once __DIR__ . '/database.php';
 
 // Core Constants (from environment only)
-define('BASE_URL', env('BASE_URL', 'http://localhost'));
+define('BASE_URL', env('BASE_URL'));
 define('ROOT_PATH', dirname(__DIR__));
 define('UPLOAD_PATH', ROOT_PATH . '/' . env('UPLOAD_PATH', 'uploads'));
 define('LOG_PATH', ROOT_PATH . '/' . env('LOG_PATH', 'logs'));

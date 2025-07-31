@@ -1,4 +1,10 @@
 <?php
+/**
+ * This file provides the audio settings page for the admin panel.
+ *
+ * @package Yuwa_Queue
+ */
+
 require_once '../config/config.php';
 requireLogin();
 
@@ -96,11 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errorMessage = 'ไม่สามารถลบรูปแบบข้อความเริ่มต้นได้';
             } else {
                 // Update service points using this template to use default template
-                $stmt = $db->prepare("
+                $stmt = $db->prepare(
+                    "
                     UPDATE service_points 
                     SET voice_template_id = (SELECT template_id FROM voice_templates WHERE is_default = 1 LIMIT 1)
                     WHERE voice_template_id = ?
-                ");
+                    "
+                );
                 $stmt->execute([$templateId]);
                 
                 // Delete template
@@ -384,6 +392,9 @@ try {
                         <a class="nav-link" href="settings.php">
                             <i class="fas fa-cog"></i>การตั้งค่า
                         </a>
+                        <a class="nav-link" href="environment_settings.php">
+                            <i class="fas fa-server"></i>Environment
+                        </a>
                         <a class="nav-link active" href="audio_settings.php">
                             <i class="fas fa-volume-up"></i>ระบบเสียงเรียกคิว
                         </a>
@@ -453,6 +464,11 @@ try {
                         <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" href="#call-history">
                                 <i class="fas fa-history me-2"></i>ประวัติการเรียกเสียง
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#voice-templates-management">
+                                <i class="fas fa-file-alt me-2"></i>จัดการรูปแบบข้อความ
                             </a>
                         </li>
                     </ul>
@@ -716,6 +732,29 @@ try {
                                         <p class="mt-2">กำลังโหลดข้อมูล...</p>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Voice Templates Management Tab -->
+                        <div class="tab-pane fade" id="voice-templates-management">
+                            <div class="content-card">
+                                <h5 class="mb-4">จัดการรูปแบบข้อความ</h5>
+                                <form method="POST" action="">
+                                    <div class="mb-3">
+                                        <label for="template_name" class="form-label">ชื่อรูปแบบ</label>
+                                        <input type="text" class="form-control" id="template_name" name="template_name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="template_text" class="form-label">ข้อความเสียงเรียก</label>
+                                        <textarea class="form-control" id="template_text" name="template_text" rows="3" required></textarea>
+                                        <div class="form-text">
+                                            ตัวแปรที่ใช้ได้: {queue_number}, {service_point_name}, {patient_name}
+                                        </div>
+                                    </div>
+                                    <button type="submit" name="add_template" class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>เพิ่มรูปแบบ
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>

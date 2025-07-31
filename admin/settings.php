@@ -78,6 +78,7 @@ $currentSettings = [
     'audio_volume' => getSetting('audio_volume', '1.0'),
     'audio_repeat_count' => getSetting('audio_repeat_count', '1'),
     'sound_notification_before' => getSetting('sound_notification_before', 'true'), // Added this setting
+    'tts_call_format' => getSetting('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ'),
     
     // Google Cloud TTS
     'google_cloud_project_id' => getSetting('google_cloud_project_id', ''),
@@ -213,9 +214,6 @@ $currentSettings = [
                     <nav class="nav flex-column">
                         <a class="nav-link" href="dashboard.php">
                             <i class="fas fa-tachometer-alt"></i>แดชบอร์ด
-                        </a>
-                        <a class="nav-link" href="realtime_dashboard.php">
-                            <i class="fas fa-chart-line"></i>Dashboard Analytics
                         </a>
                         <a class="nav-link" href="users.php">
                             <i class="fas fa-users"></i>จัดการผู้ใช้
@@ -407,6 +405,15 @@ $currentSettings = [
                                     <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]" 
                                            value="true" <?php echo $currentSettings['sound_notification_before'] == 'true' ? 'checked' : ''; ?>>
                                     <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">รูปแบบประโยคเรียกคิว</label>
+                                    <input type="text" class="form-control" name="settings[tts_call_format]" 
+                                           value="<?php echo htmlspecialchars($currentSettings['tts_call_format']); ?>">
+                                    <div class="form-text">
+                                        ใช้ {queue_number} สำหรับหมายเลขคิว และ {service_point} สำหรับชื่อจุดบริการ
+                                    </div>
                                 </div>
                                 
                                 <div class="row">

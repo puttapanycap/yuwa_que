@@ -1,4 +1,14 @@
 <?php
+/**
+ * This file displays the queue monitoring screen.
+ *
+ * @category Queue
+ * @package  Yuwa_Queue
+ * @author   Your Name <you@example.com>
+ * @license  https://opensource.org/licenses/MIT MIT License
+ * @link     https://github.com/puttapanycap/yuwa_que
+ */
+
 require_once '../config/config.php';
 
 // Get service point from URL parameter
@@ -37,217 +47,220 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <style>
+        :root {
+            --main-bg-color: #ffffff;
+            --primary-green: #4CAF50;
+            --dark-text-color: #333333;
+            --light-text-color: #ffffff;
+            --border-color: #e0e0e0;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
         body {
             font-family: 'Sarabun', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: var(--main-bg-color);
             margin: 0;
             padding: 0;
             overflow: hidden;
+            color: var(--dark-text-color);
         }
 
         .monitor-container {
             height: 100vh;
             display: flex;
             flex-direction: column;
-            color: white;
         }
 
         .header {
-            background: rgba(0,0,0,0.3);
-            padding: clamp(0.5rem, 2vw, 2rem);
+            background-color: var(--primary-green);
+            color: var(--light-text-color);
+            padding: clamp(1rem, 2vw, 1.5rem);
             text-align: center;
-            border-bottom: 3px solid rgba(255,255,255,0.3);
             flex-shrink: 0;
+            box-shadow: 0 2px 4px var(--shadow-color);
         }
 
         .hospital-name {
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
-            font-weight: 800;
-            margin-bottom: 0.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+            font-weight: 700;
+            margin-bottom: 0.25rem;
             line-height: 1.2;
         }
 
         .service-point-name {
-            font-size: clamp(1rem, 3vw, 1.8rem);
-            font-weight: 600;
-            opacity: 0.9;
+            font-size: clamp(1rem, 3vw, 1.6rem);
+            font-weight: 500;
+            opacity: 0.95;
             line-height: 1.2;
         }
 
         .current-time {
-            font-size: clamp(0.8rem, 2vw, 1.2rem);
-            opacity: 0.8;
+            font-size: clamp(0.8rem, 2vw, 1.1rem);
+            opacity: 0.9;
             margin-top: 0.5rem;
         }
 
         .content {
             flex: 1;
             display: flex;
-            padding: clamp(0.5rem, 2vw, 2rem);
-            gap: clamp(0.5rem, 2vw, 2rem);
+            padding: clamp(1rem, 2vw, 2rem);
+            gap: clamp(1rem, 2vw, 2rem);
             min-height: 0;
             overflow: hidden;
+        }
+
+        .current-queue-section,
+        .waiting-queue-section {
+            background-color: var(--main-bg-color);
+            border-radius: clamp(10px, 1.5vw, 15px);
+            padding: clamp(1rem, 2vw, 2rem);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px var(--shadow-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         .current-queue-section {
             flex: 2;
-            background: rgba(255,255,255,0.1);
-            border-radius: clamp(10px, 2vw, 20px);
-            padding: clamp(1rem, 3vw, 2rem);
             text-align: center;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-            display: flex;
-            flex-direction: column;
             justify-content: center;
-            min-height: 0;
         }
 
         .waiting-queue-section {
             flex: 1;
-            background: rgba(255,255,255,0.1);
-            border-radius: clamp(10px, 2vw, 20px);
-            padding: clamp(1rem, 2vw, 2rem);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
             overflow: hidden;
         }
 
         .current-queue-title {
-            font-size: clamp(1.2rem, 3vw, 2rem);
-            font-weight: 700;
-            margin-bottom: clamp(1rem, 3vw, 2rem);
-            color: #FFD700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 600;
+            margin-bottom: clamp(1rem, 2vw, 1.5rem);
+            color: var(--primary-green);
         }
 
         .current-queue-number {
-            font-size: clamp(3rem, 12vw, 8rem);
-            font-weight: 900;
-            color: #FFD700;
-            text-shadow: 4px 4px 8px rgba(0,0,0,0.5);
-            margin: clamp(1rem, 3vw, 2rem) 0;
-            animation: pulse 2s infinite;
+            font-size: clamp(3.5rem, 12vw, 9rem);
+            font-weight: 800;
+            color: var(--primary-green);
+            margin: clamp(1rem, 2vw, 2rem) 0;
             line-height: 1;
+            animation: pulse 1.8s infinite;
         }
 
         @keyframes pulse {
             0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
             100% { transform: scale(1); }
         }
 
         .current-queue-info {
-            font-size: clamp(1rem, 2.5vw, 1.5rem);
-            margin-bottom: 1rem;
-            opacity: 0.9;
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            margin-bottom: 0.8rem;
+            opacity: 0.8;
             line-height: 1.4;
         }
 
         .no-current-queue {
-            font-size: clamp(1.5rem, 4vw, 3rem);
-            color: rgba(255,255,255,0.6);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            color: #999;
             margin: clamp(2rem, 5vw, 4rem) 0;
             line-height: 1.2;
         }
 
         .waiting-title {
-            font-size: clamp(1rem, 2.5vw, 1.5rem);
-            font-weight: 700;
-            margin-bottom: clamp(0.5rem, 2vw, 1.5rem);
+            font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+            font-weight: 600;
+            margin-bottom: clamp(0.8rem, 1.5vw, 1.2rem);
             text-align: center;
-            color: #87CEEB;
+            color: var(--dark-text-color);
             flex-shrink: 0;
         }
 
         .waiting-queues-container {
             flex: 1;
             overflow-y: auto;
-            overflow-x: hidden;
             padding-right: 0.5rem;
         }
 
         .waiting-queue-item {
-            background: rgba(255,255,255,0.1);
-            border-radius: clamp(5px, 1vw, 10px);
-            padding: clamp(0.5rem, 1.5vw, 1rem);
-            margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+            background-color: #f9f9f9;
+            border-radius: clamp(8px, 1vw, 12px);
+            padding: clamp(0.8rem, 1.2vw, 1rem);
+            margin-bottom: clamp(0.5rem, 0.8vw, 0.8rem);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            min-height: clamp(40px, 8vw, 60px);
+            border: 1px solid #f0f0f0;
+            min-height: clamp(45px, 7vw, 65px);
         }
 
         .waiting-queue-number {
-            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-size: clamp(1.1rem, 2.5vw, 1.6rem);
             font-weight: 700;
-            color: #87CEEB;
+            color: var(--dark-text-color);
             line-height: 1;
         }
 
         .waiting-queue-type {
-            font-size: clamp(0.7rem, 1.5vw, 1rem);
-            opacity: 0.8;
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            opacity: 0.7;
             line-height: 1.2;
             margin-top: 0.2rem;
         }
 
         .queue-position {
-            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            font-size: clamp(0.8rem, 2vw, 1.1rem);
             font-weight: 600;
-            background: rgba(255,255,255,0.2);
-            padding: clamp(0.2rem, 0.5vw, 0.3rem) clamp(0.5rem, 1vw, 0.8rem);
-            border-radius: 15px;
+            background-color: var(--primary-green);
+            color: var(--light-text-color);
+            padding: clamp(0.3rem, 0.6vw, 0.4rem) clamp(0.6rem, 1.2vw, 1rem);
+            border-radius: 20px;
             white-space: nowrap;
         }
 
         .footer {
-            background: rgba(0,0,0,0.3);
-            padding: clamp(0.5rem, 1.5vw, 1rem) clamp(1rem, 2vw, 2rem);
-            text-align: center;
-            border-top: 1px solid rgba(255,255,255,0.3);
+            background-color: #f5f5f5;
+            padding: clamp(0.8rem, 1.5vw, 1rem) clamp(1rem, 2vw, 2rem);
+            border-top: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
             flex-shrink: 0;
-            font-size: clamp(0.7rem, 1.5vw, 1rem);
+            font-size: clamp(0.8rem, 1.5vw, 1rem);
         }
 
         .status-indicator {
             display: inline-block;
-            width: clamp(8px, 1.5vw, 12px);
-            height: clamp(8px, 1.5vw, 12px);
+            width: clamp(10px, 1.5vw, 14px);
+            height: clamp(10px, 1.5vw, 14px);
             border-radius: 50%;
             margin-right: 0.5rem;
-            animation: blink 1s infinite;
+            animation: blink 1.2s infinite;
         }
 
         .status-online {
-            background-color: #28a745;
+            background-color: var(--primary-green);
         }
 
         @keyframes blink {
             0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.3; }
+            51%, 100% { opacity: 0.4; }
         }
 
         .announcement {
-            background: rgba(255,193,7,0.2);
-            border: 2px solid #FFD700;
-            border-radius: clamp(8px, 2vw, 15px);
-            padding: clamp(0.5rem, 2vw, 1rem);
-            margin: clamp(0.5rem, 1vw, 1rem) 0;
+            background-color: #e8f5e9;
+            border: 2px solid var(--primary-green);
+            border-radius: clamp(8px, 1.5vw, 12px);
+            padding: clamp(0.8rem, 1.5vw, 1.2rem);
+            margin: clamp(0.8rem, 1vw, 1rem) 0;
             text-align: center;
             font-size: clamp(0.9rem, 2vw, 1.2rem);
             animation: slideIn 0.5s ease-out;
             line-height: 1.4;
+            color: var(--dark-text-color);
         }
 
         @keyframes slideIn {
@@ -256,12 +269,12 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         }
 
         .calling-animation {
-            animation: calling 1s infinite;
+            animation: calling 1.5s infinite;
         }
 
         @keyframes calling {
-            0%, 100% { background-color: rgba(255,215,0,0.3); }
-            50% { background-color: rgba(255,215,0,0.6); }
+            0%, 100% { color: var(--primary-green); }
+            50% { color: #388E3C; }
         }
 
         .audio-controls {
@@ -275,160 +288,80 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            font-size: clamp(0.8rem, 1.5vw, 0.9rem);
         }
 
         .audio-toggle {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: clamp(0.3rem, 1vw, 0.5rem) clamp(0.5rem, 1.5vw, 1rem);
-            border-radius: 20px;
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            color: var(--dark-text-color);
+            padding: clamp(0.4rem, 1vw, 0.6rem) clamp(0.8rem, 1.5vw, 1.2rem);
+            border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s;
-            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            font-size: clamp(0.8rem, 1.5vw, 0.9rem);
             white-space: nowrap;
         }
 
         .audio-toggle:hover {
-            background: rgba(255,255,255,0.3);
+            background-color: #d5d5d5;
         }
 
         .audio-toggle.enabled {
-            background: rgba(40,167,69,0.3);
-            border-color: #28a745;
+            background-color: #e8f5e9;
+            border-color: var(--primary-green);
+            color: var(--primary-green);
         }
 
         .audio-toggle.disabled {
-            background: rgba(220,53,69,0.3);
-            border-color: #dc3545;
+            background-color: #fbe9e7;
+            border-color: #ff5252;
+            color: #ff5252;
         }
 
-        /* Scrollbar styling for waiting queue */
+        /* Scrollbar styling */
         .waiting-queues-container::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
 
         .waiting-queues-container::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
+            background: #f1f1f1;
+            border-radius: 4px;
         }
 
         .waiting-queues-container::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
-            border-radius: 3px;
+            background: #ccc;
+            border-radius: 4px;
         }
 
         .waiting-queues-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.5);
+            background: #aaa;
         }
 
-        /* Media Queries for specific breakpoints */
+        /* Media Queries */
         @media (max-width: 1200px) {
-            .content {
-                flex-direction: column;
-            }
-            
-            .current-queue-section {
-                flex: 1;
-                min-height: 60vh;
-            }
-            
-            .waiting-queue-section {
-                flex: 1;
-                min-height: 30vh;
-            }
+            .content { flex-direction: column; }
+            .current-queue-section { min-height: 55vh; }
+            .waiting-queue-section { min-height: 35vh; }
         }
 
         @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-            }
-            
-            .content {
-                padding: 1rem;
-                gap: 1rem;
-            }
-            
-            .footer {
-                flex-direction: column;
-                text-align: center;
-                gap: 0.5rem;
-            }
-            
-            .audio-controls {
-                justify-content: center;
-            }
-            
-            .waiting-queue-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
-            
-            .queue-position {
-                align-self: flex-end;
-            }
+            .header, .content, .footer { padding: 1rem; gap: 1rem; }
+            .footer { flex-direction: column; text-align: center; gap: 0.8rem; }
+            .audio-controls { justify-content: center; }
+            .waiting-queue-item { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .queue-position { align-self: flex-end; }
         }
 
         @media (max-width: 480px) {
-            .current-queue-section,
-            .waiting-queue-section {
-                padding: 1rem;
-            }
-            
-            .waiting-queue-item {
-                padding: 0.75rem;
-            }
-            
-            .audio-toggle {
-                padding: 0.4rem 0.8rem;
-            }
+            .current-queue-section, .waiting-queue-section, .waiting-queue-item { padding: 0.8rem; }
+            .audio-toggle { padding: 0.5rem 1rem; }
         }
 
         @media (max-height: 600px) {
-            .header {
-                padding: 0.5rem 1rem;
-            }
-            
-            .content {
-                padding: 0.5rem;
-            }
-            
-            .current-queue-title {
-                margin-bottom: 1rem;
-            }
-            
-            .current-queue-number {
-                margin: 1rem 0;
-            }
-            
-            .footer {
-                padding: 0.5rem 1rem;
-            }
-        }
-
-        /* Landscape orientation for tablets */
-        @media (orientation: landscape) and (max-height: 768px) {
-            .content {
-                flex-direction: row;
-            }
-            
-            .current-queue-section {
-                flex: 2;
-            }
-            
-            .waiting-queue-section {
-                flex: 1;
-            }
-        }
-
-        /* High DPI displays */
-        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-            .hospital-name,
-            .current-queue-number {
-                text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
-            }
+            .header, .footer { padding: 0.5rem 1rem; }
+            .content { padding: 0.5rem; }
+            .current-queue-title, .current-queue-number { margin-bottom: 0.5rem; margin-top: 0.5rem; }
         }
     </style>
 </head>
@@ -498,11 +431,11 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         </div>
     </div>
 
-    <?php 
-include '../components/notification-system.php'; 
-renderMonitorNotificationSystem($servicePointId); 
-?>
-    
+    <?php
+    require '../components/notification-system.php';
+    renderMonitorNotificationSystem($servicePointId);
+    ?>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <script>
@@ -698,9 +631,9 @@ renderMonitorNotificationSystem($servicePointId);
                 updateAudioStatus('เกิดข้อผิดพลาด', 'disabled');
             };
 
-            if (ttsUrl && currentTTSProvider === 'api') {
+            if (ttsUrl && currentTTSProvider !== 'browser') {
                 // Use API for TTS
-                debugLog('Using API for TTS:', ttsUrl);
+                debugLog(`Using API provider: ${currentTTSProvider}`, ttsUrl);
                 $.ajax({
                     url: ttsUrl,
                     type: 'POST',
@@ -727,7 +660,7 @@ renderMonitorNotificationSystem($servicePointId);
                 });
             } else {
                 // Fallback to browser TTS
-                debugLog('Using browser TTS.');
+                debugLog(`Using browser TTS (Provider: ${currentTTSProvider}).`);
                 speakWithBrowser(text, onSpeechEnd, onSpeechError);
             }
         }
@@ -878,20 +811,30 @@ renderMonitorNotificationSystem($servicePointId);
         // Manual audio test
         function testAudio() {
             debugLog('Manual audio test triggered');
-            
             unlockAudioContext();
-            
-            refreshSettings().then(function(settings) {
-                debugLog('Settings refreshed for test', settings);
-                
-                if (!audioEnabled) {
-                    alert('เสียงถูกปิดอยู่ กรุณาเปิดเสียงก่อน');
-                    debugLog('Audio disabled by user, cannot test.');
-                    return;
-                }
-                
-                // Call the backend API to get test audio parameters
-                $.post('../api/play_queue_audio.php', { custom_message: 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', service_point_id: servicePointId || 1 })
+
+            if (!audioEnabled) {
+                alert('เสียงถูกปิดอยู่ กรุณาเปิดเสียงก่อน');
+                debugLog('Audio disabled by user, cannot test.');
+                return;
+            }
+
+            const testMessage = 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1';
+
+            // If provider is browser, test locally without server roundtrip
+            if (currentTTSProvider === 'browser') {
+                debugLog('Testing with browser provider directly.');
+                speakWithBrowser(testMessage, 
+                    () => { /* success callback */ }, 
+                    (err) => { 
+                        alert('การทดสอบเสียงล้มเหลว: ' + err); 
+                        debugLog('Browser TTS test failed:', err);
+                    }
+                );
+            } else {
+                // For API providers, call the backend
+                debugLog(`Testing with API provider: ${currentTTSProvider}`);
+                $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1 })
                     .done(function(response) {
                         if (response.success) {
                             debugLog('Test audio API response:', response);
@@ -912,7 +855,7 @@ renderMonitorNotificationSystem($servicePointId);
                         alert('ไม่สามารถเชื่อมต่อกับบริการเสียงได้: ' + error);
                         debugLog('Test audio AJAX failed:', error);
                     });
-            });
+            }
         }
         
         function formatTime(timeString) {

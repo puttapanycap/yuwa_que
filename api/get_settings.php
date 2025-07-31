@@ -11,6 +11,7 @@ try {
     $settings = [
         'hospital_name' => getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'),
         'tts_enabled' => getSetting('tts_enabled', '1'),
+        'tts_provider' => getSetting('tts_provider', 'browser'),
         'tts_api_url' => getSetting('tts_api_url', ''),
         'queue_call_template' => getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}'),
         'auto_forward_enabled' => getSetting('auto_forward_enabled', '0'),

@@ -193,6 +193,9 @@ try {
                         <a class="nav-link" href="settings.php">
                             <i class="fas fa-cog"></i>การตั้งค่า
                         </a>
+                        <a class="nav-link active" href="environment_settings.php">
+                            <i class="fas fa-server"></i>Environment
+                        </a>
                         <a class="nav-link" href="reports.php">
                             <i class="fas fa-chart-bar"></i>รายงาน
                         </a>

@@ -206,9 +206,6 @@ $envGroups = [
                         <a class="nav-link" href="dashboard.php">
                             <i class="fas fa-tachometer-alt"></i>แดชบอร์ด
                         </a>
-                        <a class="nav-link" href="realtime_dashboard.php">
-                            <i class="fas fa-chart-line"></i>Dashboard Analytics
-                        </a>
                         <a class="nav-link" href="users.php">
                             <i class="fas fa-users"></i>จัดการผู้ใช้
                         </a>

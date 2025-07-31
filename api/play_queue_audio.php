@@ -1,6 +1,15 @@
 <?php
+/**
+ * This file handles the audio playback for queue calls.
+ *
+ * @category Queue
+ * @package  Yuwa_Queue
+ * @author   Your Name <you@example.com>
+ * @license  https://opensource.org/licenses/MIT MIT License
+ * @link     https://github.com/puttapanycap/yuwa_que
+ */
+
 require_once '../config/config.php';
-requireLogin();
 
 header('Content-Type: application/json');
 
@@ -22,42 +31,46 @@ try {
     
     // Get queue and service point information
     if ($queueId) {
-        $stmt = $db->prepare("
+        $stmt = $db->prepare(
+            "
             SELECT 
                 q.queue_number,
-                q.patient_name,
-                sp.point_name as service_point_name,
-                sp.voice_template_id,
-                vt.template_text
+                q.current_service_point_id,
+                sp.point_name as service_point_name
             FROM queues q
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
-            LEFT JOIN voice_templates vt ON sp.voice_template_id = vt.template_id
             WHERE q.queue_id = ?
-        ");
+            "
+        );
         $stmt->execute([$queueId]);
         $queueData = $stmt->fetch();
         
         if (!$queueData) {
             throw new Exception('ไม่พบข้อมูลคิว');
         }
-        
-        // Get default template if service point doesn't have one
-        if (!$queueData['template_text']) {
-            $stmt = $db->prepare("SELECT template_text FROM voice_templates WHERE is_default = 1 LIMIT 1");
-            $stmt->execute();
-            $defaultTemplate = $stmt->fetch();
-            $queueData['template_text'] = $defaultTemplate['template_text'] ?? 'หมายเลข {queue_number} เชิญที่ {service_point_name}';
+
+        if (!$servicePointId) {
+            $servicePointId = $queueData['current_service_point_id'];
         }
         
+        // Get call format from settings
+        $callFormat = getSetting('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ');
+        
+        // Process service point name for speech (e.g., "Room1" -> "Room 1")
+        $servicePointName = $queueData['service_point_name'] ?? 'จุดบริการ';
+        $processedServicePointName = preg_replace('/([^\d])(\d)/', '$1 $2', $servicePointName);
+
         // Generate message from template
         $message = str_replace(
-            ['{queue_number}', '{service_point_name}', '{patient_name}'],
+            [
+                '{queue_number}',
+                '{service_point}',
+            ],
             [
                 $queueData['queue_number'],
-                $queueData['service_point_name'] ?? 'จุดบริการ',
-                $queueData['patient_name'] ?? ''
+                $processedServicePointName,
             ],
-            $queueData['template_text']
+            $callFormat
         );
         
         // แปลงหมายเลขคิวให้อ่านแยกตัว
@@ -74,17 +87,21 @@ try {
     $soundNotificationBefore = getSetting('sound_notification_before', '1');
     
     // Log audio call
-    $stmt = $db->prepare("
-        INSERT INTO audio_call_history (queue_id, service_point_id, staff_id, message, tts_used, audio_status)
-        VALUES (?, ?, ?, ?, ?, 'pending')
-    ");
-    $stmt->execute([
-        $queueId,
-        $servicePointId,
-        $_SESSION['staff_id'],
-        $message,
-        $ttsEnabled == '1' ? 1 : 0
-    ]);
+        $stmt = $db->prepare(
+            "
+            INSERT INTO audio_call_history (queue_id, service_point_id, staff_id, message, tts_used, audio_status)
+            VALUES (?, ?, ?, ?, ?, 'pending')
+            "
+        );
+    $stmt->execute(
+        [
+            $queueId,
+            $servicePointId,
+            $_SESSION['staff_id'] ?? null,
+            $message,
+            $ttsEnabled == '1' ? 1 : 0,
+        ]
+    );
     
     $callId = $db->lastInsertId();
     
@@ -111,37 +128,34 @@ try {
         ];
     }
     
-    logActivity("เล่นเสียงเรียกคิว: {$message}");
+    logActivity("เล่นเสียงเรียกคิว: {$message}", $_SESSION['staff_id'] ?? null);
     
     echo json_encode($response);
     
 } catch (Exception $e) {
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ]);
+    echo json_encode(
+        [
+            'success' => false,
+            'message' => $e->getMessage()
+        ]
+    );
 }
 
-function processQueueNumberForSpeech($message, $queueNumber) {
-    // แยกตัวอักษรและตัวเลขในหมายเลขคิว
-    if (preg_match('/([A-Z]+)(\d+)/', $queueNumber, $matches)) {
-        $letters = $matches[1];
-        $numbers = $matches[2];
-        
-        // แยกตัวอักษร
-        $letterArray = str_split($letters);
-        $letterText = implode(' ', $letterArray);
-        
-        // แยกตัวเลข
-        $numberArray = str_split($numbers);
-        $numberText = implode(' ', $numberArray);
-        
-        $separatedQueueNumber = $letterText . ' ' . $numberText;
-        
-        // แทนที่หมายเลขคิวในข้อความ
-        $message = str_replace($queueNumber, $separatedQueueNumber, $message);
-    }
+/**
+ * Processes a queue number for speech by separating all characters.
+ *
+ * @param string $message     The message to process.
+ * @param string $queueNumber The queue number to process.
+ *
+ * @return string The processed message.
+ */
+function processQueueNumberForSpeech($message, $queueNumber)
+{
+    // Split the queue number into individual characters
+    $characters = str_split($queueNumber);
+    $spacedNumber = implode(' ', $characters);
     
-    return $message;
+    // Replace the queue number in the message
+    return str_replace($queueNumber, $spacedNumber, $message);
 }
 ?>
