@@ -1,4 +1,17 @@
 <?php
+/**
+ * System Settings Page
+ *
+ * This script provides the user interface for managing system-wide settings.
+ * It allows administrators to configure application details, queue behavior,
+ * audio/TTS providers, and notification channels.
+ *
+ * @category Admin
+ * @package  YuwaQueue
+ * @author   Puttapong <puttapong.p@gmail.com>
+ * @license  https://opensource.org/licenses/MIT MIT
+ * @link     https://github.com/puttapanycap/yuwa_que
+ */
 require_once '../config/config.php';
 requireLogin();
 
@@ -421,6 +434,7 @@ $currentSettings = [
                                         <div class="mb-3">
                                             <label class="form-label">ผู้ให้บริการ TTS</label>
                                             <select class="form-select" name="settings[tts_provider]" id="tts_provider">
+                                                <option value="google_free" <?php echo $currentSettings['tts_provider'] == 'google_free' ? 'selected' : ''; ?>>Google TTS (ฟรี)</option>
                                                 <option value="google" <?php echo $currentSettings['tts_provider'] == 'google' ? 'selected' : ''; ?>>Google Cloud TTS</option>
                                                 <option value="azure" <?php echo $currentSettings['tts_provider'] == 'azure' ? 'selected' : ''; ?>>Azure Speech Service</option>
                                                 <option value="amazon" <?php echo $currentSettings['tts_provider'] == 'amazon' ? 'selected' : ''; ?>>Amazon Polly</option>
@@ -707,8 +721,13 @@ $currentSettings = [
         function toggleTTSProviderSettings() {
             const provider = $('#tts_provider').val();
             $('.provider-settings').hide();
-            if (provider !== 'browser') { // 'browser' provider doesn't have specific API settings
-                $('#' + provider + '_settings').show();
+            
+            if (provider === 'google') {
+                $('#google_settings').show();
+            } else if (provider === 'azure') {
+                $('#azure_settings').show();
+            } else if (provider === 'amazon') {
+                $('#amazon_settings').show();
             }
         }
         

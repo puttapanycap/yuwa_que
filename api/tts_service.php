@@ -1,4 +1,16 @@
 <?php
+/**
+ * TTS Service API
+ *
+ * This script handles Text-to-Speech (TTS) requests, converting text to audio
+ * using various configured TTS providers.
+ *
+ * @category API
+ * @package  YuwaQueue
+ * @author   Puttapong <puttapong.p@gmail.com>
+ * @license  https://opensource.org/licenses/MIT MIT
+ * @link     https://github.com/puttapanycap/yuwa_que
+ */
 require_once '../config/config.php';
 
 header('Content-Type: application/json');
@@ -32,27 +44,26 @@ try {
     $ttsApiUrl = getSetting('tts_api_url', '');
     
     switch ($ttsProvider) {
-        case 'google':
-            $audioData = generateGoogleTTS($processedText, $language, $voice, $speed, $pitch);
-            break;
-            
-        case 'azure':
-            $audioData = generateAzureTTS($processedText, $language, $voice, $speed, $pitch);
-            break;
-            
-        case 'amazon':
-            $audioData = generateAmazonTTS($processedText, $language, $voice, $speed, $pitch);
-            break;
-            
-        case 'custom':
-            if (empty($ttsApiUrl)) {
-                throw new Exception('ไม่ได้กำหนด URL สำหรับ TTS API');
-            }
-            $audioData = generateCustomTTS($processedText, $language, $voice, $speed, $pitch, $ttsApiUrl);
-            break;
-            
-        default:
-            throw new Exception('ผู้ให้บริการ TTS ไม่ถูกต้อง');
+    case 'google_free':
+        $audioData = generateGoogleFreeTTS($processedText, $language, $speed);
+        break;
+    case 'google':
+        $audioData = generateGoogleTTS($processedText, $language, $voice, $speed, $pitch);
+        break;
+    case 'azure':
+        $audioData = generateAzureTTS($processedText, $language, $voice, $speed, $pitch);
+        break;
+    case 'amazon':
+        $audioData = generateAmazonTTS($processedText, $language, $voice, $speed, $pitch);
+        break;
+    case 'custom':
+        if (empty($ttsApiUrl)) {
+            throw new Exception('ไม่ได้กำหนด URL สำหรับ TTS API');
+        }
+        $audioData = generateCustomTTS($processedText, $language, $voice, $speed, $pitch, $ttsApiUrl);
+        break;
+    default:
+        throw new Exception('ผู้ให้บริการ TTS ไม่ถูกต้อง');
     }
     
     if ($audioData === false) {
@@ -69,22 +80,34 @@ try {
     echo json_encode(['error' => $e->getMessage()]);
 }
 
-function processTextForSpeech($text) {
+/**
+ * Processes text to make it more suitable for speech synthesis.
+ *
+ * @param string $text The input text.
+ *
+ * @return string The processed text.
+ */
+function processTextForSpeech($text)
+{
     // แยกหมายเลขคิวออกจากข้อความ
-    $processedText = preg_replace_callback('/([A-Z]+)(\d+)/', function($matches) {
-        $letters = $matches[1];
-        $numbers = $matches[2];
+    $processedText = preg_replace_callback(
+        '/([A-Z]+)(\d+)/',
+        function ($matches) {
+            $letters = $matches[1];
+            $numbers = $matches[2];
         
-        // แยกตัวอักษร
-        $letterArray = str_split($letters);
-        $letterText = implode(' ', $letterArray);
+            // แยกตัวอักษร
+            $letterArray = str_split($letters);
+            $letterText = implode(' ', $letterArray);
         
-        // แยกตัวเลข
-        $numberArray = str_split($numbers);
-        $numberText = implode(' ', $numberArray);
+            // แยกตัวเลข
+            $numberArray = str_split($numbers);
+            $numberText = implode(' ', $numberArray);
         
-        return $letterText . ' ' . $numberText;
-    }, $text);
+            return $letterText . ' ' . $numberText;
+        },
+        $text
+    );
     
     // แทนที่คำที่ต้องการให้อ่านแบบพิเศษ
     $replacements = [
@@ -142,7 +165,48 @@ function processTextForSpeech($text) {
     return $processedText;
 }
 
-function generateGoogleTTS($text, $language, $voice, $speed, $pitch) {
+/**
+ * Generates audio using the free Google Translate TTS service.
+ *
+ * @param string $text     The text to synthesize.
+ * @param string $language The language code (e.g., 'th-TH').
+ * @param float  $speed    The speech rate.
+ *
+ * @return string|false The audio data or false on failure.
+ */
+function generateGoogleFreeTTS($text, $language, $speed)
+{
+    $url = "https://translate.google.com/translate_tts?ie=UTF-8&q=" . urlencode($text) . "&tl=" . $language . "&client=tw-ob&ttsspeed=" . $speed;
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36');
+    
+    $audioData = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200 && $audioData !== false) {
+        return $audioData;
+    }
+    
+    return false;
+}
+
+/**
+ * Placeholder for Google Cloud TTS integration.
+ *
+ * @param string $text     The text to synthesize.
+ * @param string $language The language code.
+ * @param string $voice    The voice name.
+ * @param float  $speed    The speech rate.
+ * @param float  $pitch    The speech pitch.
+ *
+ * @return void
+ */
+function generateGoogleTTS($text, $language, $voice, $speed, $pitch)
+{
     // This is a placeholder for Google Cloud Text-to-Speech integration
     // You would need to implement actual Google Cloud TTS API calls here
     // For now, return false to indicate TTS is not available
@@ -151,7 +215,19 @@ function generateGoogleTTS($text, $language, $voice, $speed, $pitch) {
     exit;
 }
 
-function generateAzureTTS($text, $language, $voice, $speed, $pitch) {
+/**
+ * Placeholder for Azure Speech Service integration.
+ *
+ * @param string $text     The text to synthesize.
+ * @param string $language The language code.
+ * @param string $voice    The voice name.
+ * @param float  $speed    The speech rate.
+ * @param float  $pitch    The speech pitch.
+ *
+ * @return void
+ */
+function generateAzureTTS($text, $language, $voice, $speed, $pitch)
+{
     // This is a placeholder for Azure Speech Service integration
     // You would need to implement actual Azure Speech API calls here
     http_response_code(501);
@@ -159,7 +235,19 @@ function generateAzureTTS($text, $language, $voice, $speed, $pitch) {
     exit;
 }
 
-function generateAmazonTTS($text, $language, $voice, $speed, $pitch) {
+/**
+ * Placeholder for Amazon Polly integration.
+ *
+ * @param string $text     The text to synthesize.
+ * @param string $language The language code.
+ * @param string $voice    The voice name.
+ * @param float  $speed    The speech rate.
+ * @param float  $pitch    The speech pitch.
+ *
+ * @return void
+ */
+function generateAmazonTTS($text, $language, $voice, $speed, $pitch)
+{
     // This is a placeholder for Amazon Polly integration
     // You would need to implement actual Amazon Polly API calls here
     http_response_code(501);
@@ -167,7 +255,20 @@ function generateAmazonTTS($text, $language, $voice, $speed, $pitch) {
     exit;
 }
 
-function generateCustomTTS($text, $language, $voice, $speed, $pitch, $apiUrl) {
+/**
+ * Generates audio using a custom TTS API.
+ *
+ * @param string $text     The text to synthesize.
+ * @param string $language The language code.
+ * @param string $voice    The voice name.
+ * @param float  $speed    The speech rate.
+ * @param float  $pitch    The speech pitch.
+ * @param string $apiUrl   The URL of the custom TTS API.
+ *
+ * @return string|false The audio data or false on failure.
+ */
+function generateCustomTTS($text, $language, $voice, $speed, $pitch, $apiUrl)
+{
     // Call custom TTS API
     $postData = [
         'text' => $text,
@@ -178,15 +279,20 @@ function generateCustomTTS($text, $language, $voice, $speed, $pitch, $apiUrl) {
     ];
     
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $apiUrl);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Accept: audio/mpeg'
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_URL => $apiUrl,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($postData),
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: audio/mpeg'
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+        ]
+    );
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
