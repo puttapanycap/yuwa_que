@@ -382,8 +382,18 @@ if (!$hasAccess) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Call Time Groups -->
+                <div class="stats-card mt-3">
+                    <h5 class="mb-3"><i class="fas fa-clock me-2"></i>เรียกคิวตามช่วงเวลา</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <tbody id="callTimeGroups"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Queue List -->
             <div class="col-md-8">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -477,11 +487,12 @@ if (!$hasAccess) {
         $(document).ready(function() {
             loadQueues();
             loadServicePoints();
-            
+            loadCallTimeGroups();
+
             // Auto refresh every 10 seconds
             setInterval(loadQueues, 10000);
         });
-        
+
         function loadQueues() {
             $.get('../api/get_queues.php', {
                 service_point_id: servicePointId
@@ -490,6 +501,7 @@ if (!$hasAccess) {
                 displayWaitingQueues(data.waiting);
                 updateStats(data.stats);
                 updateButtons(data.current);
+                loadCallTimeGroups();
             }).fail(function() {
                 console.error('Failed to load queues');
             });
@@ -613,14 +625,32 @@ if (!$hasAccess) {
         
         function updateButtons(currentQueue) {
             const hasCurrentQueue = currentQueue !== null;
-            
+
             $('#callNextBtn').prop('disabled', hasCurrentQueue);
             $('#recallBtn').prop('disabled', !hasCurrentQueue);
             $('#holdBtn').prop('disabled', !hasCurrentQueue);
             $('#completeBtn').prop('disabled', !hasCurrentQueue);
             $('#cancelBtn').prop('disabled', !hasCurrentQueue);
         }
-        
+
+        function loadCallTimeGroups() {
+            $.get('../api/get_call_time_groups.php', {
+                service_point_id: servicePointId
+            }, function(response) {
+                if (response.success) {
+                    displayCallTimeGroups(response.groups);
+                }
+            });
+        }
+
+        function displayCallTimeGroups(groups) {
+            const container = $('#callTimeGroups');
+            container.empty();
+            groups.forEach(function(g) {
+                container.append(`<tr><td>${g.start} - ${g.end}</td><td class="text-end">${g.count}</td></tr>`);
+            });
+        }
+
         function loadServicePoints() {
             $.get('../api/get_service_points.php', function(data) {
                 const select = $('#nextServicePoint');
