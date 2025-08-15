@@ -382,8 +382,32 @@ if (!$hasAccess) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Queue Categories -->
+                <div class="stats-card mt-3">
+                    <h5 class="mb-3"><i class="fas fa-layer-group me-2"></i>หมวดหมู่คิว</h5>
+                    <form class="row g-2 mb-3" id="categoryForm">
+                        <div class="col-5">
+                            <input type="text" class="form-control" name="name" placeholder="ชื่อหมวดหมู่" required>
+                        </div>
+                        <div class="col-3">
+                            <input type="time" class="form-control" name="start" required>
+                        </div>
+                        <div class="col-3">
+                            <input type="time" class="form-control" name="end" required>
+                        </div>
+                        <div class="col-1">
+                            <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </form>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <tbody id="categoryList"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Queue List -->
             <div class="col-md-8">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -477,11 +501,27 @@ if (!$hasAccess) {
         $(document).ready(function() {
             loadQueues();
             loadServicePoints();
-            
+            loadCategories();
+
+            $('#categoryForm').on('submit', function(e) {
+                e.preventDefault();
+                $.post('../api/queue_categories.php', $(this).serialize(), function(response) {
+                    if (response.success) {
+                        loadCategories();
+                        $('#categoryForm')[0].reset();
+                        showAlert('เพิ่มหมวดหมู่แล้ว', 'success');
+                    } else {
+                        showAlert(response.message || 'เกิดข้อผิดพลาด', 'danger');
+                    }
+                }).fail(function() {
+                    showAlert('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'danger');
+                });
+            });
+
             // Auto refresh every 10 seconds
             setInterval(loadQueues, 10000);
         });
-        
+
         function loadQueues() {
             $.get('../api/get_queues.php', {
                 service_point_id: servicePointId
@@ -490,6 +530,7 @@ if (!$hasAccess) {
                 displayWaitingQueues(data.waiting);
                 updateStats(data.stats);
                 updateButtons(data.current);
+                loadCategories();
             }).fail(function() {
                 console.error('Failed to load queues');
             });
@@ -613,14 +654,59 @@ if (!$hasAccess) {
         
         function updateButtons(currentQueue) {
             const hasCurrentQueue = currentQueue !== null;
-            
+
             $('#callNextBtn').prop('disabled', hasCurrentQueue);
             $('#recallBtn').prop('disabled', !hasCurrentQueue);
             $('#holdBtn').prop('disabled', !hasCurrentQueue);
             $('#completeBtn').prop('disabled', !hasCurrentQueue);
             $('#cancelBtn').prop('disabled', !hasCurrentQueue);
         }
-        
+
+        function loadCategories() {
+            $.get('../api/queue_categories.php', function(response) {
+                if (response.success) {
+                    displayCategories(response.categories);
+                }
+            });
+        }
+
+        function displayCategories(categories) {
+            const container = $('#categoryList');
+            container.empty();
+            categories.forEach(function(cat) {
+                container.append(`<tr>
+                    <td class="align-middle"><strong>${cat.name}</strong><br><small>${cat.start} - ${cat.end}</small></td>
+                    <td class="text-end align-middle">${cat.count || 0}</td>
+                    <td class="text-end align-middle">
+                        <button class="btn btn-sm btn-outline-primary" onclick="sendToCategory(${cat.id})">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </td>
+                </tr>`);
+            });
+        }
+
+        function sendToCategory(categoryId) {
+            if (!currentQueueId) {
+                showAlert('ยังไม่มีคิวปัจจุบัน', 'warning');
+                return;
+            }
+            $.post('../api/queue_categories.php', {
+                action: 'assign',
+                category_id: categoryId,
+                queue_id: currentQueueId
+            }, function(response) {
+                if (response.success) {
+                    showAlert('ส่งคิวเข้าหมวดหมู่แล้ว', 'success');
+                    loadCategories();
+                } else {
+                    showAlert('เกิดข้อผิดพลาด', 'danger');
+                }
+            }).fail(function() {
+                showAlert('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'danger');
+            });
+        }
+
         function loadServicePoints() {
             $.get('../api/get_service_points.php', function(data) {
                 const select = $('#nextServicePoint');
