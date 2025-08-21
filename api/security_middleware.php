@@ -150,57 +150,6 @@ class SecurityMiddleware {
         }
     }
     
-    /**
-     * Validate file upload
-     */
-    public static function validateFileUpload($file) {
-        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
-            return ['valid' => false, 'error' => 'Upload error'];
-        }
-        
-        // Check file size
-        if ($file['size'] > self::$securityConfig['max_file_size']) {
-            return ['valid' => false, 'error' => 'File too large'];
-        }
-        
-        // Check file type
-        $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($fileExt, self::$securityConfig['allowed_file_types'])) {
-            return ['valid' => false, 'error' => 'Invalid file type'];
-        }
-        
-        // Check MIME type
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $file['tmp_name']);
-        finfo_close($finfo);
-        
-        $allowedMimes = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'pdf' => 'application/pdf',
-            'doc' => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ];
-        
-        if (!isset($allowedMimes[$fileExt]) || $mimeType !== $allowedMimes[$fileExt]) {
-            return ['valid' => false, 'error' => 'MIME type mismatch'];
-        }
-        
-        // Scan for malware (if ClamAV is available)
-        if (function_exists('cl_scanfile')) {
-            $scanResult = cl_scanfile($file['tmp_name']);
-            if ($scanResult !== CL_CLEAN) {
-                self::logSecurityEvent('malware_detected', [
-                    'file' => $file['name'],
-                    'ip' => self::getClientIP()
-                ]);
-                return ['valid' => false, 'error' => 'Malware detected'];
-            }
-        }
-        
-        return ['valid' => true];
-    }
     
     /**
      * Password strength validation

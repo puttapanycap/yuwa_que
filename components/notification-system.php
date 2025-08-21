@@ -144,32 +144,3 @@ function renderMonitorNotificationSystem($servicePointId = null) {
     <?php
 }
 
-// เพิ่มฟังก์ชันสำหรับสร้าง public notification
-function createPublicNotification($type, $title, $message, $options = []) {
-    try {
-        $db = getDB();
-        
-        $sql = "INSERT INTO notifications (
-            type, title, message, priority, is_public, is_active,
-            service_point_id, expires_at, auto_dismiss_after, metadata, created_at
-        ) VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?, NOW())";
-        
-        $stmt = $db->prepare($sql);
-        $stmt->execute([
-            $type,
-            $title,
-            $message,
-            $options['priority'] ?? 'normal',
-            $options['service_point_id'] ?? null,
-            $options['expires_at'] ?? null,
-            $options['auto_dismiss_after'] ?? 5000,
-            isset($options['metadata']) ? json_encode($options['metadata']) : null
-        ]);
-        
-        return $db->lastInsertId();
-        
-    } catch (Exception $e) {
-        error_log("Failed to create public notification: " . $e->getMessage());
-        return false;
-    }
-}

@@ -472,42 +472,6 @@ function formatFileSize($bytes) {
     return round($bytes, 2) . ' ' . $units[$pow];
 }
 
-function validateFileUpload($file, $allowedTypes = null, $maxSize = null) {
-    if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
-        return ['success' => false, 'message' => 'ไม่มีไฟล์ที่อัพโหลดหรือเกิดข้อผิดพลาด'];
-    }
-    
-    if ($maxSize === null) {
-        $maxSize = MAX_FILE_SIZE;
-    }
-    
-    if ($file['size'] > $maxSize) {
-        return ['success' => false, 'message' => 'ไฟล์มีขนาดใหญ่เกินไป (สูงสุด ' . formatFileSize($maxSize) . ')'];
-    }
-    
-    $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    
-    if ($allowedTypes && !in_array($fileExt, $allowedTypes)) {
-        return ['success' => false, 'message' => 'รูปแบบไฟล์ไม่ถูกต้อง'];
-    }
-    
-    return ['success' => true];
-}
-
-function generateUniqueFileName($originalName, $directory) {
-    $fileExt = pathinfo($originalName, PATHINFO_EXTENSION);
-    $baseName = pathinfo($originalName, PATHINFO_FILENAME);
-    $baseName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $baseName);
-    
-    $counter = 0;
-    do {
-        $fileName = $baseName . ($counter > 0 ? "_$counter" : '') . '.' . $fileExt;
-        $fullPath = $directory . '/' . $fileName;
-        $counter++;
-    } while (file_exists($fullPath));
-    
-    return $fileName;
-}
 
 // Performance monitoring
 if (env('PERFORMANCE_MONITORING', false)) {
