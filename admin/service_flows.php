@@ -281,45 +281,7 @@ try {
                         จัดการระบบ
                     </h5>
                     
-                    <nav class="nav flex-column">
-                        <a class="nav-link" href="dashboard.php">
-                            <i class="fas fa-tachometer-alt"></i>แดชบอร์ด
-                        </a>
-                        <a class="nav-link" href="users.php">
-                            <i class="fas fa-users"></i>จัดการผู้ใช้
-                        </a>
-                        <a class="nav-link" href="roles.php">
-                            <i class="fas fa-user-tag"></i>บทบาทและสิทธิ์
-                        </a>
-                        <a class="nav-link" href="service_points.php">
-                            <i class="fas fa-map-marker-alt"></i>จุดบริการ
-                        </a>
-                        <a class="nav-link" href="queue_types.php">
-                            <i class="fas fa-list"></i>ประเภทคิว
-                        </a>
-                        <a class="nav-link active" href="service_flows.php">
-                            <i class="fas fa-route"></i>Service Flow
-                        </a>
-                        <a class="nav-link" href="settings.php">
-                            <i class="fas fa-cog"></i>การตั้งค่า
-                        </a>
-                        <a class="nav-link active" href="environment_settings.php">
-                            <i class="fas fa-server"></i>Environment
-                        </a>
-                        <a class="nav-link" href="reports.php">
-                            <i class="fas fa-chart-bar"></i>รายงาน
-                        </a>
-                        <a class="nav-link" href="audit_logs.php">
-                            <i class="fas fa-history"></i>บันทึกการใช้งาน
-                        </a>
-                        <hr class="my-3" style="border-color: rgba(255,255,255,0.3);">
-                        <a class="nav-link" href="../staff/dashboard.php">
-                            <i class="fas fa-arrow-left"></i>กลับหน้าเจ้าหน้าที่
-                        </a>
-                        <a class="nav-link" href="../staff/logout.php">
-                            <i class="fas fa-sign-out-alt"></i>ออกจากระบบ
-                        </a>
-                    </nav>
+                    <?php include 'nav.php'; ?>
                 </div>
             </div>
             
