@@ -12,28 +12,6 @@ try {
     
     $db = getDB();
     
-    // สร้าง query สำหรับ monitor notifications
-    $whereConditions = [
-        "n.is_public = 1",
-        "n.is_active = 1",
-        "(n.expires_at IS NULL OR n.expires_at > NOW())"
-    ];
-    $params = [];
-    
-    // กรองตาม service point
-    if ($servicePointId) {
-        $whereConditions[] = "(n.service_point_id IS NULL OR n.service_point_id = ?)";
-        $params[] = $servicePointId;
-    }
-    
-    // กรองตามเวลาที่ตรวจสอบล่าสุด
-    if ($lastCheck) {
-        $whereConditions[] = "n.created_at > ?";
-        $params[] = $lastCheck;
-    }
-    
-    $whereClause = implode(' AND ', $whereConditions);
-    
     // Query สำหรับ active notifications
     $sql = "
     SELECT 
@@ -144,8 +122,7 @@ try {
     }
     
     // ดึงข้อมูลสถิติเพิ่มเติม
-    $stats = [];
-    
+
     // นับ notification ที่ยังไม่หมดอายุ
     $statsSql = "
         SELECT 
