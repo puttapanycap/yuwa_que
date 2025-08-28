@@ -511,26 +511,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
         });
         
-        // Function to fetch current settings
-        function refreshSettings() {
-            return $.get('../api/get_settings.php').then(function(settings) {
-                // Update all relevant settings
-                audioEnabled = settings.tts_enabled == '1';
-                currentTTSProvider = settings.tts_provider || 'browser';
-                
-                debugLog('Settings refreshed:', {
-                    audioEnabled: audioEnabled,
-                    currentTTSProvider: currentTTSProvider
-                });
-                
-                updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
-                return settings;
-            }).fail(function() {
-                console.error('Failed to refresh settings');
-                return null;
-            });
-        }
-        
         // Initialize Audio System
         function initializeAudio() {
             debugLog('Initializing audio system...');
