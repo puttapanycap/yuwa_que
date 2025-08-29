@@ -11,10 +11,15 @@ try {
     $lastCheck = isset($_GET['last_check']) ? $_GET['last_check'] : null;
     
     $db = getDB();
-    
+
+    // Check for optional auto_dismiss_after column
+    $columnCheck = $db->query("SHOW COLUMNS FROM notifications LIKE 'auto_dismiss_after'");
+    $hasAutoDismiss = $columnCheck && $columnCheck->rowCount() > 0;
+    $autoDismissField = $hasAutoDismiss ? 'n.auto_dismiss_after' : 'NULL as auto_dismiss_after';
+
     // Query สำหรับ active notifications
     $sql = "
-    SELECT 
+    SELECT
         n.notification_id,
         n.notification_type as type,
         n.title,
@@ -23,7 +28,7 @@ try {
         n.created_at,
         n.metadata,
         n.expires_at,
-        n.auto_dismiss_after,
+        {$autoDismissField},
         n.color,
         n.icon,
         sp.point_name as service_point_name
@@ -78,7 +83,9 @@ try {
         }
         
         // กำหนดการแสดงผล
-        $notification['display_duration'] = $notification['auto_dismiss_after'] ?: 5000; // 5 วินาที default
+        $notification['display_duration'] = $notification['auto_dismiss_after']
+            ? (int)$notification['auto_dismiss_after']
+            : 5000; // 5 วินาที default
         
         // จัดรูปแบบข้อความ
         $notification['formatted_message'] = nl2br(htmlspecialchars($notification['message']));
