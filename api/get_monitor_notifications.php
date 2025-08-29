@@ -23,6 +23,10 @@ try {
         n.created_at,
         n.read_at,
         n.metadata,
+        n.expires_at,
+        n.auto_dismiss_after,
+        n.color,
+        n.icon,
         sp.point_name as service_point_name
     FROM notifications n
     LEFT JOIN service_points sp ON n.service_point_id = sp.service_point_id
