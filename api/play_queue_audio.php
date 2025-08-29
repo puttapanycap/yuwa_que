@@ -99,7 +99,6 @@ try {
     } else {
         $message = $customMessage;
         $queueData = null;
-        $templateText = $customMessage ?? '';
         $servicePointName = '';
     }
     
@@ -117,10 +116,7 @@ try {
         return $row['file_path'] ?? null;
     };
 
-    $templateText = is_string($templateText) ? $templateText : '';
-    $segments = $templateText === ''
-        ? []
-        : preg_split('/({[^}]+})/', $templateText, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+    $segments = preg_split('/({[^}]+})/', $templateText, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
     foreach ($segments as $segment) {
         if (preg_match('/^{([^}]+)}$/', $segment, $m)) {
             switch ($m[1]) {
