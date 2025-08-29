@@ -5,7 +5,8 @@
 DESCRIBE notifications;
 
 -- เพิ่มคอลัมน์ที่อาจจะขาดหายไป
-ALTER TABLE notifications 
+ALTER TABLE notifications
+ADD COLUMN IF NOT EXISTS read_at DATETIME NULL AFTER metadata,
 ADD COLUMN IF NOT EXISTS is_public TINYINT(1) DEFAULT 0 AFTER priority,
 ADD COLUMN IF NOT EXISTS is_active TINYINT(1) DEFAULT 1 AFTER is_public,
 ADD COLUMN IF NOT EXISTS expires_at DATETIME NULL AFTER is_active,
