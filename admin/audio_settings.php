@@ -929,22 +929,74 @@ function confirmDeleteAudio(audioId, audioName) {
     $('#deleteAudioModal').modal('show');
 }
 
+const previewVolume = parseFloat('<?php echo $audioVolume; ?>');
+
+function playNotificationSound() {
+    const audio = new Audio('../assets/audio/notification.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.error('Notification sound play failed:', e));
+}
+
+function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
+    if (!Array.isArray(audioFiles) || audioFiles.length === 0) {
+        console.error('No audio files to play.');
+        return;
+    }
+
+    const playSet = () => {
+        let index = 0;
+        const playNext = () => {
+            if (index < audioFiles.length) {
+                const audio = new Audio(audioFiles[index]);
+                audio.volume = previewVolume;
+                audio.onended = playNext;
+                audio.play().catch(e => console.error('Audio play failed:', e));
+                index++;
+            } else if (--repeatCount > 0) {
+                index = 0;
+                playNext();
+            }
+        };
+        playNext();
+    };
+
+    if (notificationBefore) {
+        playNotificationSound();
+        setTimeout(playSet, 1000);
+    } else {
+        playSet();
+    }
+}
+
 function playTemplate(templateId, templateText) {
     // Replace template variables with sample data
     let sampleText = templateText
         .replace('{queue_number}', 'A001')
         .replace('{service_point_name}', 'ห้องตรวจ 1')
         .replace('{patient_name}', 'คุณสมชาย');
-    
-    // Use Text-to-Speech to play the sample
+
+    $.post('../api/play_queue_audio.php', { custom_message: sampleText, template_id: templateId, service_point_id: 1 })
+        .done(function(response) {
+            if (response.success) {
+                playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+            } else {
+                playTTSFallback(sampleText);
+            }
+        })
+        .fail(function() {
+            playTTSFallback(sampleText);
+        });
+}
+
+function playTTSFallback(text) {
     if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(sampleText);
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH';
         utterance.rate = 0.8;
         utterance.pitch = 1;
         speechSynthesis.speak(utterance);
     } else {
-        alert('เบราว์เซอร์ของคุณไม่รองรับการอ่านเสียง');
+        alert('เบราว์เซอร์ของคุณไม่รองรับการเล่นเสียง');
     }
 }
 
