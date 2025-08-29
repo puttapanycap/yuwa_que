@@ -21,7 +21,6 @@ try {
         n.message,
         n.priority,
         n.created_at,
-        n.read_at,
         n.metadata,
         n.expires_at,
         n.auto_dismiss_after,
