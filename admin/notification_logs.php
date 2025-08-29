@@ -390,4 +390,132 @@ include '../includes/header.php';
                 <nav aria-label="Page navigation">
                     <ul class="pagination justify-content-center">
                         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="#" data-page="<?php echo $page - 1; ?>">ก่อน
+                            <a class="page-link" href="#" data-page="<?php echo $page - 1; ?>">ก่อน</a>
+                        </li>
+                        <?php
+                            $startPage = max(1, $page - 2);
+                            $endPage = min($totalPages, $page + 2);
+                            for ($i = $startPage; $i <= $endPage; $i++):
+                        ?>
+                        <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                            <a class="page-link" href="#" data-page="<?php echo $i; ?>"><?php echo $i; ?></a>
+                        </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="#" data-page="<?php echo $page + 1; ?>">ถัดไป</a>
+                        </li>
+                    </ul>
+                </nav>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Modal: View Notification -->
+    <div class="modal fade" id="viewNotificationModal" tabindex="-1" aria-labelledby="viewNotificationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewNotificationModalLabel">รายละเอียดการแจ้งเตือน</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i id="modal_icon" class="fas fa-bell me-2"></i>
+                            <span id="modal_type" class="badge bg-secondary me-2"></span>
+                            <span id="modal_priority" class="badge bg-info"></span>
+                        </div>
+                        <h5 id="modal_title" class="mb-2"></h5>
+                        <p id="modal_message" class="mb-3"></p>
+                        <div class="small text-muted">
+                            <div><strong>ผู้รับ:</strong> <span id="modal_recipient"></span></div>
+                            <div><strong>ผู้ส่ง:</strong> <span id="modal_sender"></span></div>
+                            <div><strong>สร้างเมื่อ:</strong> <span id="modal_created"></span></div>
+                            <div id="modal_link_row" class="mt-2" style="display:none;">
+                                <a id="modal_link" href="#" target="_blank" class="link-primary">ลิงก์ที่เกี่ยวข้อง</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sorting
+        document.querySelectorAll('.sort-link').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const sortField = this.dataset.sort;
+                const sortInput = document.getElementById('sort');
+                const orderInput = document.getElementById('order');
+                const pageInput = document.getElementById('page');
+                if (sortInput.value === sortField) {
+                    orderInput.value = orderInput.value.toLowerCase() === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortInput.value = sortField;
+                    orderInput.value = 'asc';
+                }
+                pageInput.value = 1;
+                document.getElementById('filter-form').submit();
+            });
+        });
+
+        // Pagination
+        document.querySelectorAll('nav .page-link[data-page]').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = parseInt(this.getAttribute('data-page'), 10);
+                if (!isNaN(target)) {
+                    document.getElementById('page').value = target;
+                    document.getElementById('filter-form').submit();
+                }
+            });
+        });
+
+        // View notification
+        document.querySelectorAll('.view-notification').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const title = this.dataset.title || '';
+                const message = this.dataset.message || '';
+                const type = this.dataset.type || '';
+                const icon = this.dataset.icon || 'bell';
+                const priority = this.dataset.priority || '';
+                const recipient = this.dataset.recipient || '';
+                const sender = this.dataset.sender || '';
+                const created = this.dataset.created || '';
+                const link = this.dataset.link || '';
+
+                document.getElementById('modal_title').textContent = title;
+                document.getElementById('modal_message').textContent = message;
+                document.getElementById('modal_type').textContent = type;
+                document.getElementById('modal_priority').textContent = priority;
+
+                const iconEl = document.getElementById('modal_icon');
+                iconEl.className = 'fas fa-' + icon + ' me-2';
+
+                document.getElementById('modal_recipient').textContent = recipient;
+                document.getElementById('modal_sender').textContent = sender;
+                document.getElementById('modal_created').textContent = created;
+
+                const linkRow = document.getElementById('modal_link_row');
+                const linkEl = document.getElementById('modal_link');
+                if (link) {
+                    linkEl.href = link;
+                    linkRow.style.display = '';
+                } else {
+                    linkRow.style.display = 'none';
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('viewNotificationModal'));
+                modal.show();
+            });
+        });
+    });
+    </script>
+
+    <?php include '../includes/footer.php'; ?>
