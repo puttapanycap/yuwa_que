@@ -204,6 +204,39 @@ if (isset($_POST['update_audio_settings'])) {
                 }
             }
         }
+    } elseif (isset($_POST['delete_audio'])) {
+        // Delete audio file
+        $audioId = (int)$_POST['audio_id'];
+
+        try {
+            $db = getDB();
+            // Fetch file information
+            $stmt = $db->prepare("SELECT file_path, display_name FROM audio_files WHERE audio_id = ?");
+            $stmt->execute([$audioId]);
+            $fileInfo = $stmt->fetch();
+
+            if ($fileInfo) {
+                $filePath = ROOT_PATH . ($fileInfo['file_path'] ?? '');
+                if (!empty($fileInfo['file_path']) && file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+
+                $stmt = $db->prepare("DELETE FROM audio_files WHERE audio_id = ?");
+                $stmt->execute([$audioId]);
+
+                logActivity('ลบไฟล์เสียง: ' . ($fileInfo['display_name'] ?? ('ID: ' . $audioId)));
+                $successMessage = 'ลบไฟล์เสียงเรียบร้อยแล้ว';
+
+                // Refresh audio files list
+                $stmt = $db->prepare("SELECT * FROM audio_files ORDER BY audio_type, display_name");
+                $stmt->execute();
+                $audioFiles = $stmt->fetchAll();
+            } else {
+                $errorMessage = 'ไม่พบไฟล์เสียงที่ต้องการลบ';
+            }
+        } catch (Exception $e) {
+            $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+        }
     }
 }
 
