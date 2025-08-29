@@ -99,6 +99,7 @@ try {
     } else {
         $message = $customMessage;
         $queueData = null;
+        $servicePointName = '';
     }
     
     $audioRepeatCount = intval(getSetting('audio_repeat_count', '1'));
