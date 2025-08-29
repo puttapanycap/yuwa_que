@@ -12,14 +12,9 @@ if (!hasPermission('manage_audio_system')) {
     die('ไม่มีสิทธิ์เข้าถึงหน้านี้');
 }
 
-// Get TTS settings
-$ttsEnabled = getSetting('tts_enabled', '0');
-$ttsApiUrl = getSetting('tts_api_url', '');
-$ttsProvider = getSetting('tts_provider', 'google');
-$ttsLanguage = getSetting('tts_language', 'th-TH');
-$ttsVoice = getSetting('tts_voice', 'th-TH-Standard-A');
-$ttsSpeed = getSetting('tts_speed', '1.0');
-$ttsPitch = getSetting('tts_pitch', '0');
+// Force disable TTS and load audio settings
+setSetting('tts_enabled', '0');
+$ttsEnabled = '0';
 $audioVolume = getSetting('audio_volume', '1.0');
 $audioRepeatCount = getSetting('audio_repeat_count', '1');
 $soundNotificationBefore = getSetting('sound_notification_before', '1');
@@ -36,30 +31,17 @@ try {
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_tts_settings'])) {
-        // Update TTS settings
-        setSetting('tts_enabled', $_POST['tts_enabled'] ?? '0');
-        setSetting('tts_provider', $_POST['tts_provider'] ?? 'google');
-        setSetting('tts_api_url', $_POST['tts_api_url'] ?? '');
-        setSetting('tts_language', $_POST['tts_language'] ?? 'th-TH');
-        setSetting('tts_voice', $_POST['tts_voice'] ?? 'th-TH-Standard-A');
-        setSetting('tts_speed', $_POST['tts_speed'] ?? '1.0');
-        setSetting('tts_pitch', $_POST['tts_pitch'] ?? '0');
+if (isset($_POST['update_audio_settings'])) {
+        // Update audio settings
+        setSetting('tts_enabled', '0');
         setSetting('audio_volume', $_POST['audio_volume'] ?? '1.0');
         setSetting('audio_repeat_count', $_POST['audio_repeat_count'] ?? '1');
         setSetting('sound_notification_before', $_POST['sound_notification_before'] ?? '1');
-        
+
         logActivity('อัพเดทการตั้งค่าระบบเสียง');
         $successMessage = 'บันทึกการตั้งค่าเรียบร้อยแล้ว';
-        
+
         // Refresh settings
-        $ttsEnabled = $_POST['tts_enabled'] ?? '0';
-        $ttsProvider = $_POST['tts_provider'] ?? 'google';
-        $ttsApiUrl = $_POST['tts_api_url'] ?? '';
-        $ttsLanguage = $_POST['tts_language'] ?? 'th-TH';
-        $ttsVoice = $_POST['tts_voice'] ?? 'th-TH-Standard-A';
-        $ttsSpeed = $_POST['tts_speed'] ?? '1.0';
-        $ttsPitch = $_POST['tts_pitch'] ?? '0';
         $audioVolume = $_POST['audio_volume'] ?? '1.0';
         $audioRepeatCount = $_POST['audio_repeat_count'] ?? '1';
         $soundNotificationBefore = $_POST['sound_notification_before'] ?? '1';
@@ -445,13 +427,6 @@ try {
                                     <!-- Basic Settings -->
                                     <div class="settings-section">
                                         <div class="mb-3">
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="ttsEnabled" name="tts_enabled" value="1" <?php echo $ttsEnabled == '1' ? 'checked' : ''; ?>>
-                                                <label class="form-check-label" for="ttsEnabled">เปิดใช้งานระบบเสียงเรียกคิว</label>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
                                             <label for="audioRepeatCount" class="form-label">จำนวนครั้งที่เล่นเสียงซ้ำ</label>
                                             <select class="form-select" id="audioRepeatCount" name="audio_repeat_count">
                                                 <option value="1" <?php echo $audioRepeatCount == '1' ? 'selected' : ''; ?>>1 ครั้ง</option>
@@ -459,89 +434,22 @@ try {
                                                 <option value="3" <?php echo $audioRepeatCount == '3' ? 'selected' : ''; ?>>3 ครั้ง</option>
                                             </select>
                                         </div>
-                                        
+
                                         <div class="mb-3">
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="soundNotificationBefore" name="sound_notification_before" value="1" <?php echo $soundNotificationBefore == '1' ? 'checked' : ''; ?>>
                                                 <label class="form-check-label" for="soundNotificationBefore">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
                                             </div>
                                         </div>
-                                        
+
                                         <div class="mb-3">
                                             <label for="audioVolume" class="form-label">ความดังของเสียง: <span id="volumeValue"><?php echo $audioVolume; ?></span></label>
                                             <input type="range" class="form-range" min="0" max="1" step="0.1" id="audioVolume" name="audio_volume" value="<?php echo $audioVolume; ?>">
                                         </div>
                                     </div>
-                                    
-                                    <!-- TTS Provider Settings -->
-                                    <div class="settings-section">
-                                        <h5 class="mb-3">การตั้งค่า Text-to-Speech</h5>
-                                        
-                                        <div class="mb-3">
-                                            <label for="ttsProvider" class="form-label">ผู้ให้บริการ Text-to-Speech</label>
-                                            <select class="form-select" id="ttsProvider" name="tts_provider">
-                                                <option value="google" <?php echo $ttsProvider == 'google' ? 'selected' : ''; ?>>Google Cloud Text-to-Speech</option>
-                                                <option value="azure" <?php echo $ttsProvider == 'azure' ? 'selected' : ''; ?>>Microsoft Azure Speech Service</option>
-                                                <option value="amazon" <?php echo $ttsProvider == 'amazon' ? 'selected' : ''; ?>>Amazon Polly</option>
-                                                <option value="custom" <?php echo $ttsProvider == 'custom' ? 'selected' : ''; ?>>API ที่กำหนดเอง</option>
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="mb-3 custom-api-section" style="display: <?php echo $ttsProvider == 'custom' ? 'block' : 'none'; ?>">
-                                            <label for="ttsApiUrl" class="form-label">URL สำหรับ Text-to-Speech API</label>
-                                            <input type="text" class="form-control" id="ttsApiUrl" name="tts_api_url" value="<?php echo $ttsApiUrl; ?>" placeholder="https://your-tts-service.com/api/tts">
-                                            <div class="form-text">API ต้องส่งกลับไฟล์เสียง MP3 หรือ WAV</div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="ttsLanguage" class="form-label">ภาษา</label>
-                                            <select class="form-select" id="ttsLanguage" name="tts_language">
-                                                <option value="th-TH" <?php echo $ttsLanguage == 'th-TH' ? 'selected' : ''; ?>>ไทย (th-TH)</option>
-                                                <option value="en-US" <?php echo $ttsLanguage == 'en-US' ? 'selected' : ''; ?>>English (US)</option>
-                                                <option value="en-GB" <?php echo $ttsLanguage == 'en-GB' ? 'selected' : ''; ?>>English (UK)</option>
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="ttsVoice" class="form-label">รูปแบบเสียง</label>
-                                            <select class="form-select" id="ttsVoice" name="tts_voice">
-                                                <!-- Google Thai Voices -->
-                                                <optgroup label="Google - Thai">
-                                                    <option value="th-TH-Standard-A" <?php echo $ttsVoice == 'th-TH-Standard-A' ? 'selected' : ''; ?>>เสียงผู้หญิง (Standard A)</option>
-                                                    <option value="th-TH-Wavenet-A" <?php echo $ttsVoice == 'th-TH-Wavenet-A' ? 'selected' : ''; ?>>เสียงผู้หญิง (Wavenet A)</option>
-                                                    <option value="th-TH-Wavenet-B" <?php echo $ttsVoice == 'th-TH-Wavenet-B' ? 'selected' : ''; ?>>เสียงชาย (Wavenet B)</option>
-                                                    <option value="th-TH-Wavenet-C" <?php echo $ttsVoice == 'th-TH-Wavenet-C' ? 'selected' : ''; ?>>เสียงผู้หญิง (Wavenet C)</option>
-                                                </optgroup>
-                                                <!-- Azure Thai Voices -->
-                                                <optgroup label="Azure - Thai">
-                                                    <option value="th-TH-PremwadeeNeural" <?php echo $ttsVoice == 'th-TH-PremwadeeNeural' ? 'selected' : ''; ?>>เสียงผู้หญิง (Premwadee)</option>
-                                                    <option value="th-TH-NiwatNeural" <?php echo $ttsVoice == 'th-TH-NiwatNeural' ? 'selected' : ''; ?>>เสียงชาย (Niwat)</option>
-                                                </optgroup>
-                                                <!-- Amazon Thai Voices -->
-                                                <optgroup label="Amazon - Thai">
-                                                    <option value="Chantara" <?php echo $ttsVoice == 'Chantara' ? 'selected' : ''; ?>>เสียงผู้หญิง (Chantara)</option>
-                                                </optgroup>
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="ttsSpeed" class="form-label">ความเร็วในการพูด: <span id="speedValue"><?php echo $ttsSpeed; ?></span></label>
-                                                    <input type="range" class="form-range" min="0.5" max="2.0" step="0.1" id="ttsSpeed" name="tts_speed" value="<?php echo $ttsSpeed; ?>">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="ttsPitch" class="form-label">ระดับเสียงสูง-ต่ำ: <span id="pitchValue"><?php echo $ttsPitch; ?></span></label>
-                                                    <input type="range" class="form-range" min="-10" max="10" step="1" id="ttsPitch" name="tts_pitch" value="<?php echo $ttsPitch; ?>">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
+
                                     <div class="mt-4">
-                                        <button type="submit" name="update_tts_settings" class="btn btn-primary">
+                                        <button type="submit" name="update_audio_settings" class="btn btn-primary">
                                             <i class="fas fa-save me-2"></i>บันทึกการตั้งค่า
                                         </button>
                                     </div>
@@ -904,35 +812,7 @@ try {
             $('#audioVolume').on('input', function() {
                 $('#volumeValue').text($(this).val());
             });
-            
-            $('#ttsSpeed').on('input', function() {
-                $('#speedValue').text($(this).val());
-            });
-            
-            $('#ttsPitch').on('input', function() {
-                $('#pitchValue').text($(this).val());
-            });
-            
-            // Toggle custom API URL field
-            $('#ttsProvider').on('change', function() {
-                if ($(this).val() === 'custom') {
-                    $('.custom-api-section').show();
-                } else {
-                    $('.custom-api-section').hide();
-                }
-            });
-            
-            // Test audio button
-            $('#testAudio').on('click', function() {
-                $.get('../api/test_audio.php', function(response) {
-                    if (response.success) {
-                        // Audio will be played by the API response
-                    } else {
-                        alert('เกิดข้อผิดพลาด: ' + response.error);
-                    }
-                });
-            });
-            
+
             // Load call history
             loadCallHistory();
             
@@ -951,7 +831,7 @@ function loadCallHistory() {
             if (data.history.length === 0) {
                 html = '<div class="text-center text-muted py-5"><i class="fas fa-history fa-3x mb-3"></i><p>ยังไม่มีประวัติการเรียกเสียง</p></div>';
             } else {
-                html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>วันที่/เวลา</th><th>หมายเลขคิว</th><th>จุดบริการ</th><th>เจ้าหน้าที่</th><th>ข้อความ</th><th>สถานะ</th><th>TTS</th></tr></thead><tbody>';
+                html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>วันที่/เวลา</th><th>หมายเลขคิว</th><th>จุดบริการ</th><th>เจ้าหน้าที่</th><th>ข้อความ</th><th>สถานะ</th></tr></thead><tbody>';
                 
                 data.history.forEach(function(item) {
                     const statusBadge = item.audio_status === 'played' ? 'bg-success' : 
@@ -966,7 +846,6 @@ function loadCallHistory() {
                         <td>${item.staff_name || '-'}</td>
                         <td>${item.message || '-'}</td>
                         <td><span class="badge ${statusBadge}">${statusText}</span></td>
-                        <td>${item.tts_used == '1' ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-muted"></i>'}</td>
                     </tr>`;
                 });
                 

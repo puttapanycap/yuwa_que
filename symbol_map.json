@@ -77,19 +77,6 @@
       "api/save_dashboard_layout.php:18",
       "api/save_dashboard_layout.php:49",
       "api/save_dashboard_layout.php:50",
-      "api/tts_service.php:5",
-      "api/tts_service.php:5",
-      "api/tts_service.php:84",
-      "api/tts_service.php:171",
-      "api/tts_service.php:200",
-      "api/tts_service.php:210",
-      "api/tts_service.php:211",
-      "api/tts_service.php:212",
-      "api/tts_service.php:221",
-      "api/tts_service.php:232",
-      "api/tts_service.php:241",
-      "api/tts_service.php:252",
-      "api/tts_service.php:261",
       "api/get_queues.php:14",
       "api/get_dashboard_widgets.php:41",
       "api/get_dashboard_widgets.php:42",
@@ -1635,11 +1622,6 @@
       "api/get_role.php:28",
       "api/get_role.php:48",
       "api/get_role.php:48",
-      "api/tts_service.php:23",
-      "api/tts_service.php:80",
-      "api/tts_service.php:214",
-      "api/tts_service.php:234",
-      "api/tts_service.php:254",
       "api/get_audio_call_history.php:35",
       "api/generate_queue.php:106",
       "api/generate_queue.php:115",
@@ -2097,9 +2079,6 @@
       "api/get_settings.php:21",
       "api/get_settings.php:22",
       "api/get_settings.php:23",
-      "api/tts_service.php:43",
-      "api/tts_service.php:44",
-      "api/tts_service.php:156",
       "api/call_queue.php:103",
       "api/call_queue.php:118",
       "api/test_audio.php:9",
@@ -5057,20 +5036,6 @@
       "api/get_widget_data.php:181",
       "api/get_widget_data.php:85",
       "api/get_widget_data.php:181",
-      "api/tts_service.php:84",
-      "api/tts_service.php:198",
-      "api/tts_service.php:210",
-      "api/tts_service.php:219",
-      "api/tts_service.php:231",
-      "api/tts_service.php:239",
-      "api/tts_service.php:251",
-      "api/tts_service.php:84",
-      "api/tts_service.php:198",
-      "api/tts_service.php:210",
-      "api/tts_service.php:219",
-      "api/tts_service.php:231",
-      "api/tts_service.php:239",
-      "api/tts_service.php:251",
       "api/generate_queue.php:67",
       "api/generate_queue.php:106",
       "api/generate_queue.php:67",
@@ -5422,50 +5387,38 @@
   },
   "processTextForSpeech": {
     "definitions": [
-      "api/tts_service.php:90"
     ],
     "references": [
-      "api/tts_service.php:40"
     ]
   },
   "generateGoogleFreeTTS": {
     "definitions": [
-      "api/tts_service.php:177"
     ],
     "references": [
-      "api/tts_service.php:48"
     ]
   },
   "generateGoogleTTS": {
     "definitions": [
-      "api/tts_service.php:208"
     ],
     "references": [
-      "api/tts_service.php:51"
     ]
   },
   "generateAzureTTS": {
     "definitions": [
-      "api/tts_service.php:229"
     ],
     "references": [
-      "api/tts_service.php:54"
     ]
   },
   "generateAmazonTTS": {
     "definitions": [
-      "api/tts_service.php:249"
     ],
     "references": [
-      "api/tts_service.php:57"
     ]
   },
   "generateCustomTTS": {
     "definitions": [
-      "api/tts_service.php:270"
     ],
     "references": [
-      "api/tts_service.php:63"
     ]
   },
   "exportCSV": {
@@ -6644,13 +6597,6 @@
       "api/get_role.php:14",
       "api/get_role.php:27",
       "api/get_call_time_groups.php:30",
-      "api/tts_service.php:21",
-      "api/tts_service.php:35",
-      "api/tts_service.php:60",
-      "api/tts_service.php:69",
-      "api/tts_service.php:158",
-      "api/tts_service.php:190",
-      "api/tts_service.php:301",
       "api/generate_queue.php:6",
       "api/generate_queue.php:15",
       "api/generate_queue.php:21",

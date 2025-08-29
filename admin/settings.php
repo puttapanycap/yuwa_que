@@ -30,7 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $booleanSettings = [
             'enable_priority_queue',
             'auto_forward_enabled',
-            'tts_enabled',
             'sound_notification_before', // Added this setting
             'email_notifications',
             'telegram_notifications'
@@ -80,31 +79,11 @@ $currentSettings = [
     'working_hours_start' => getSetting('working_hours_start', '08:00'),
     'working_hours_end' => getSetting('working_hours_end', '16:00'),
     
-    // Audio/TTS Configuration
-    'tts_enabled' => getSetting('tts_enabled', 'true'),
-    'tts_provider' => getSetting('tts_provider', 'browser'), // Changed default to 'browser' as per previous fix
-    'tts_api_url' => getSetting('tts_api_url', ''),
-    'tts_language' => getSetting('tts_language', 'th-TH'),
-    'tts_voice' => getSetting('tts_voice', 'th-TH-Standard-A'),
-    'tts_speed' => getSetting('tts_speed', '1.0'),
-    'tts_pitch' => getSetting('tts_pitch', '0'),
+    // Audio Configuration
     'audio_volume' => getSetting('audio_volume', '1.0'),
     'audio_repeat_count' => getSetting('audio_repeat_count', '1'),
     'sound_notification_before' => getSetting('sound_notification_before', 'true'), // Added this setting
     'tts_call_format' => getSetting('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ'),
-    
-    // Google Cloud TTS
-    'google_cloud_project_id' => getSetting('google_cloud_project_id', ''),
-    'google_cloud_key_file' => getSetting('google_cloud_key_file', ''),
-    
-    // Azure Speech Service
-    'azure_speech_key' => getSetting('azure_speech_key', ''),
-    'azure_speech_region' => getSetting('azure_speech_region', ''),
-    
-    // Amazon Polly
-    'aws_access_key_id' => getSetting('aws_access_key_id', ''),
-    'aws_secret_access_key' => getSetting('aws_secret_access_key', ''),
-    'aws_region' => getSetting('aws_region', ''),
     
     // Email Configuration
     'email_notifications' => getSetting('email_notifications', 'false'),
@@ -369,147 +348,38 @@ $currentSettings = [
                             <!-- Audio Settings -->
                             <div class="setting-group">
                                 <h6><i class="fas fa-volume-up me-2"></i>การตั้งค่าเสียง</h6>
-                                
-                                <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" name="settings[tts_enabled]" 
-                                           value="true" <?php echo $currentSettings['tts_enabled'] == 'true' ? 'checked' : ''; ?>>
-                                    <label class="form-check-label">เปิดใช้งานระบบเสียงเรียกคิว</label>
-                                </div>
 
-                                <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]" 
-                                           value="true" <?php echo $currentSettings['sound_notification_before'] == 'true' ? 'checked' : ''; ?>>
-                                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
-                                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]"
+                           value="true" <?php echo $currentSettings['sound_notification_before'] == 'true' ? 'checked' : ''; ?>>
+                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
+                </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label">รูปแบบประโยคเรียกคิว</label>
-                                    <input type="text" class="form-control" name="settings[tts_call_format]" 
-                                           value="<?php echo htmlspecialchars($currentSettings['tts_call_format']); ?>">
-                                    <div class="form-text">
-                                        ใช้ {queue_number} สำหรับหมายเลขคิว และ {service_point} สำหรับชื่อจุดบริการ
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">ผู้ให้บริการ TTS</label>
-                                            <select class="form-select" name="settings[tts_provider]" id="tts_provider">
-                                                <option value="google_free" <?php echo $currentSettings['tts_provider'] == 'google_free' ? 'selected' : ''; ?>>Google TTS (ฟรี)</option>
-                                                <option value="google" <?php echo $currentSettings['tts_provider'] == 'google' ? 'selected' : ''; ?>>Google Cloud TTS</option>
-                                                <option value="azure" <?php echo $currentSettings['tts_provider'] == 'azure' ? 'selected' : ''; ?>>Azure Speech Service</option>
-                                                <option value="amazon" <?php echo $currentSettings['tts_provider'] == 'amazon' ? 'selected' : ''; ?>>Amazon Polly</option>
-                                                <option value="browser" <?php echo $currentSettings['tts_provider'] == 'browser' ? 'selected' : ''; ?>>Browser TTS</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">ภาษา</label>
-                                            <select class="form-select" name="settings[tts_language]">
-                                                <option value="th-TH" <?php echo $currentSettings['tts_language'] == 'th-TH' ? 'selected' : ''; ?>>ไทย (th-TH)</option>
-                                                <option value="en-US" <?php echo $currentSettings['tts_language'] == 'en-US' ? 'selected' : ''; ?>>อังกฤษ (en-US)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <div class="mb-3">
-                                            <label class="form-label">ความเร็ว: <span id="speed_value"><?php echo $currentSettings['tts_speed']; ?></span></label>
-                                            <input type="range" class="form-range" name="settings[tts_speed]" id="tts_speed"
-                                                   min="0.5" max="2.0" step="0.1" value="<?php echo $currentSettings['tts_speed']; ?>">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="mb-3">
-                                            <label class="form-label">ระดับเสียง: <span id="volume_value"><?php echo $currentSettings['audio_volume']; ?></span></label>
-                                            <input type="range" class="form-range" name="settings[audio_volume]" id="audio_volume"
-                                                   min="0.1" max="1.0" step="0.1" value="<?php echo $currentSettings['audio_volume']; ?>">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="mb-3">
-                                            <label class="form-label">จำนวนครั้งที่เล่นซ้ำ</label>
-                                            <input type="number" class="form-control" name="settings[audio_repeat_count]" 
-                                                   value="<?php echo $currentSettings['audio_repeat_count']; ?>" min="1" max="5">
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- TTS Provider Settings -->
-                                <div id="google_settings" class="provider-settings" style="display: none;">
-                                    <h6 class="text-secondary">Google Cloud TTS</h6>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Project ID</label>
-                                                <input type="text" class="form-control" name="settings[google_cloud_project_id]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['google_cloud_project_id']); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Key File Path</label>
-                                                <input type="text" class="form-control" name="settings[google_cloud_key_file]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['google_cloud_key_file']); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div id="azure_settings" class="provider-settings" style="display: none;">
-                                    <h6 class="text-secondary">Azure Speech Service</h6>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Speech Key</label>
-                                                <input type="password" class="form-control" name="settings[azure_speech_key]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['azure_speech_key']); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Region</label>
-                                                <input type="text" class="form-control" name="settings[azure_speech_region]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['azure_speech_region']); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div id="amazon_settings" class="provider-settings" style="display: none;">
-                                    <h6 class="text-secondary">Amazon Polly</h6>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">Access Key ID</label>
-                                                <input type="password" class="form-control" name="settings[aws_access_key_id]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['aws_access_key_id']); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">Secret Access Key</label>
-                                                <input type="password" class="form-control" name="settings[aws_secret_access_key]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['aws_secret_access_key']); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">Region</label>
-                                                <input type="text" class="form-control" name="settings[aws_region]" 
-                                                       value="<?php echo htmlspecialchars($currentSettings['aws_region']); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testTTS()">
-                                    <i class="fas fa-play me-1"></i>ทดสอบเสียง
-                                </button>
+                <div class="mb-3">
+                    <label class="form-label">รูปแบบประโยคเรียกคิว</label>
+                    <input type="text" class="form-control" name="settings[tts_call_format]"
+                           value="<?php echo htmlspecialchars($currentSettings['tts_call_format']); ?>">
+                    <div class="form-text">
+                        ใช้ {queue_number} สำหรับหมายเลขคิว และ {service_point} สำหรับชื่อจุดบริการ
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">ระดับเสียง: <span id="volume_value"><?php echo $currentSettings['audio_volume']; ?></span></label>
+                            <input type="range" class="form-range" name="settings[audio_volume]" id="audio_volume"
+                                   min="0.1" max="1.0" step="0.1" value="<?php echo $currentSettings['audio_volume']; ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">จำนวนครั้งที่เล่นซ้ำ</label>
+                            <input type="number" class="form-control" name="settings[audio_repeat_count]"
+                                   value="<?php echo $currentSettings['audio_repeat_count']; ?>" min="1" max="5">
+                        </div>
+                    </div>
+                </div>
                             </div>
                             
                             <!-- Email Settings -->
@@ -671,35 +541,10 @@ $currentSettings = [
     
     <script>
         // Update range value displays
-        $('#tts_speed').on('input', function() {
-            $('#speed_value').text($(this).val());
-        });
-        
         $('#audio_volume').on('input', function() {
             $('#volume_value').text($(this).val());
         });
-        
-        // Show/hide TTS provider settings
-        function toggleTTSProviderSettings() {
-            const provider = $('#tts_provider').val();
-            $('.provider-settings').hide();
-            
-            if (provider === 'google') {
-                $('#google_settings').show();
-            } else if (provider === 'azure') {
-                $('#azure_settings').show();
-            } else if (provider === 'amazon') {
-                $('#amazon_settings').show();
-            }
-        }
-        
-        $('#tts_provider').on('change', toggleTTSProviderSettings);
-        
-        // Initialize on page load
-        $(document).ready(function() {
-            toggleTTSProviderSettings();
-        });
-        
+
         // Preview Telegram message template
         $('input[name="settings[telegram_notify_template]"]').on('input', function() {
             const template = $(this).val();
@@ -709,67 +554,7 @@ $currentSettings = [
             $('#telegram_preview').text(preview);
         });
         
-        // Test TTS
-        function testTTS() {
-            const provider = $('#tts_provider').val();
-            const language = $('select[name="settings[tts_language]"]').val();
-            const speed = $('#tts_speed').val();
-            const volume = $('#audio_volume').val();
-            const message = "ทดสอบระบบเสียงเรียกคิว หมายเลข A001 เชิญที่ห้องตรวจ 1";
-            
-            // Disable button during test
-            const testButton = $('button[onclick="testTTS()"]');
-            testButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังทดสอบ...');
-
-            if (provider === 'browser') {
-                // Use browser TTS
-                if (window.speechSynthesis) {
-                    const utterance = new SpeechSynthesisUtterance(message);
-                    utterance.lang = language;
-                    utterance.rate = parseFloat(speed);
-                    utterance.volume = parseFloat(volume);
-                    
-                    utterance.onend = function() {
-                        alert('ทดสอบเสียงสำเร็จ');
-                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
-                    };
-                    utterance.onerror = function(event) {
-                        alert('เกิดข้อผิดพลาดในการทดสอบ: ' + event.error);
-                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
-                    };
-                    speechSynthesis.speak(utterance);
-                } else {
-                    alert('เบราว์เซอร์ไม่รองรับระบบเสียง');
-                    testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
-                }
-            } else {
-                // Use API
-                $.ajax({
-                    url: '../api/test_audio.php',
-                    method: 'POST',
-                    data: {
-                        provider: provider,
-                        message: message,
-                        language: language,
-                        speed: speed,
-                        volume: volume
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            alert('ทดสอบเสียงสำเร็จ');
-                        } else {
-                            alert('เกิดข้อผิดพลาด: ' + response.message);
-                        }
-                    },
-                    error: function() {
-                        alert('เกิดข้อผิดพลาดในการทดสอบ');
-                    },
-                    complete: function() {
-                        testButton.prop('disabled', false).html('<i class="fas fa-play me-1"></i>ทดสอบเสียง');
-                    }
-                });
-            }
-        }
+        // Test TTS function removed
         
         // Test Telegram
         function testTelegram() {

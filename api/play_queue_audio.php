@@ -81,27 +81,49 @@ try {
         $queueData = null;
     }
     
-    // Check if TTS is enabled
-    $ttsEnabled = getSetting('tts_enabled', '0');
     $audioRepeatCount = intval(getSetting('audio_repeat_count', '1'));
     $soundNotificationBefore = getSetting('sound_notification_before', '1');
-    
+
+    // Build audio file sequence from uploaded files
+    $audioFiles = [];
+
+    // Helper to fetch audio file path
+    $getFile = function($type, $name) use ($db) {
+        $stmt = $db->prepare("SELECT file_path FROM audio_files WHERE audio_type = ? AND display_name = ? LIMIT 1");
+        $stmt->execute([$type, $name]);
+        $row = $stmt->fetch();
+        return $row['file_path'] ?? null;
+    };
+
+    // Prefix "หมายเลข"
+    $audioFiles[] = $getFile('message', 'หมายเลข');
+    // Queue number characters
+    if ($queueData && isset($queueData['queue_number'])) {
+        foreach (preg_split('//u', $queueData['queue_number'], -1, PREG_SPLIT_NO_EMPTY) as $char) {
+            $audioFiles[] = $getFile('queue_number', $char);
+        }
+    }
+    // Middle phrase "เชิญที่"
+    $audioFiles[] = $getFile('message', 'เชิญที่');
+    // Service point name
+    if ($servicePointName) {
+        $audioFiles[] = $getFile('service_point', $servicePointName);
+    }
+
+    // Remove missing files
+    $audioFiles = array_values(array_filter($audioFiles));
+
     // Log audio call
-        $stmt = $db->prepare(
-            "
-            INSERT INTO audio_call_history (queue_id, service_point_id, staff_id, message, tts_used, audio_status)
-            VALUES (?, ?, ?, ?, ?, 'pending')
-            "
-        );
-    $stmt->execute(
-        [
-            $queueId,
-            $servicePointId,
-            $_SESSION['staff_id'] ?? null,
-            $message,
-            $ttsEnabled == '1' ? 1 : 0,
-        ]
+    $stmt = $db->prepare(
+        "INSERT INTO audio_call_history (queue_id, service_point_id, staff_id, message, tts_used, audio_status)
+        VALUES (?, ?, ?, ?, 0, 'pending')"
     );
+    $stmt->execute([
+        $queueId,
+        $servicePointId,
+        $_SESSION['staff_id'] ?? null,
+        $message
+    ]);
     
     $callId = $db->lastInsertId();
     
@@ -109,24 +131,11 @@ try {
     $response = [
         'success' => true,
         'call_id' => $callId,
-        'message' => $message,
-        'tts_enabled' => $ttsEnabled == '1',
+        'audio_files' => $audioFiles,
         'repeat_count' => $audioRepeatCount,
         'notification_before' => $soundNotificationBefore == '1',
         'queue_data' => $queueData
     ];
-    
-    // If TTS is enabled, provide TTS URL
-    if ($ttsEnabled == '1') {
-        $response['tts_url'] = BASE_URL . '/api/tts_service.php';
-        $response['tts_params'] = [
-            'text' => $message,
-            'language' => getSetting('tts_language', 'th-TH'),
-            'voice' => getSetting('tts_voice', 'th-TH-Standard-A'),
-            'speed' => floatval(getSetting('tts_speed', '1.0')),
-            'pitch' => floatval(getSetting('tts_pitch', '0'))
-        ];
-    }
     
     logActivity("เล่นเสียงเรียกคิว: {$message}", $_SESSION['staff_id'] ?? null);
     

@@ -99,45 +99,10 @@ try {
     
     logActivity("เรียกคิว {$queue['queue_number']} ที่จุดบริการ ID: {$servicePointId}");
     
-    // Trigger audio call if enabled
-    $ttsEnabled = getSetting('tts_enabled', '0');
-    if ($ttsEnabled == '1') {
-        // Create audio call entry
-        $stmt = $db->prepare("
-            INSERT INTO audio_call_history (queue_id, service_point_id, staff_id, message, tts_used, audio_status)
-            VALUES (?, ?, ?, ?, 1, 'pending')
-        ");
-        
-        // Get service point name for audio message
-        $stmt2 = $db->prepare("SELECT point_name FROM service_points WHERE service_point_id = ?");
-        $stmt2->execute([$servicePointId]);
-        $servicePoint = $stmt2->fetch();
-        $servicePointName = $servicePoint['point_name'] ?? 'จุดบริการ';
-        
-        // Get voice template
-        $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
-        $audioMessage = str_replace(
-            ['{queue_number}', '{service_point_name}'],
-            [$queue['queue_number'], $servicePointName],
-            $queueCallTemplate
-        );
-        
-        $stmt->execute([$queueId, $servicePointId, $_SESSION['staff_id'], $audioMessage]);
-        $audioCallId = $db->lastInsertId();
-        
-        // Add audio call info to response
-        $response['audio_call'] = [
-            'call_id' => $audioCallId,
-            'message' => $audioMessage,
-            'tts_enabled' => true
-        ];
-    }
-    
     echo json_encode([
         'success' => true,
         'message' => 'เรียกคิวสำเร็จ',
-        'queue_number' => $queue['queue_number'],
-        'audio_call' => $response['audio_call'] ?? null
+        'queue_number' => $queue['queue_number']
     ]);
     
 } catch (Exception $e) {

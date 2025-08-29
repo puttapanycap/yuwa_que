@@ -31,7 +31,6 @@ if ($servicePointId) {
 
 $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
 // These settings will be fetched dynamically via API for real-time updates
-// $ttsEnabled = getSetting('tts_enabled', '1');
 // $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
 ?>
 
@@ -443,12 +442,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         let lastCalledQueue = null;
         let lastCalledCount = 0; // เพิ่มตัวแปรเก็บจำนวนครั้งที่เรียกล่าสุด
         let audioEnabled = false; // Default to false, will be set by settings
-        let speechSynthesisReady = false;
-        let voices = [];
-        let currentTTSProvider = 'browser'; // 'browser' or 'api'
         let audioContext = null;
-        let speechSynthesisSupported = false;
-        let isSpeaking = false; // Flag to prevent overlapping speech
 
         // Debug mode toggle
         let debugMode = false; // Set to true for development, false for production
@@ -461,48 +455,26 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         
         $(document).ready(function() {
             updateTime();
-            initializeAudio();
             loadQueueData();
-            
+
             // Update time every second
             setInterval(updateTime, 1000);
-            
+
             // Refresh queue data every 3 seconds
             setInterval(loadQueueData, 3000);
 
-            // Check Speech Synthesis status periodically
-            setInterval(function() {
-                if (audioEnabled && speechSynthesisSupported && !speechSynthesisReady) {
-                    debugLog('Voices lost or not ready, reinitializing...');
-                    initializeAudio();
-                }
-            }, 10000);
-
             // Add user interaction handling for unlocking audio
             let audioUnlocked = false;
-            
             function unlockAudio() {
                 if (!audioUnlocked) {
-                    debugLog('Unlocking audio on user interaction');
-                    
-                    // Unlock AudioContext
                     unlockAudioContext();
-                    
-                    // Prepare Speech Synthesis if not ready
-                    if (speechSynthesisSupported && !speechSynthesisReady) {
-                        initializeAudio();
-                    }
-                    
                     audioUnlocked = true;
-                    debugLog('Audio unlocked successfully');
                 }
             }
-            
-            // Add event listeners for unlock audio
             document.addEventListener('click', unlockAudio, { once: true });
             document.addEventListener('touchstart', unlockAudio, { once: true });
             document.addEventListener('keydown', unlockAudio, { once: true });
-            
+
             // Load audio settings from localStorage
             const savedAudioEnabled = localStorage.getItem('audioEnabled');
             if (savedAudioEnabled !== null) {
@@ -511,67 +483,17 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
         });
         
-        // Initialize Audio System
-        function initializeAudio() {
-            debugLog('Initializing audio system...');
-            
-            // Check for Speech Synthesis support
-            if (!window.speechSynthesis) {
-                speechSynthesisSupported = false;
-                updateAudioStatus('ไม่รองรับเสียง', 'disabled');
-                debugLog('Speech Synthesis not supported');
-            } else {
-                speechSynthesisSupported = true;
-                debugLog('Speech Synthesis supported');
-                
-                // Wait for voices to load
-                function loadVoices() {
-                    voices = speechSynthesis.getVoices();
-                    debugLog('Available voices:', voices.length);
-                    
-                    if (voices.length > 0) {
-                        speechSynthesisReady = true;
-                        debugLog('Voices loaded successfully', voices.map(v => v.name));
-                        // Auto-test audio after voices loaded if enabled
-                        if (audioEnabled) {
-                            debugLog('Auto-testing audio after voices loaded');
-                            testAudioQuiet();
-                        }
-                    } else {
-                        debugLog('No voices available, retrying...');
-                        setTimeout(loadVoices, 500);
-                    }
-                }
-                
-                speechSynthesis.onvoiceschanged = loadVoices;
-                loadVoices(); // Call immediately in case voices are already ready
-            }
-            
-            // Create AudioContext for playing fetched audio
-            try {
+        // Function to unlock audio context (required by browsers for autoplay)
+        function unlockAudioContext() {
+            if (audioContext && audioContext.state === 'suspended') {
+                debugLog('Unlocking audio context...');
+                audioContext.resume().then(() => {
+                    debugLog('Audio context unlocked:', audioContext.state);
+                }).catch(error => {
+                    debugLog('Failed to unlock audio context:', error);
+                });
+            } else if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                debugLog('AudioContext created', audioContext.state);
-            } catch (e) {
-                debugLog('AudioContext creation failed', e);
-            }
-        }
-
-        // Function to test audio quietly (for initialization)
-        function testAudioQuiet() {
-            debugLog('Testing audio quietly...');
-            try {
-                const utterance = new SpeechSynthesisUtterance(' '); // Use a silent utterance
-                utterance.volume = 0.01;
-                utterance.rate = 10;
-                utterance.pitch = 1;
-                
-                utterance.onstart = function() { debugLog('Quiet test audio started'); };
-                utterance.onend = function() { debugLog('Quiet test audio ended - system ready'); };
-                utterance.onerror = function(event) { debugLog('Quiet test audio error:', event.error); };
-                
-                speechSynthesis.speak(utterance);
-            } catch (error) {
-                debugLog('Quiet test failed:', error);
             }
         }
         
@@ -587,119 +509,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         }
 
-        // Main function to speak text (handles both browser TTS and API TTS)
-        function speakText(text, ttsUrl = null, ttsParams = null) {
-            if (isSpeaking) {
-                debugLog('Already speaking, queuing new speech.');
-                // Optionally queue speech here, or just ignore
-                return;
-            }
-            isSpeaking = true;
-            debugLog('Starting speakText:', { text, ttsUrl, ttsParams });
-            
-            unlockAudioContext(); // Ensure audio context is unlocked
-
-            const onSpeechEnd = () => {
-                isSpeaking = false;
-                debugLog('Speech ended.');
-                updateAudioStatus('เสียงพร้อม', 'enabled');
-            };
-
-            const onSpeechError = (error) => {
-                isSpeaking = false;
-                debugLog('Speech error:', error);
-                updateAudioStatus('เกิดข้อผิดพลาด', 'disabled');
-            };
-
-            if (ttsUrl && currentTTSProvider !== 'browser') {
-                // Use API for TTS
-                debugLog(`Using API provider: ${currentTTSProvider}`, ttsUrl);
-                $.ajax({
-                    url: ttsUrl,
-                    type: 'POST',
-                    data: ttsParams,
-                    xhrFields: {
-                        responseType: 'blob' // Expecting audio blob
-                    },
-                    success: function(blob) {
-                        debugLog('Audio blob received, playing...');
-                        const audioUrl = URL.createObjectURL(blob);
-                        const audio = new Audio(audioUrl);
-                        audio.volume = 1.0; // Can be controlled by a setting
-                        audio.onended = onSpeechEnd;
-                        audio.onerror = (e) => onSpeechError(e.message || 'Audio playback error');
-                        audio.play().catch(e => onSpeechError('Audio play failed: ' + e.message));
-                        updateAudioStatus('กำลังพูด...', 'enabled');
-                    },
-                    error: function(xhr, status, error) {
-                        onSpeechError('API TTS failed: ' + error);
-                        // Fallback to browser TTS if API fails
-                        debugLog('API TTS failed, falling back to browser TTS.');
-                        speakWithBrowser(text, onSpeechEnd, onSpeechError);
-                    }
-                });
-            } else {
-                // Fallback to browser TTS
-                debugLog(`Using browser TTS (Provider: ${currentTTSProvider}).`);
-                speakWithBrowser(text, onSpeechEnd, onSpeechError);
-            }
-        }
-
-        // Function to speak using browser's SpeechSynthesis
-        function speakWithBrowser(text, onEndCallback, onErrorCallback) {
-            debugLog('Speaking with browser TTS:', text);
-            
-            if (!speechSynthesisSupported || !speechSynthesisReady) {
-                onErrorCallback('Speech Synthesis not ready or supported.');
-                return;
-            }
-
-            if (speechSynthesis.speaking) {
-                debugLog('Cancelling previous browser speech.');
-                speechSynthesis.cancel();
-            }
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'th-TH';
-            utterance.rate = 0.8; // Default rate, can be from settings
-            utterance.pitch = 1; // Default pitch, can be from settings
-            utterance.volume = 0.9; // Default volume, can be from settings
-            
-            const thaiVoice = voices.find(voice => 
-                voice.lang.includes('th') || 
-                voice.name.toLowerCase().includes('thai')
-            );
-            
-            if (thaiVoice) {
-                utterance.voice = thaiVoice;
-                debugLog('Using Thai voice:', thaiVoice.name);
-            } else {
-                debugLog('No Thai voice found, using default.');
-            }
-            
-            utterance.onstart = function() {
-                debugLog('Browser speech started successfully.');
-                updateAudioStatus('กำลังพูด...', 'enabled');
-            };
-            
-            utterance.onend = function() {
-                debugLog('Browser speech ended successfully.');
-                if (onEndCallback) onEndCallback();
-            };
-            
-            utterance.onerror = function(event) {
-                debugLog('Browser speech error:', event.error);
-                if (onErrorCallback) onErrorCallback(event.error);
-            };
-            
-            try {
-                speechSynthesis.speak(utterance);
-            } catch (error) {
-                debugLog('Failed to speak with browser TTS:', error);
-                if (onErrorCallback) onErrorCallback(error.message);
-            }
-        }
-
         // Function to play a short notification sound
         function playNotificationSound() {
             debugLog('Playing notification sound.');
@@ -709,36 +518,37 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
         }
 
-        // Function to orchestrate audio sequence (notification + main announcement + repeats)
-        function playAudioSequence(message, ttsEnabled, ttsUrl, ttsParams, repeatCount, notificationBefore) {
-            if (!audioEnabled) {
-                debugLog('Audio is disabled, skipping audio sequence.');
+        function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
+            if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
+                debugLog('No audio files to play.');
                 return;
             }
 
-            let currentRepeat = 0;
-
-            const playNext = () => {
-                if (currentRepeat < repeatCount) {
-                    debugLog(`Playing audio repeat ${currentRepeat + 1}/${repeatCount}`);
-                    speakText(message, ttsUrl, ttsParams);
-                    currentRepeat++;
-                    // Wait for speech to end before next repeat (simple delay for now)
-                    setTimeout(playNext, (message.length * 80) + 1000); // Estimate speech duration + 1 sec pause
-                } else {
-                    debugLog('Audio sequence completed.');
-                }
+            const playSet = () => {
+                let index = 0;
+                const playNext = () => {
+                    if (index < audioFiles.length) {
+                        const audio = new Audio(audioFiles[index]);
+                        audio.volume = 1.0;
+                        audio.onended = playNext;
+                        audio.play().catch(e => debugLog('Audio play failed:', e.message));
+                        index++;
+                    } else if (--repeatCount > 0) {
+                        index = 0;
+                        playNext();
+                    }
+                };
+                playNext();
             };
 
             if (notificationBefore) {
-                debugLog('Playing notification sound before announcement.');
                 playNotificationSound();
-                setTimeout(playNext, 1000); // Wait for notification sound to finish
+                setTimeout(playSet, 1000);
             } else {
-                playNext();
+                playSet();
             }
         }
-        
+
         // Update audio status display and toggle button
         function updateAudioStatus(text, status) {
             debugLog('Audio status updated:', { text, status });
@@ -768,26 +578,16 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         
         // Toggle audio on/off
         function toggleAudio() {
-            if (!speechSynthesisSupported && currentTTSProvider === 'browser') {
-                alert('เบราว์เซอร์ของคุณไม่รองรับระบบเสียง');
-                return;
-            }
-            
             audioEnabled = !audioEnabled;
             updateAudioStatus(audioEnabled ? 'เสียงพร้อม' : 'เสียงปิด', audioEnabled ? 'enabled' : 'disabled');
-            
+
             localStorage.setItem('audioEnabled', audioEnabled); // Save setting
-            
+
             if (audioEnabled) {
                 testAudio(); // Test audio when enabled
-            } else {
-                if (speechSynthesis && speechSynthesis.speaking) {
-                    speechSynthesis.cancel(); // Stop any ongoing speech
-                }
-                isSpeaking = false;
             }
         }
-        
+
         // Manual audio test
         function testAudio() {
             debugLog('Manual audio test triggered');
@@ -801,41 +601,20 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
 
             const testMessage = 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1';
 
-            // If provider is browser, test locally without server roundtrip
-            if (currentTTSProvider === 'browser') {
-                debugLog('Testing with browser provider directly.');
-                speakWithBrowser(testMessage, 
-                    () => { /* success callback */ }, 
-                    (err) => { 
-                        alert('การทดสอบเสียงล้มเหลว: ' + err); 
-                        debugLog('Browser TTS test failed:', err);
+            $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1 })
+                .done(function(response) {
+                    if (response.success) {
+                        debugLog('Test audio API response:', response);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                    } else {
+                        alert('เกิดข้อผิดพลาดในการทดสอบเสียง: ' + response.message);
+                        debugLog('Test audio API error response:', response.message);
                     }
-                );
-            } else {
-                // For API providers, call the backend
-                debugLog(`Testing with API provider: ${currentTTSProvider}`);
-                $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1 })
-                    .done(function(response) {
-                        if (response.success) {
-                            debugLog('Test audio API response:', response);
-                            playAudioSequence(
-                                response.message,
-                                response.tts_enabled,
-                                response.tts_url,
-                                response.tts_params,
-                                response.repeat_count,
-                                response.notification_before
-                            );
-                        } else {
-                            alert('เกิดข้อผิดพลาดในการทดสอบเสียง: ' + response.message);
-                            debugLog('Test audio API error response:', response.message);
-                        }
-                    })
-                    .fail(function(xhr, status, error) {
-                        alert('ไม่สามารถเชื่อมต่อกับบริการเสียงได้: ' + error);
-                        debugLog('Test audio AJAX failed:', error);
-                    });
-            }
+                })
+                .fail(function(xhr, status, error) {
+                    alert('ไม่สามารถเชื่อมต่อกับบริการเสียงได้: ' + error);
+                    debugLog('Test audio AJAX failed:', error);
+                });
         }
         
         function formatTime(timeString) {
@@ -915,12 +694,8 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 // Display debug info
                 console.log('Audio Debug Info:', {
                     audioEnabled,
-                    speechSynthesisReady,
-                    speechSynthesisSupported,
-                    voicesCount: voices.length,
                     audioContextState: audioContext?.state,
                     browserSupport: {
-                        speechSynthesis: !!window.speechSynthesis,
                         audioContext: !!(window.AudioContext || window.webkitAudioContext)
                     }
                 });
@@ -1056,10 +831,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                                 if (response.success) {
                                     debugLog('Audio API response for queue:', response);
                                     playAudioSequence(
-                                        response.message,
-                                        response.tts_enabled,
-                                        response.tts_url,
-                                        response.tts_params,
+                                        response.audio_files,
                                         response.repeat_count,
                                         response.notification_before
                                     );
