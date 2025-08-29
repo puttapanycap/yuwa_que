@@ -22,6 +22,7 @@ try {
     $queueId = $_POST['queue_id'] ?? null;
     $servicePointId = $_POST['service_point_id'] ?? null;
     $customMessage = $_POST['custom_message'] ?? null;
+    $templateId = $_POST['template_id'] ?? null;
     
     if (!$queueId && !$customMessage) {
         throw new Exception('ต้องระบุ queue_id หรือ custom_message');
@@ -33,10 +34,12 @@ try {
     if ($queueId) {
         $stmt = $db->prepare(
             "
-            SELECT 
+            SELECT
                 q.queue_number,
+                q.patient_name,
                 q.current_service_point_id,
-                sp.point_name as service_point_name
+                sp.point_name as service_point_name,
+                sp.voice_template_id
             FROM queues q
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
             WHERE q.queue_id = ?
@@ -52,27 +55,44 @@ try {
         if (!$servicePointId) {
             $servicePointId = $queueData['current_service_point_id'];
         }
-        
-        // Get call format from settings
-        $callFormat = getSetting('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ');
-        
+
+        // Determine voice template
+        if (!$templateId) {
+            $templateId = $queueData['voice_template_id'] ?? null;
+        }
+        if (!$templateId && $servicePointId) {
+            $stmt = $db->prepare("SELECT voice_template_id FROM service_points WHERE service_point_id = ?");
+            $stmt->execute([$servicePointId]);
+            $sp = $stmt->fetch();
+            if ($sp && $sp['voice_template_id']) {
+                $templateId = $sp['voice_template_id'];
+            }
+        }
+        if (!$templateId) {
+            $stmt = $db->query("SELECT template_id FROM voice_templates WHERE is_default = 1 LIMIT 1");
+            $templateId = $stmt->fetchColumn();
+        }
+
+        $stmt = $db->prepare("SELECT template_text FROM voice_templates WHERE template_id = ?");
+        $stmt->execute([$templateId]);
+        $templateText = $stmt->fetchColumn();
+        if (!$templateText) {
+            $templateText = 'ขอเชิญหมายเลข {queue_number} ที่ {service_point_name} ครับ';
+        }
+
         // Process service point name for speech (e.g., "Room1" -> "Room 1")
         $servicePointName = $queueData['service_point_name'] ?? 'จุดบริการ';
         $processedServicePointName = preg_replace('/([^\d])(\d)/', '$1 $2', $servicePointName);
 
-        // Generate message from template
-        $message = str_replace(
-            [
-                '{queue_number}',
-                '{service_point}',
-            ],
-            [
-                $queueData['queue_number'],
-                $processedServicePointName,
-            ],
-            $callFormat
-        );
-        
+        // Generate message from template text
+        $placeholders = [
+            '{queue_number}' => $queueData['queue_number'],
+            '{service_point}' => $processedServicePointName,
+            '{service_point_name}' => $processedServicePointName,
+            '{patient_name}' => $queueData['patient_name'] ?? ''
+        ];
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $templateText);
+
         // แปลงหมายเลขคิวให้อ่านแยกตัว
         $message = processQueueNumberForSpeech($message, $queueData['queue_number']);
         
@@ -84,7 +104,7 @@ try {
     $audioRepeatCount = intval(getSetting('audio_repeat_count', '1'));
     $soundNotificationBefore = getSetting('sound_notification_before', '1');
 
-    // Build audio file sequence from uploaded files
+    // Build audio file sequence from template
     $audioFiles = [];
 
     // Helper to fetch audio file path
@@ -95,19 +115,36 @@ try {
         return $row['file_path'] ?? null;
     };
 
-    // Prefix "หมายเลข"
-    $audioFiles[] = $getFile('message', 'หมายเลข');
-    // Queue number characters
-    if ($queueData && isset($queueData['queue_number'])) {
-        foreach (preg_split('//u', $queueData['queue_number'], -1, PREG_SPLIT_NO_EMPTY) as $char) {
-            $audioFiles[] = $getFile('queue_number', $char);
+    $segments = preg_split('/({[^}]+})/', $templateText, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+    foreach ($segments as $segment) {
+        if (preg_match('/^{([^}]+)}$/', $segment, $m)) {
+            switch ($m[1]) {
+                case 'queue_number':
+                    if ($queueData && isset($queueData['queue_number'])) {
+                        foreach (preg_split('//u', $queueData['queue_number'], -1, PREG_SPLIT_NO_EMPTY) as $char) {
+                            $audioFiles[] = $getFile('queue_number', $char);
+                        }
+                    }
+                    break;
+                case 'service_point':
+                case 'service_point_name':
+                    if ($servicePointName) {
+                        $audioFiles[] = $getFile('service_point', $servicePointName);
+                    }
+                    break;
+                case 'patient_name':
+                    if ($queueData && !empty($queueData['patient_name'])) {
+                        $audioFiles[] = $getFile('patient_name', $queueData['patient_name']);
+                    }
+                    break;
+            }
+        } else {
+            foreach (preg_split('/\s+/u', trim($segment)) as $word) {
+                if ($word !== '') {
+                    $audioFiles[] = $getFile('message', $word);
+                }
+            }
         }
-    }
-    // Middle phrase "เชิญที่"
-    $audioFiles[] = $getFile('message', 'เชิญที่');
-    // Service point name
-    if ($servicePointName) {
-        $audioFiles[] = $getFile('service_point', $servicePointName);
     }
 
     // Remove missing files

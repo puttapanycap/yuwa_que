@@ -18,11 +18,12 @@ $servicePointName = 'ทุกจุดบริการ';
 if ($servicePointId) {
     try {
         $db = getDB();
-        $stmt = $db->prepare("SELECT point_name FROM service_points WHERE service_point_id = ? AND is_active = 1");
+        $stmt = $db->prepare("SELECT point_name, voice_template_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
         $stmt->execute([$servicePointId]);
         $servicePoint = $stmt->fetch();
         if ($servicePoint) {
             $servicePointName = $servicePoint['point_name'];
+            $voiceTemplateId = $servicePoint['voice_template_id'] ?? null;
         }
     } catch (Exception $e) {
         // Use default name
@@ -439,6 +440,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
     
     <script>
         let servicePointId = <?php echo json_encode($servicePointId); ?>;
+        let voiceTemplateId = <?php echo json_encode($voiceTemplateId ?? null); ?>;
         let lastCalledQueue = null;
         let lastCalledCount = 0; // เพิ่มตัวแปรเก็บจำนวนครั้งที่เรียกล่าสุด
         let audioEnabled = false; // Default to false, will be set by settings
@@ -601,7 +603,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
 
             const testMessage = 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1';
 
-            $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1 })
+            $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1, template_id: voiceTemplateId })
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Test audio API response:', response);
@@ -826,7 +828,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                         }
                         
                         // Fetch audio parameters from backend API
-                        $.post('../api/play_queue_audio.php', { queue_id: currentQueueId, service_point_id: servicePointId })
+                        $.post('../api/play_queue_audio.php', { queue_id: currentQueueId, service_point_id: servicePointId, template_id: voiceTemplateId })
                             .done(function(response) {
                                 if (response.success) {
                                     debugLog('Audio API response for queue:', response);
