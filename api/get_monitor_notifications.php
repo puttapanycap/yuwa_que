@@ -17,6 +17,15 @@ try {
     $hasAutoDismiss = $columnCheck && $columnCheck->rowCount() > 0;
     $autoDismissField = $hasAutoDismiss ? 'n.auto_dismiss_after' : 'NULL as auto_dismiss_after';
 
+    // Check for optional color and icon columns
+    $colorCheck = $db->query("SHOW COLUMNS FROM notifications LIKE 'color'");
+    $hasColor = $colorCheck && $colorCheck->rowCount() > 0;
+    $colorField = $hasColor ? 'n.color' : 'NULL as color';
+
+    $iconCheck = $db->query("SHOW COLUMNS FROM notifications LIKE 'icon'");
+    $hasIcon = $iconCheck && $iconCheck->rowCount() > 0;
+    $iconField = $hasIcon ? 'n.icon' : 'NULL as icon';
+
     // Query สำหรับ active notifications
     $sql = "
     SELECT
@@ -29,21 +38,21 @@ try {
         n.metadata,
         n.expires_at,
         {$autoDismissField},
-        n.color,
-        n.icon,
+        {$colorField},
+        {$iconField},
         sp.point_name as service_point_name
     FROM notifications n
     LEFT JOIN service_points sp ON n.service_point_id = sp.service_point_id
     WHERE n.notification_type IN ('queue_called', 'announcement', 'system_alert', 'emergency')
     AND (n.service_point_id IS NULL OR n.service_point_id = ? OR ? IS NULL)
     " . ($lastCheck ? "AND n.created_at > ?" : "") . "
-    ORDER BY 
-        CASE n.priority 
-            WHEN 'urgent' THEN 1 
-            WHEN 'high' THEN 2 
-            WHEN 'normal' THEN 3 
-            WHEN 'low' THEN 4 
-            ELSE 5 
+    ORDER BY
+        CASE n.priority
+            WHEN 'urgent' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'normal' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
         END,
         n.created_at DESC
     LIMIT 20
