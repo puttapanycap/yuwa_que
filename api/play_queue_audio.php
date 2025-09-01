@@ -36,12 +36,13 @@ try {
             "
             SELECT
                 q.queue_number,
-                q.patient_name,
+                p.name AS patient_name,
                 q.current_service_point_id,
-                sp.point_name as service_point_name,
+                sp.point_name AS service_point_name,
                 sp.voice_template_id
             FROM queues q
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
+            LEFT JOIN patients p ON q.patient_id_card_number = p.id_card_number
             WHERE q.queue_id = ?
             "
         );

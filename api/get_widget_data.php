@@ -105,17 +105,18 @@ try {
             
         case 'service_point_status':
             $stmt = $db->prepare("
-                SELECT 
+                SELECT
                     sp.point_name,
-                    CASE 
+                    CASE
                         WHEN q.queue_id IS NOT NULL THEN 'ใช้งาน'
                         ELSE 'ว่าง'
                     END as status,
                     q.queue_number,
-                    q.patient_name
+                    p.name AS patient_name
                 FROM service_points sp
-                LEFT JOIN queues q ON sp.service_point_id = q.current_service_point_id 
+                LEFT JOIN queues q ON sp.service_point_id = q.current_service_point_id
                     AND q.current_status IN ('called', 'processing')
+                LEFT JOIN patients p ON q.patient_id_card_number = p.id_card_number
                 WHERE sp.is_active = 1
                 ORDER BY sp.display_order
             ");
@@ -158,14 +159,15 @@ try {
             
         case 'recent_queues':
             $stmt = $db->prepare("
-                SELECT 
+                SELECT
                     q.queue_number,
                     qt.type_name,
-                    q.patient_name,
+                    p.name AS patient_name,
                     q.current_status,
                     TIME_FORMAT(q.creation_time, '%H:%i') as created_time
                 FROM queues q
                 LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
+                LEFT JOIN patients p ON q.patient_id_card_number = p.id_card_number
                 WHERE DATE(q.creation_time) = CURDATE()
                 ORDER BY q.creation_time DESC
                 LIMIT 10
