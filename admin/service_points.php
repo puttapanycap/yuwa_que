@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         switch ($action) {
             case 'add_service_point':
+                $pointLabel = sanitizeInput($_POST['point_label']);
                 $pointName = sanitizeInput($_POST['point_name']);
                 $pointDescription = sanitizeInput($_POST['point_description']);
                 $positionKey = sanitizeInput($_POST['position_key']);
@@ -38,12 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $stmt = $db->prepare("
-                    INSERT INTO service_points (point_name, point_description, position_key, display_order, is_active) 
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO service_points (point_label, point_name, point_description, position_key, display_order, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$pointName, $pointDescription, $positionKey, $displayOrder, $isActive]);
-                
-                logActivity("เพิ่ม{$servicePointLabel}ใหม่: {$pointName}");
+                $stmt->execute([$pointLabel, $pointName, $pointDescription, $positionKey, $displayOrder, $isActive]);
+
+                $fullName = trim(($pointLabel ? $pointLabel . ' ' : '') . $pointName);
+                logActivity("เพิ่ม{$servicePointLabel}ใหม่: {$fullName}");
 
                 $message = "เพิ่ม{$servicePointLabel}สำเร็จ";
                 $messageType = 'success';
@@ -51,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
             case 'edit_service_point':
                 $servicePointId = $_POST['service_point_id'];
+                $pointLabel = sanitizeInput($_POST['point_label']);
                 $pointName = sanitizeInput($_POST['point_name']);
                 $pointDescription = sanitizeInput($_POST['point_description']);
                 $positionKey = sanitizeInput($_POST['position_key']);
@@ -69,13 +72,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $stmt = $db->prepare("
-                    UPDATE service_points 
-                    SET point_name = ?, point_description = ?, position_key = ?, display_order = ?, is_active = ? 
+                    UPDATE service_points
+                    SET point_label = ?, point_name = ?, point_description = ?, position_key = ?, display_order = ?, is_active = ?
                     WHERE service_point_id = ?
                 ");
-                $stmt->execute([$pointName, $pointDescription, $positionKey, $displayOrder, $isActive, $servicePointId]);
-                
-                logActivity("แก้ไข{$servicePointLabel}: {$pointName}");
+                $stmt->execute([$pointLabel, $pointName, $pointDescription, $positionKey, $displayOrder, $isActive, $servicePointId]);
+
+                $fullName = trim(($pointLabel ? $pointLabel . ' ' : '') . $pointName);
+                logActivity("แก้ไข{$servicePointLabel}: {$fullName}");
 
                 $message = "แก้ไข{$servicePointLabel}สำเร็จ";
                 $messageType = 'success';
@@ -247,7 +251,7 @@ try {
                                     <div class="row align-items-center">
                                         <div class="col-md-4">
                                             <h6 class="mb-1">
-                                                <?php echo htmlspecialchars($sp['point_name']); ?>
+                                                <?php echo htmlspecialchars(trim(($sp['point_label'] ? $sp['point_label'].' ' : '') . $sp['point_name'])); ?>
                                                 <?php if (!$sp['is_active']): ?>
                                                     <span class="badge bg-secondary ms-2">ปิดใช้งาน</span>
                                                 <?php endif; ?>
@@ -319,7 +323,7 @@ try {
                                     <?php foreach ($servicePoints as $sp): ?>
                                         <?php if ($sp['is_active']): ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($sp['point_name']); ?></td>
+                                                <td><?php echo htmlspecialchars(trim(($sp['point_label'] ? $sp['point_label'].' ' : '') . $sp['point_name'])); ?></td>
                                                 <td><code><?php echo BASE_URL; ?>/monitor/display.php?service_point=<?php echo $sp['service_point_id']; ?></code></td>
                                                 <td>
                                                     <a href="../monitor/display.php?service_point=<?php echo $sp['service_point_id']; ?>" target="_blank" class="btn btn-sm btn-outline-primary">
@@ -349,6 +353,13 @@ try {
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">คำเรียกเฉพาะ</label>
+                            <input type="text" class="form-control" name="point_label" placeholder="เช่น ห้อง, ช่อง">
+                            <div class="form-text">ใช้เมื่อแต่ละ<?php echo $servicePointLabel; ?>มีคำเรียกแตกต่างกัน</div>
+                        </div>
+
+        
                         <div class="mb-3">
                             <label class="form-label">ชื่อ<?php echo $servicePointLabel; ?> *</label>
                             <input type="text" class="form-control" name="point_name" required>
@@ -401,6 +412,11 @@ try {
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
+                            <label class="form-label">คำเรียกเฉพาะ</label>
+                            <input type="text" class="form-control" name="point_label" id="edit_point_label" placeholder="เช่น ห้อง, ช่อง">
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">ชื่อ<?php echo $servicePointLabel; ?> *</label>
                             <input type="text" class="form-control" name="point_name" id="edit_point_name" required>
                         </div>
@@ -445,6 +461,7 @@ try {
     <script>
         function editServicePoint(servicePoint) {
             $('#edit_service_point_id').val(servicePoint.service_point_id);
+            $('#edit_point_label').val(servicePoint.point_label);
             $('#edit_point_name').val(servicePoint.point_name);
             $('#edit_point_description').val(servicePoint.point_description);
             $('#edit_position_key').val(servicePoint.position_key);

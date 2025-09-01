@@ -1374,6 +1374,7 @@ INSERT INTO `service_flows` VALUES (4, 1, 2, 5, 3, 0, 1);
 DROP TABLE IF EXISTS `service_points`;
 CREATE TABLE `service_points`  (
   `service_point_id` int NOT NULL AUTO_INCREMENT,
+  `point_label` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `point_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `point_description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `position_key` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
@@ -1395,12 +1396,12 @@ CREATE TABLE `service_points`  (
 -- ----------------------------
 -- Records of service_points
 -- ----------------------------
-INSERT INTO `service_points` VALUES (1, 'จุดคัดกรอง', 'จุดคัดกรองผู้ป่วยเบื้องต้น', 'SCREENING_01', 1, 1, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (2, 'ห้องตรวจ 1', 'ห้องตรวจแพทย์ห้องที่ 1', 'DOCTOR_01', 1, 2, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (3, 'ห้องตรวจ 2', 'ห้องตรวจแพทย์ห้องที่ 2', 'DOCTOR_02', 1, 3, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (4, 'ห้องเภสัช', 'จุดรับยา', 'PHARMACY_01', 1, 4, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (5, 'การเงิน', 'จุดชำระเงิน', 'CASHIER_01', 1, 5, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (6, 'เวชระเบียน', 'จุดบริการเวชระเบียน', 'RECORDS_01', 1, 6, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (1, NULL, 'จุดคัดกรอง', 'จุดคัดกรองผู้ป่วยเบื้องต้น', 'SCREENING_01', 1, 1, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (2, NULL, 'ห้องตรวจ 1', 'ห้องตรวจแพทย์ห้องที่ 1', 'DOCTOR_01', 1, 2, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (3, NULL, 'ห้องตรวจ 2', 'ห้องตรวจแพทย์ห้องที่ 2', 'DOCTOR_02', 1, 3, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (4, NULL, 'ห้องเภสัช', 'จุดรับยา', 'PHARMACY_01', 1, 4, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (5, NULL, 'การเงิน', 'จุดชำระเงิน', 'CASHIER_01', 1, 5, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (6, NULL, 'เวชระเบียน', 'จุดบริการเวชระเบียน', 'RECORDS_01', 1, 6, NULL, NULL, '2025-06-19 16:30:13');
 
 -- ----------------------------
 -- Table structure for settings
