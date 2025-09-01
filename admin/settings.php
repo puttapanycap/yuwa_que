@@ -74,7 +74,8 @@ $currentSettings = [
     'display_refresh_interval' => getSetting('display_refresh_interval', '3'),
     'enable_priority_queue' => getSetting('enable_priority_queue', 'true'),
     'auto_forward_enabled' => getSetting('auto_forward_enabled', 'false'),
-    
+    'service_point_label' => getSetting('service_point_label', 'จุดบริการ'),
+
     // Working Hours
     'working_hours_start' => getSetting('working_hours_start', '08:00'),
     'working_hours_end' => getSetting('working_hours_end', '16:00'),
@@ -339,12 +340,20 @@ $currentSettings = [
                                 </div>
                                 
                                 <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" name="settings[auto_forward_enabled]" 
+                                    <input class="form-check-input" type="checkbox" name="settings[auto_forward_enabled]"
                                            value="true" <?php echo $currentSettings['auto_forward_enabled'] == 'true' ? 'checked' : ''; ?>>
                                     <label class="form-check-label">ส่งต่อคิวอัตโนมัติ</label>
                                 </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">คำเรียกจุดบริการ</label>
+                                    <input type="text" class="form-control" name="settings[service_point_label]"
+                                           value="<?php echo htmlspecialchars($currentSettings['service_point_label']); ?>"
+                                           placeholder="เช่น ช่อง, จุดรับบริการ, บริเวณ, ห้อง">
+                                    <div class="form-text">กำหนดชื่อที่ใช้เรียกจุดบริการในระบบ</div>
+                                </div>
                             </div>
-                            
+
                             <!-- Audio Settings -->
                             <div class="setting-group">
                                 <h6><i class="fas fa-volume-up me-2"></i>การตั้งค่าเสียง</h6>

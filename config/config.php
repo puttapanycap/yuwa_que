@@ -301,6 +301,15 @@ function getAppName() {
     return getSetting('app_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
 }
 
+/**
+ * Get the label used for service points throughout the system
+ *
+ * @return string
+ */
+function getServicePointLabel() {
+    return getSetting('service_point_label', 'จุดบริการ');
+}
+
 function formatFileSize($bytes) {
     $units = ['B', 'KB', 'MB', 'GB'];
     $bytes = max($bytes, 0);

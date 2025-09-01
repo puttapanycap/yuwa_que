@@ -4,7 +4,7 @@ $navItems = [
     ['dashboard.php', 'fas fa-tachometer-alt', 'แดชบอร์ด'],
     ['users.php', 'fas fa-users', 'จัดการผู้ใช้'],
     ['roles.php', 'fas fa-user-tag', 'บทบาทและสิทธิ์'],
-    ['service_points.php', 'fas fa-map-marker-alt', 'จุดบริการ'],
+    ['service_points.php', 'fas fa-map-marker-alt', getServicePointLabel()],
     ['queue_types.php', 'fas fa-list', 'ประเภทคิว'],
     ['service_flows.php', 'fas fa-route', 'Service Flows'],
     ['queue_management.php', 'fas fa-tasks', 'จัดการคิว'],

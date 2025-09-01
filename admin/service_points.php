@@ -6,6 +6,8 @@ if (!hasPermission('manage_service_points')) {
     die('ไม่มีสิทธิ์เข้าถึงหน้านี้');
 }
 
+$servicePointLabel = getServicePointLabel();
+
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -41,9 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([$pointName, $pointDescription, $positionKey, $displayOrder, $isActive]);
                 
-                logActivity("เพิ่มจุดบริการใหม่: {$pointName}");
-                
-                $message = 'เพิ่มจุดบริการสำเร็จ';
+                logActivity("เพิ่ม{$servicePointLabel}ใหม่: {$pointName}");
+
+                $message = "เพิ่ม{$servicePointLabel}สำเร็จ";
                 $messageType = 'success';
                 break;
                 
@@ -73,9 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([$pointName, $pointDescription, $positionKey, $displayOrder, $isActive, $servicePointId]);
                 
-                logActivity("แก้ไขจุดบริการ: {$pointName}");
-                
-                $message = 'แก้ไขจุดบริการสำเร็จ';
+                logActivity("แก้ไข{$servicePointLabel}: {$pointName}");
+
+                $message = "แก้ไข{$servicePointLabel}สำเร็จ";
                 $messageType = 'success';
                 break;
                 
@@ -88,15 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $count = $stmt->fetch()['count'];
                 
                 if ($count > 0) {
-                    throw new Exception('ไม่สามารถลบจุดบริการนี้ได้เนื่องจากมีคิวที่ใช้จุดบริการนี้อยู่');
+                    throw new Exception("ไม่สามารถลบ{$servicePointLabel}นี้ได้เนื่องจากมีคิวที่ใช้{$servicePointLabel}นี้อยู่");
                 }
                 
                 $stmt = $db->prepare("DELETE FROM service_points WHERE service_point_id = ?");
                 $stmt->execute([$servicePointId]);
                 
-                logActivity("ลบจุดบริการ ID: {$servicePointId}");
-                
-                $message = 'ลบจุดบริการสำเร็จ';
+                logActivity("ลบ{$servicePointLabel} ID: {$servicePointId}");
+
+                $message = "ลบ{$servicePointLabel}สำเร็จ";
                 $messageType = 'success';
                 break;
         }
@@ -130,7 +132,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการจุดบริการ - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
+    <title>จัดการ<?php echo $servicePointLabel; ?> - <?php echo getAppName(); ?></title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -215,11 +217,11 @@ try {
                     <!-- Header -->
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <div>
-                            <h2>จัดการจุดบริการ</h2>
-                            <p class="text-muted">กำหนดจุดบริการสำหรับระบบเรียกคิว</p>
+                            <h2>จัดการ<?php echo $servicePointLabel; ?></h2>
+                            <p class="text-muted">กำหนด<?php echo $servicePointLabel; ?>สำหรับระบบเรียกคิว</p>
                         </div>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addServicePointModal">
-                            <i class="fas fa-plus me-2"></i>เพิ่มจุดบริการใหม่
+                            <i class="fas fa-plus me-2"></i>เพิ่ม<?php echo $servicePointLabel; ?>ใหม่
                         </button>
                     </div>
                     
@@ -232,12 +234,12 @@ try {
                     
                     <!-- Service Points List -->
                     <div class="content-card">
-                        <h5 class="mb-4">รายการจุดบริการ (<?php echo count($servicePoints); ?> จุด)</h5>
+                        <h5 class="mb-4">รายการ<?php echo $servicePointLabel; ?> (<?php echo count($servicePoints); ?> <?php echo $servicePointLabel; ?>)</h5>
                         
                         <?php if (empty($servicePoints)): ?>
                             <div class="text-center text-muted py-4">
                                 <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
-                                <p>ไม่มีจุดบริการในระบบ</p>
+                                <p>ไม่มี<?php echo $servicePointLabel; ?>ในระบบ</p>
                             </div>
                         <?php else: ?>
                             <?php foreach ($servicePoints as $sp): ?>
@@ -278,7 +280,7 @@ try {
                                                         <input type="hidden" name="action" value="delete_service_point">
                                                         <input type="hidden" name="service_point_id" value="<?php echo $sp['service_point_id']; ?>">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                                onclick="return confirm('คุณต้องการลบจุดบริการนี้หรือไม่?')">
+                                                                onclick="return confirm('คุณต้องการลบ<?php echo $servicePointLabel; ?>นี้หรือไม่?')">
                                                             <i class="fas fa-trash"></i> ลบ
                                                         </button>
                                                     </form>
@@ -299,14 +301,14 @@ try {
                             <table class="table table-striped">
                                 <thead class="table-dark">
                                     <tr>
-                                        <th>จุดบริการ</th>
+                                        <th><?php echo $servicePointLabel; ?></th>
                                         <th>URL</th>
                                         <th>การดำเนินการ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td>ทุกจุดบริการ</td>
+                                        <td>ทุก<?php echo $servicePointLabel; ?></td>
                                         <td><code><?php echo BASE_URL; ?>/monitor/display.php</code></td>
                                         <td>
                                             <a href="../monitor/display.php" target="_blank" class="btn btn-sm btn-outline-primary">
@@ -343,12 +345,12 @@ try {
                 <form method="POST">
                     <input type="hidden" name="action" value="add_service_point">
                     <div class="modal-header">
-                        <h5 class="modal-title">เพิ่มจุดบริการใหม่</h5>
+                        <h5 class="modal-title">เพิ่ม<?php echo $servicePointLabel; ?>ใหม่</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">ชื่อจุดบริการ *</label>
+                            <label class="form-label">ชื่อ<?php echo $servicePointLabel; ?> *</label>
                             <input type="text" class="form-control" name="point_name" required>
                         </div>
                         
@@ -379,7 +381,7 @@ try {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" class="btn btn-primary">เพิ่มจุดบริการ</button>
+                        <button type="submit" class="btn btn-primary">เพิ่ม<?php echo $servicePointLabel; ?></button>
                     </div>
                 </form>
             </div>
@@ -394,12 +396,12 @@ try {
                     <input type="hidden" name="action" value="edit_service_point">
                     <input type="hidden" name="service_point_id" id="edit_service_point_id">
                     <div class="modal-header">
-                        <h5 class="modal-title">แก้ไขจุดบริการ</h5>
+                        <h5 class="modal-title">แก้ไข<?php echo $servicePointLabel; ?></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">ชื่อจุดบริการ *</label>
+                            <label class="form-label">ชื่อ<?php echo $servicePointLabel; ?> *</label>
                             <input type="text" class="form-control" name="point_name" id="edit_point_name" required>
                         </div>
                         
