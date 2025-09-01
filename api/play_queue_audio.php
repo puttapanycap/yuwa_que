@@ -101,6 +101,7 @@ try {
         $message = $customMessage;
         $queueData = null;
         $servicePointName = '';
+        $templateText = (string) $customMessage;
     }
     
     $audioRepeatCount = intval(getSetting('audio_repeat_count', '1'));
