@@ -38,7 +38,7 @@ try {
                 q.queue_number,
                 p.name AS patient_name,
                 q.current_service_point_id,
-                sp.point_name AS service_point_name,
+                TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) AS service_point_name,
                 sp.voice_template_id
             FROM queues q
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
@@ -132,7 +132,18 @@ try {
                 case 'service_point':
                 case 'service_point_name':
                     if ($servicePointName) {
-                        $audioFiles[] = $getFile('service_point', $servicePointName);
+                        foreach (preg_split('/\s+/u', trim($servicePointName)) as $word) {
+                            if ($word === '') {
+                                continue;
+                            }
+                            if (preg_match('/^\d+$/u', $word)) {
+                                foreach (preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+                                    $audioFiles[] = $getFile('queue_number', $char);
+                                }
+                            } else {
+                                $audioFiles[] = $getFile('message', $word);
+                            }
+                        }
                     }
                     break;
                 case 'patient_name':
