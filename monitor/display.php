@@ -520,35 +520,64 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
         }
 
+        // Preload audio files before playing to avoid missing segments
+        function preloadAudioFiles(files) {
+            const normalize = path => {
+                if (path.startsWith('http') || path.startsWith('/')) return path;
+                return '../' + path;
+            };
+
+            const loaders = files.map(src => new Promise(resolve => {
+                const audio = new Audio();
+                audio.src = normalize(src);
+                audio.preload = 'auto';
+                audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+                audio.addEventListener('error', () => {
+                    debugLog('Failed to load audio file:', src);
+                    resolve(null);
+                }, { once: true });
+                audio.load();
+            }));
+
+            return Promise.all(loaders).then(results => results.filter(a => a !== null));
+        }
+
         function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
             if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
                 debugLog('No audio files to play.');
                 return;
             }
 
-            const playSet = () => {
-                let index = 0;
-                const playNext = () => {
-                    if (index < audioFiles.length) {
-                        const audio = new Audio(audioFiles[index]);
-                        audio.volume = 1.0;
-                        audio.onended = playNext;
-                        audio.play().catch(e => debugLog('Audio play failed:', e.message));
-                        index++;
-                    } else if (--repeatCount > 0) {
-                        index = 0;
-                        playNext();
-                    }
-                };
-                playNext();
-            };
+            preloadAudioFiles(audioFiles).then(loadedAudios => {
+                if (loadedAudios.length === 0) {
+                    debugLog('Audio files failed to load.');
+                    return;
+                }
 
-            if (notificationBefore) {
-                playNotificationSound();
-                setTimeout(playSet, 1000);
-            } else {
-                playSet();
-            }
+                const playSet = () => {
+                    let index = 0;
+                    const playNext = () => {
+                        if (index < loadedAudios.length) {
+                            const audio = loadedAudios[index];
+                            audio.currentTime = 0;
+                            audio.onended = playNext;
+                            audio.play().catch(e => debugLog('Audio play failed:', e.message));
+                            index++;
+                        } else if (--repeatCount > 0) {
+                            index = 0;
+                            playNext();
+                        }
+                    };
+                    playNext();
+                };
+
+                if (notificationBefore) {
+                    playNotificationSound();
+                    setTimeout(playSet, 1000);
+                } else {
+                    playSet();
+                }
+            });
         }
 
         // Update audio status display and toggle button

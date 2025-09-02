@@ -24,7 +24,7 @@ if (!$queueId) {
         
         // Get queue info with better error handling
         $stmt = $db->prepare("
-            SELECT q.*, qt.type_name, sp.point_name as current_service_point_name
+            SELECT q.*, qt.type_name, sp.point_label as current_service_point_label, sp.point_name as current_service_point_name
             FROM queues q
             LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
@@ -41,7 +41,10 @@ if (!$queueId) {
         }
         
         $queue = $stmt->fetch();
-        
+        if ($queue) {
+            $queue['current_service_point_name'] = trim(($queue['current_service_point_label'] ? $queue['current_service_point_label'] . ' ' : '') . $queue['current_service_point_name']);
+        }
+
         if (!$queue) {
             $error_message = 'ไม่พบข้อมูลคิว ID: ' . htmlspecialchars($queueId);
         } else {
@@ -115,7 +118,9 @@ if (!$queueId) {
             }
             // Get service flow history
             $stmt = $db->prepare("
-                SELECT sfh.*, sp_from.point_name as from_point_name, sp_to.point_name as to_point_name
+                SELECT sfh.*,
+                       TRIM(CONCAT(COALESCE(sp_from.point_label,''),' ', sp_from.point_name)) as from_point_name,
+                       TRIM(CONCAT(COALESCE(sp_to.point_label,''),' ', sp_to.point_name)) as to_point_name
                 FROM service_flow_history sfh
                 LEFT JOIN service_points sp_from ON sfh.from_service_point_id = sp_from.service_point_id
                 LEFT JOIN service_points sp_to ON sfh.to_service_point_id = sp_to.service_point_id
@@ -129,11 +134,11 @@ if (!$queueId) {
             
             // Get all service points for this queue type to build complete timeline
             $stmt = $db->prepare("
-                SELECT DISTINCT sp.service_point_id, sp.point_name, sp.display_order
+                SELECT DISTINCT sp.service_point_id, TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) as point_name, sp.display_order
                 FROM service_points sp
-                INNER JOIN service_flows sf ON (sp.service_point_id = sf.to_service_point_id 
+                INNER JOIN service_flows sf ON (sp.service_point_id = sf.to_service_point_id
                     OR sp.service_point_id = sf.from_service_point_id)
-                WHERE sp.is_active = 1 
+                WHERE sp.is_active = 1
                 AND sf.queue_type_id = ?
                 AND sf.is_active = 1
                 ORDER BY sp.display_order ASC
@@ -145,8 +150,8 @@ if (!$queueId) {
                 // ถ้าไม่พบจุดบริการที่เกี่ยวข้อง ให้เพิ่มจุดบริการปัจจุบันเข้าไป
                 if (empty($allServicePoints) && !empty($queue['current_service_point_id'])) {
                     $currentPointStmt = $db->prepare("
-                        SELECT service_point_id, point_name, display_order
-                        FROM service_points 
+                        SELECT service_point_id, TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) as point_name, display_order
+                        FROM service_points
                         WHERE service_point_id = ? AND is_active = 1
                     ");
                     
@@ -160,9 +165,9 @@ if (!$queueId) {
             } else {
                 // Fallback: get all active service points if the flow query fails
                 $stmt = $db->prepare("
-                    SELECT service_point_id, point_name, display_order
-                    FROM service_points 
-                    WHERE is_active = 1 
+                    SELECT service_point_id, TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) as point_name, display_order
+                    FROM service_points
+                    WHERE is_active = 1
                     ORDER BY display_order ASC
                 ");
                 if ($stmt && $stmt->execute()) {
@@ -182,8 +187,8 @@ if (!$queueId) {
             // ถ้าไม่มีจุดบริการปัจจุบันใน allServicePoints ให้เพิ่มเข้าไป
             if (!$currentPointExists && !empty($queue['current_service_point_id'])) {
                 $currentPointStmt = $db->prepare("
-                    SELECT service_point_id, point_name, display_order
-                    FROM service_points 
+                    SELECT service_point_id, TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) as point_name, display_order
+                    FROM service_points
                     WHERE service_point_id = ?
                 ");
                 

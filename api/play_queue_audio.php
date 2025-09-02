@@ -38,7 +38,7 @@ try {
                 q.queue_number,
                 p.name AS patient_name,
                 q.current_service_point_id,
-                sp.point_name AS service_point_name,
+                TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) AS service_point_name,
                 sp.voice_template_id
             FROM queues q
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
