@@ -18,11 +18,11 @@ $servicePointName = 'ทุกจุดบริการ';
 if ($servicePointId) {
     try {
         $db = getDB();
-        $stmt = $db->prepare("SELECT point_name, voice_template_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
+        $stmt = $db->prepare("SELECT TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) AS service_point_name, voice_template_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
         $stmt->execute([$servicePointId]);
         $servicePoint = $stmt->fetch();
         if ($servicePoint) {
-            $servicePointName = $servicePoint['point_name'];
+            $servicePointName = $servicePoint['service_point_name'];
             $voiceTemplateId = $servicePoint['voice_template_id'] ?? null;
         }
     } catch (Exception $e) {
@@ -580,6 +580,28 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             });
         }
 
+        // Request audio playback with simple retry for reliability
+        function requestAudio(queueId, attempt = 0) {
+            $.post('../api/play_queue_audio.php', { queue_id: queueId, service_point_id: servicePointId, template_id: voiceTemplateId })
+                .done(function(response) {
+                    if (response.success) {
+                        debugLog('Audio API response for queue:', response);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                    } else if (attempt < 2) {
+                        setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
+                    } else {
+                        console.error('Failed to get audio parameters from API:', response.message);
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    if (attempt < 2) {
+                        setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
+                    } else {
+                        console.error('AJAX call to play_queue_audio.php failed:', error);
+                    }
+                });
+        }
+
         // Update audio status display and toggle button
         function updateAudioStatus(text, status) {
             debugLog('Audio status updated:', { text, status });
@@ -856,23 +878,8 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             monitorNotificationSystem.showNotification(notificationData);
                         }
                         
-                        // Fetch audio parameters from backend API
-                        $.post('../api/play_queue_audio.php', { queue_id: currentQueueId, service_point_id: servicePointId, template_id: voiceTemplateId })
-                            .done(function(response) {
-                                if (response.success) {
-                                    debugLog('Audio API response for queue:', response);
-                                    playAudioSequence(
-                                        response.audio_files,
-                                        response.repeat_count,
-                                        response.notification_before
-                                    );
-                                } else {
-                                    console.error('Failed to get audio parameters from API:', response.message);
-                                }
-                            })
-                            .fail(function(xhr, status, error) {
-                                console.error('AJAX call to play_queue_audio.php failed:', error);
-                            });
+                        // Fetch audio parameters from backend API with retry
+                        requestAudio(currentQueueId);
                     }
                     
                     // Update last values

@@ -132,7 +132,18 @@ try {
                 case 'service_point':
                 case 'service_point_name':
                     if ($servicePointName) {
-                        $audioFiles[] = $getFile('service_point', $servicePointName);
+                        foreach (preg_split('/\s+/u', trim($servicePointName)) as $word) {
+                            if ($word === '') {
+                                continue;
+                            }
+                            if (preg_match('/^\d+$/u', $word)) {
+                                foreach (preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+                                    $audioFiles[] = $getFile('queue_number', $char);
+                                }
+                            } else {
+                                $audioFiles[] = $getFile('message', $word);
+                            }
+                        }
                     }
                     break;
                 case 'patient_name':
