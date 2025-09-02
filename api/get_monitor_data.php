@@ -13,7 +13,7 @@ try {
         
         // Current queue
         $stmt = $db->prepare("
-            SELECT q.*, qt.type_name, sp.point_name as service_point_name
+            SELECT q.*, qt.type_name, TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) as service_point_name
             FROM queues q
             LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
@@ -42,7 +42,7 @@ try {
         
         // Current queues being called
         $stmt = $db->prepare("
-            SELECT q.*, qt.type_name, sp.point_name as service_point_name
+            SELECT q.*, qt.type_name, TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) as service_point_name
             FROM queues q
             LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
@@ -55,7 +55,7 @@ try {
         
         // All waiting queues
         $stmt = $db->prepare("
-            SELECT q.*, qt.type_name, sp.point_name as service_point_name
+            SELECT q.*, qt.type_name, TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) as service_point_name
             FROM queues q
             LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
