@@ -441,8 +441,8 @@ $dayNames = [
                                         <div class="schedule-card <?php echo $schedule['is_active'] ? '' : 'inactive'; ?>">
                                             <div class="d-flex justify-content-between align-items-start mb-3">
                                                 <div>
-                                                    <h6 class="mb-1"><?php echo htmlspecialchars($schedule['schedule_name']); ?></h6>
-                                                    <small class="text-muted"><?php echo htmlspecialchars($schedule['target_name']); ?></small>
+                                                    <h6 class="mb-1"><?php echo htmlspecialchars($schedule['schedule_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></h6>
+                                                    <small class="text-muted"><?php echo htmlspecialchars($schedule['target_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></small>
                                                 </div>
                                                 <span class="status-badge <?php echo $schedule['is_active'] ? 'status-active' : 'status-inactive'; ?>">
                                                     <?php echo $schedule['is_active'] ? 'เปิดใช้งาน' : 'ปิดใช้งาน'; ?>
@@ -544,16 +544,16 @@ $dayNames = [
                                     <select class="form-select" id="target_id" name="target_id">
                                         <optgroup label="ประเภทคิว" id="queue_types_group">
                                             <?php foreach ($queueTypes as $type): ?>
-                                                <option value="<?php echo $type['queue_type_id']; ?>" data-type="by_type">
-                                                    <?php echo htmlspecialchars($type['type_name']); ?>
-                                                </option>
+                                                  <option value="<?php echo $type['queue_type_id']; ?>" data-type="by_type">
+                                                      <?php echo htmlspecialchars($type['type_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+                                                  </option>
                                             <?php endforeach; ?>
                                         </optgroup>
                                         <optgroup label="จุดบริการ" id="service_points_group">
                                             <?php foreach ($servicePoints as $point): ?>
-                                                <option value="<?php echo $point['service_point_id']; ?>" data-type="by_service_point">
-                                                    <?php echo htmlspecialchars($point['point_name']); ?>
-                                                </option>
+                                                  <option value="<?php echo $point['service_point_id']; ?>" data-type="by_service_point">
+                                                      <?php echo htmlspecialchars($point['point_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+                                                  </option>
                                             <?php endforeach; ?>
                                         </optgroup>
                                     </select>
