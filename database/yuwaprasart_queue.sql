@@ -1563,18 +1563,58 @@ INSERT INTO `voice_templates` VALUES (4, '5555', 'ขอเชิญ {คัด�
 -- View structure for v_current_queue_status
 -- ----------------------------
 DROP VIEW IF EXISTS `v_current_queue_status`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_current_queue_status` AS select `q`.`queue_id` AS `queue_id`,`q`.`queue_number` AS `queue_number`,`q`.`service_type_id` AS `service_type_id`,`st`.`service_name` AS `service_name`,`q`.`patient_name` AS `patient_name`,`q`.`status` AS `status`,`q`.`priority` AS `priority`,`q`.`current_service_point_id` AS `current_service_point_id`,`sp`.`point_name` AS `service_point_name`,`q`.`created_at` AS `created_at`,`q`.`called_at` AS `called_at`,`q`.`estimated_wait_time` AS `estimated_wait_time` from ((`queues` `q` left join `service_types` `st` on((`q`.`service_type_id` = `st`.`service_type_id`))) left join `service_points` `sp` on((`q`.`current_service_point_id` = `sp`.`service_point_id`))) where ((cast(`q`.`created_at` as date) = curdate()) and (`q`.`status` in ('waiting','called','serving')));
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_current_queue_status` AS
+SELECT
+  q.queue_id AS queue_id,
+  q.queue_number AS queue_number,
+  q.queue_type_id AS queue_type_id,
+  qt.type_name AS queue_type_name,
+  q.current_status AS status,
+  q.priority_level AS priority,
+  q.current_service_point_id AS current_service_point_id,
+  sp.point_name AS service_point_name,
+  q.creation_time AS created_at,
+  q.last_called_time AS called_at,
+  q.estimated_wait_time AS estimated_wait_time
+FROM queues q
+LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
+LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
+WHERE CAST(q.creation_time AS date) = CURDATE()
+  AND q.current_status IN ('waiting','called','processing');
 
 -- ----------------------------
 -- View structure for v_queue_statistics
 -- ----------------------------
 DROP VIEW IF EXISTS `v_queue_statistics`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_queue_statistics` AS select cast(`queues`.`created_at` as date) AS `queue_date`,`queues`.`service_type_id` AS `service_type_id`,count(0) AS `total_queues`,sum((case when (`queues`.`status` = 'completed') then 1 else 0 end)) AS `completed_queues`,sum((case when (`queues`.`status` = 'cancelled') then 1 else 0 end)) AS `cancelled_queues`,sum((case when (`queues`.`status` = 'no_show') then 1 else 0 end)) AS `no_show_queues`,avg((case when (`queues`.`actual_wait_time` is not null) then `queues`.`actual_wait_time` end)) AS `avg_wait_time`,avg((case when (`queues`.`service_duration` is not null) then `queues`.`service_duration` end)) AS `avg_service_time` from `queues` group by cast(`queues`.`created_at` as date),`queues`.`service_type_id`;
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_queue_statistics` AS
+SELECT
+  CAST(q.creation_time AS date) AS queue_date,
+  q.queue_type_id AS queue_type_id,
+  COUNT(*) AS total_queues,
+  SUM(CASE WHEN q.current_status = 'completed' THEN 1 ELSE 0 END) AS completed_queues,
+  SUM(CASE WHEN q.current_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_queues,
+  SUM(CASE WHEN q.current_status = 'no_show' THEN 1 ELSE 0 END) AS no_show_queues,
+  NULL AS avg_wait_time,
+  NULL AS avg_service_time
+FROM queues q
+GROUP BY CAST(q.creation_time AS date), q.queue_type_id;
 
 -- ----------------------------
 -- View structure for v_service_point_performance
 -- ----------------------------
 DROP VIEW IF EXISTS `v_service_point_performance`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_service_point_performance` AS select `sp`.`service_point_id` AS `service_point_id`,`sp`.`point_name` AS `point_name`,cast(`q`.`created_at` as date) AS `performance_date`,count(`q`.`queue_id`) AS `total_served`,avg(`q`.`service_duration`) AS `avg_service_time`,sum((case when (`q`.`status` = 'completed') then 1 else 0 end)) AS `completed_count`,((sum((case when (`q`.`status` = 'completed') then 1 else 0 end)) / count(`q`.`queue_id`)) * 100) AS `completion_rate` from (`service_points` `sp` left join `queues` `q` on((`sp`.`service_point_id` = `q`.`current_service_point_id`))) where (`q`.`created_at` >= (curdate() - interval 30 day)) group by `sp`.`service_point_id`,cast(`q`.`created_at` as date);
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_service_point_performance` AS
+SELECT
+  sp.service_point_id AS service_point_id,
+  sp.point_name AS point_name,
+  CAST(q.creation_time AS date) AS performance_date,
+  COUNT(q.queue_id) AS total_served,
+  NULL AS avg_service_time,
+  SUM(CASE WHEN q.current_status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+  (SUM(CASE WHEN q.current_status = 'completed' THEN 1 ELSE 0 END) / COUNT(q.queue_id) * 100) AS completion_rate
+FROM service_points sp
+LEFT JOIN queues q ON sp.service_point_id = q.current_service_point_id
+WHERE q.creation_time >= (CURDATE() - INTERVAL 30 DAY)
+GROUP BY sp.service_point_id, CAST(q.creation_time AS date);
 
 SET FOREIGN_KEY_CHECKS = 1;

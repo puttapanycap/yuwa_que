@@ -29,7 +29,7 @@ try {
     if ($db) {
         // Test 2: Check required tables
         $requiredTables = [
-            'users', 'roles', 'service_types', 'service_points', 'service_flows', 'user_service_points',
+            'users', 'roles', 'queue_types', 'service_points', 'service_flows', 'user_service_points',
             'queues', 'queue_history', 'queue_flow_tracking',
             'audio_settings', 'audio_files', 'audio_call_history', 'tts_cache',
             'notification_types', 'notifications', 'notification_preferences', 'notification_deliveries',
@@ -64,11 +64,11 @@ try {
         try {
             $stmt = $db->query("
                 SELECT COUNT(*) as total_queues,
-                       COUNT(CASE WHEN status = 'waiting' THEN 1 END) as waiting,
-                       COUNT(CASE WHEN status = 'serving' THEN 1 END) as serving,
-                       COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                       COUNT(CASE WHEN current_status = 'waiting' THEN 1 END) as waiting,
+                       COUNT(CASE WHEN current_status = 'processing' THEN 1 END) as processing,
+                       COUNT(CASE WHEN current_status = 'completed' THEN 1 END) as completed
                 FROM queues 
-                WHERE DATE(created_at) = CURDATE()
+                WHERE DATE(creation_time) = CURDATE()
             ");
             $queueStats = $stmt->fetch();
             
@@ -79,7 +79,7 @@ try {
                     'วันนี้: %d คิว (รอ: %d, กำลังให้บริการ: %d, เสร็จ: %d)',
                     $queueStats['total_queues'],
                     $queueStats['waiting'],
-                    $queueStats['serving'],
+                    $queueStats['processing'],
                     $queueStats['completed']
                 )
             ];
@@ -91,26 +91,26 @@ try {
             ];
         }
         
-        // Test 4: Check foreign key relationships (example: queues to service_types)
+        // Test 4: Check foreign key relationships (example: queues to queue_types)
         try {
             $stmt = $db->query("
                 SELECT COUNT(*) as orphaned_queues
                 FROM queues q
-                LEFT JOIN service_types st ON q.service_type_id = st.service_type_id
-                WHERE st.service_type_id IS NULL
+                LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
+                WHERE q.queue_type_id IS NOT NULL AND qt.queue_type_id IS NULL
             ");
             $orphanedQueues = $stmt->fetchColumn();
             
-            $diagnostics['foreign_keys_queues_service_types'] = [
-                'name' => 'ความสัมพันธ์ข้อมูล (คิว-ประเภทบริการ)',
+            $diagnostics['foreign_keys_queues_queue_types'] = [
+                'name' => 'ความสัมพันธ์ข้อมูล (คิว-ประเภทคิว)',
                 'status' => $orphanedQueues > 0 ? 'warning' : 'success',
                 'message' => $orphanedQueues > 0 ? 
-                    "พบคิวที่ไม่มีประเภทบริการ: $orphanedQueues คิว" : 
+                    "พบคิวที่ไม่มีประเภทคิว: $orphanedQueues คิว" : 
                     'ความสัมพันธ์ข้อมูลปกติ'
             ];
         } catch (Exception $e) {
-            $diagnostics['foreign_keys_queues_service_types'] = [
-                'name' => 'ความสัมพันธ์ข้อมูล (คิว-ประเภทบริการ)',
+            $diagnostics['foreign_keys_queues_queue_types'] = [
+                'name' => 'ความสัมพันธ์ข้อมูล (คิว-ประเภทคิว)',
                 'status' => 'error',
                 'message' => 'ไม่สามารถตรวจสอบได้: ' . $e->getMessage()
             ];
@@ -253,11 +253,11 @@ if (isset($_POST['auto_fix'])) {
                 $fixResults[] = 'อัปเดตลำดับการแสดงผลจุดบริการแล้ว';
             }
 
-            // Fix 5: Update display_order for service_types without display_order
-            $stmt = $db->prepare("UPDATE service_types SET display_order = service_type_id WHERE display_order IS NULL OR display_order = 0");
+            // Fix 5: Update display_order for queue_types without display_order
+            $stmt = $db->prepare("UPDATE queue_types SET display_order = queue_type_id WHERE display_order IS NULL OR display_order = 0");
             $updated = $stmt->execute();
             if ($updated) {
-                $fixResults[] = 'อัปเดตลำดับการแสดงผลประเภทบริการแล้ว';
+                $fixResults[] = 'อัปเดตลำดับการแสดงผลประเภทคิวแล้ว';
             }
             
         }
