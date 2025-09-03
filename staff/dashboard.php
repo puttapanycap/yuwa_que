@@ -500,7 +500,8 @@ if (!$hasAccess) {
 
         function loadQueues() {
             $.get('../api/get_queues.php', {
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                _: Date.now()
             }, function(data) {
                 displayCurrentQueue(data.current);
                 displayWaitingQueues(data.waiting);
@@ -640,7 +641,8 @@ if (!$hasAccess) {
 
         function loadCallTimeGroups() {
             $.get('../api/get_call_time_groups.php', {
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                _: Date.now()
             }, function(response) {
                 if (response.success) {
                     displayCallTimeGroups(response.groups);
@@ -657,7 +659,7 @@ if (!$hasAccess) {
         }
 
         function loadServicePoints() {
-            $.get('../api/get_service_points.php', function(data) {
+            $.get('../api/get_service_points.php', { _: Date.now() }, function(data) {
                 const select = $('#nextServicePoint');
                 select.empty().append('<option value="">เลือกจุดบริการถัดไป</option>');
                 
@@ -672,7 +674,8 @@ if (!$hasAccess) {
         function callNextQueue() {
             $.post('../api/call_queue.php', {
                 action: 'call_next',
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -689,7 +692,8 @@ if (!$hasAccess) {
             $.post('../api/call_queue.php', {
                 action: 'call_specific',
                 queue_id: queueId,
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -708,7 +712,8 @@ if (!$hasAccess) {
             $.post('../api/call_queue.php', {
                 action: 'recall',
                 queue_id: currentQueueId,
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -726,7 +731,8 @@ if (!$hasAccess) {
             
             $.post('../api/queue_action.php', {
                 action: 'hold',
-                queue_id: currentQueueId
+                queue_id: currentQueueId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -752,7 +758,8 @@ if (!$hasAccess) {
                 action: 'complete',
                 queue_id: currentQueueId,
                 next_service_point_id: nextServicePointId,
-                notes: notes
+                notes: notes,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     $('#completeModal').modal('hide');
@@ -788,7 +795,8 @@ if (!$hasAccess) {
                 action: 'cancel',
                 queue_id: currentQueueId,
                 reason: reason,
-                notes: notes
+                notes: notes,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     $('#cancelModal').modal('hide');
@@ -812,7 +820,7 @@ if (!$hasAccess) {
         }
 
         function pollNotifications() {
-            $.get('../api/get_notifications.php', { unread_only: true, limit: 5 }, function(response) {
+            $.get('../api/get_notifications.php', { unread_only: true, limit: 5, _: Date.now() }, function(response) {
                 if (response.success && Array.isArray(response.notifications)) {
                     response.notifications.forEach(function(n) {
                         const typeMap = { urgent: 'danger', high: 'warning', normal: 'info', low: 'secondary' };
