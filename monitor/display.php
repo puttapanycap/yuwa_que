@@ -618,6 +618,9 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                     if (response.success) {
                         debugLog('Audio API response for queue:', response);
                         playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, queueId);
+                        if (response.missing_words && response.missing_words.length) {
+                            reportAudioIssue(queueId, response.missing_words);
+                        }
                     } else if (attempt < 2) {
                         setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
                     } else {
@@ -690,6 +693,9 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                     if (response.success) {
                         debugLog('Test audio API response:', response);
                         playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                        if (response.missing_words && response.missing_words.length) {
+                            reportAudioIssue(null, response.missing_words);
+                        }
                     } else {
                         alert('เกิดข้อผิดพลาดในการทดสอบเสียง: ' + response.message);
                         debugLog('Test audio API error response:', response.message);

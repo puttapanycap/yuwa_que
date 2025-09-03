@@ -81,8 +81,21 @@ try {
             $templateText = 'ขอเชิญหมายเลข {queue_number} ที่ {service_point_name} ครับ';
         }
 
+        // Ensure service point placeholder exists
+        if (strpos($templateText, '{service_point_name}') === false && strpos($templateText, '{service_point}') === false) {
+            $templateText = rtrim($templateText) . ' ที่ {service_point_name}';
+        }
+
         // Process service point name for speech (e.g., "Room1" -> "Room 1")
-        $servicePointName = $queueData['service_point_name'] ?? 'จุดบริการ';
+        $servicePointName = $queueData['service_point_name'] ?? '';
+        if (!$servicePointName && $servicePointId) {
+            $stmt = $db->prepare("SELECT TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) FROM service_points WHERE service_point_id = ?");
+            $stmt->execute([$servicePointId]);
+            $servicePointName = $stmt->fetchColumn() ?: '';
+        }
+        if (!$servicePointName) {
+            $servicePointName = 'จุดบริการ ' . ($servicePointId ?? '');
+        }
         $processedServicePointName = preg_replace('/([^\d])(\d)/', '$1 $2', $servicePointName);
 
         // Generate message from template text
@@ -109,6 +122,7 @@ try {
 
     // Build audio file sequence from template
     $audioFiles = [];
+    $missingWords = [];
 
     // Helper to fetch audio file path
     $getFile = function($type, $name) use ($db) {
@@ -116,6 +130,54 @@ try {
         $stmt->execute([$type, $name]);
         $row = $stmt->fetch();
         return $row['file_path'] ?? null;
+    };
+
+    // Build service point audio with fallback when files are missing
+    $getServicePointAudio = function($name) use ($getFile, $servicePointId, &$missingWords) {
+        $files = [];
+        $missing = false;
+        foreach (preg_split('/\s+/u', trim($name)) as $word) {
+            if ($word === '') {
+                continue;
+            }
+            if (preg_match('/^\d+$/u', $word)) {
+                foreach (preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+                    $digitFile = $getFile('queue_number', $char);
+                    if ($digitFile) {
+                        $files[] = $digitFile;
+                    } else {
+                        $missing = true;
+                        $missingWords[] = $char;
+                    }
+                }
+            } else {
+                $file = $getFile('message', $word);
+                if ($file) {
+                    $files[] = $file;
+                } else {
+                    $missing = true;
+                    $missingWords[] = $word;
+                }
+            }
+        }
+
+        if ($missing) {
+            $files = [];
+            $generic = $getFile('message', 'จุดบริการ');
+            if ($generic) {
+                $files[] = $generic;
+            }
+            if ($servicePointId) {
+                foreach (preg_split('//u', (string)$servicePointId, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+                    $digitFile = $getFile('queue_number', $char);
+                    if ($digitFile) {
+                        $files[] = $digitFile;
+                    }
+                }
+            }
+        }
+
+        return $files;
     };
 
     $segments = preg_split('/({[^}]+})/', $templateText, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
@@ -132,18 +194,7 @@ try {
                 case 'service_point':
                 case 'service_point_name':
                     if ($servicePointName) {
-                        foreach (preg_split('/\s+/u', trim($servicePointName)) as $word) {
-                            if ($word === '') {
-                                continue;
-                            }
-                            if (preg_match('/^\d+$/u', $word)) {
-                                foreach (preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY) as $char) {
-                                    $audioFiles[] = $getFile('queue_number', $char);
-                                }
-                            } else {
-                                $audioFiles[] = $getFile('message', $word);
-                            }
-                        }
+                        $audioFiles = array_merge($audioFiles, $getServicePointAudio($servicePointName));
                     }
                     break;
                 case 'patient_name':
@@ -185,7 +236,8 @@ try {
         'audio_files' => $audioFiles,
         'repeat_count' => $audioRepeatCount,
         'notification_before' => $soundNotificationBefore == '1',
-        'queue_data' => $queueData
+        'queue_data' => $queueData,
+        'missing_words' => $missingWords
     ];
     
     logActivity("เล่นเสียงเรียกคิว: {$message}", $_SESSION['staff_id'] ?? null);

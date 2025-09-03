@@ -27,7 +27,10 @@ try {
         $message .= " (Queue ID: {$queueId})";
     }
     if ($servicePointId) {
-        $message .= " (Service Point: {$servicePointId})";
+        $stmt = getDB()->prepare("SELECT TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) FROM service_points WHERE service_point_id = ?");
+        $stmt->execute([$servicePointId]);
+        $spName = $stmt->fetchColumn();
+        $message .= " (Service Point: " . ($spName ?: $servicePointId) . ")";
     }
 
     $result = createNotification('system_alert', $title, $message, [
