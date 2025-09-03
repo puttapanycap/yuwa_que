@@ -43,13 +43,12 @@ try {
     
     // Get waiting queues
     $stmt = $db->prepare("
-        SELECT q.*, qt.type_name 
+        SELECT q.*, qt.type_name
         FROM queues q
         LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
-        WHERE q.current_service_point_id = ? 
+        WHERE q.current_service_point_id = ?
         AND q.current_status = 'waiting'
         ORDER BY q.priority_level DESC, q.creation_time ASC
-        LIMIT 20
     ");
     $stmt->execute([$servicePointId]);
     $waitingQueues = $stmt->fetchAll();

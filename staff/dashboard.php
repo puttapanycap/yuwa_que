@@ -479,10 +479,11 @@ if (!$hasAccess) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
+
     <script>
         let currentQueueId = null;
         let servicePointId = <?php echo $selectedServicePoint; ?>;
+        const csrfToken = '<?php echo generateCSRFToken(); ?>';
         
         $(document).ready(function() {
             loadQueues();
@@ -491,11 +492,16 @@ if (!$hasAccess) {
 
             // Auto refresh every 10 seconds
             setInterval(loadQueues, 10000);
+
+            // Poll notifications
+            pollNotifications();
+            setInterval(pollNotifications, 10000);
         });
 
         function loadQueues() {
             $.get('../api/get_queues.php', {
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                _: Date.now()
             }, function(data) {
                 displayCurrentQueue(data.current);
                 displayWaitingQueues(data.waiting);
@@ -635,7 +641,8 @@ if (!$hasAccess) {
 
         function loadCallTimeGroups() {
             $.get('../api/get_call_time_groups.php', {
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                _: Date.now()
             }, function(response) {
                 if (response.success) {
                     displayCallTimeGroups(response.groups);
@@ -652,7 +659,7 @@ if (!$hasAccess) {
         }
 
         function loadServicePoints() {
-            $.get('../api/get_service_points.php', function(data) {
+            $.get('../api/get_service_points.php', { _: Date.now() }, function(data) {
                 const select = $('#nextServicePoint');
                 select.empty().append('<option value="">เลือกจุดบริการถัดไป</option>');
                 
@@ -667,7 +674,8 @@ if (!$hasAccess) {
         function callNextQueue() {
             $.post('../api/call_queue.php', {
                 action: 'call_next',
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -684,7 +692,8 @@ if (!$hasAccess) {
             $.post('../api/call_queue.php', {
                 action: 'call_specific',
                 queue_id: queueId,
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -703,7 +712,8 @@ if (!$hasAccess) {
             $.post('../api/call_queue.php', {
                 action: 'recall',
                 queue_id: currentQueueId,
-                service_point_id: servicePointId
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -721,7 +731,8 @@ if (!$hasAccess) {
             
             $.post('../api/queue_action.php', {
                 action: 'hold',
-                queue_id: currentQueueId
+                queue_id: currentQueueId,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     loadQueues();
@@ -747,7 +758,8 @@ if (!$hasAccess) {
                 action: 'complete',
                 queue_id: currentQueueId,
                 next_service_point_id: nextServicePointId,
-                notes: notes
+                notes: notes,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     $('#completeModal').modal('hide');
@@ -783,7 +795,8 @@ if (!$hasAccess) {
                 action: 'cancel',
                 queue_id: currentQueueId,
                 reason: reason,
-                notes: notes
+                notes: notes,
+                csrf_token: csrfToken
             }, function(response) {
                 if (response.success) {
                     $('#cancelModal').modal('hide');
@@ -805,7 +818,25 @@ if (!$hasAccess) {
             loadQueues();
             showAlert('รีเฟรชข้อมูลแล้ว', 'info');
         }
-        
+
+        function pollNotifications() {
+            $.get('../api/get_notifications.php', { unread_only: true, limit: 5, _: Date.now() }, function(response) {
+                if (response.success && Array.isArray(response.notifications)) {
+                    response.notifications.forEach(function(n) {
+                        const typeMap = { urgent: 'danger', high: 'warning', normal: 'info', low: 'secondary' };
+                        const msg = n.title ? n.title + ': ' + n.message : n.message;
+                        showAlert(msg, typeMap[n.priority] || 'info');
+
+                        $.post('../api/notification_action.php', {
+                            action: 'mark_read',
+                            notification_id: n.notification_id,
+                            csrf_token: csrfToken
+                        });
+                    });
+                }
+            });
+        }
+
         function formatTime(timeString) {
             if (!timeString) return '-';
             const date = new Date(timeString);

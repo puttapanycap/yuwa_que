@@ -442,9 +442,11 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         let servicePointId = <?php echo json_encode($servicePointId); ?>;
         let voiceTemplateId = <?php echo json_encode($voiceTemplateId ?? null); ?>;
         let lastCalledQueue = null;
-        let lastCalledCount = 0; // เพิ่มตัวแปรเก็บจำนวนครั้งที่เรียกล่าสุด
+        let lastCalledCount = 0; // เก็บจำนวนครั้งที่เรียกล่าสุด
+        let lastCalledTime = null; // เก็บเวลาที่เรียกล่าสุด
         let audioEnabled = false; // Default to false, will be set by settings
         let audioContext = null;
+        let activeAudios = []; // เก็บเสียงที่กำลังเล่นอยู่
 
         // Debug mode toggle
         let debugMode = false; // Set to true for development, false for production
@@ -499,18 +501,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         }
         
-        // Function to unlock audio context (required by browsers for autoplay)
-        function unlockAudioContext() {
-            if (audioContext && audioContext.state === 'suspended') {
-                debugLog('Unlocking audio context...');
-                audioContext.resume().then(() => {
-                    debugLog('Audio context unlocked:', audioContext.state);
-                }).catch(error => {
-                    debugLog('Failed to unlock audio context:', error);
-                });
-            }
-        }
-
         // Function to play a short notification sound
         function playNotificationSound() {
             debugLog('Playing notification sound.');
@@ -521,6 +511,19 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         }
 
         // Preload audio files before playing to avoid missing segments
+        function stopCurrentAudio() {
+            if (activeAudios.length) {
+                activeAudios.forEach(a => {
+                    try {
+                        a.pause();
+                        a.currentTime = 0;
+                        a.onended = null;
+                    } catch (e) {}
+                });
+                activeAudios = [];
+            }
+        }
+
         function preloadAudioFiles(files) {
             const normalize = path => {
                 if (path.startsWith('http') || path.startsWith('/')) return path;
@@ -529,26 +532,50 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
 
             const loaders = files.map(src => new Promise(resolve => {
                 const audio = new Audio();
-                audio.src = normalize(src);
+                // Cache busting query to ensure fresh load when recalling
+                audio.src = normalize(src) + `?v=${Date.now()}`;
                 audio.preload = 'auto';
-                audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+                audio.addEventListener('canplaythrough', () => resolve({ audio, src }), { once: true });
                 audio.addEventListener('error', () => {
                     debugLog('Failed to load audio file:', src);
-                    resolve(null);
+                    resolve({ audio: null, src });
                 }, { once: true });
                 audio.load();
             }));
 
-            return Promise.all(loaders).then(results => results.filter(a => a !== null));
+            return Promise.all(loaders).then(results => {
+                return {
+                    loaded: results.filter(r => r.audio).map(r => r.audio),
+                    missing: results.filter(r => !r.audio).map(r => r.src)
+                };
+            });
         }
 
-        function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
+        function reportAudioIssue(queueId, missingFiles) {
+            if (!missingFiles || missingFiles.length === 0) return;
+
+            $.post('../api/report_audio_issue.php', {
+                queue_id: queueId,
+                service_point_id: servicePointId,
+                missing_files: JSON.stringify(missingFiles)
+            }).fail(function() {
+                console.error('Failed to report audio issue');
+            });
+        }
+
+        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null) {
             if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
                 debugLog('No audio files to play.');
                 return;
             }
 
-            preloadAudioFiles(audioFiles).then(loadedAudios => {
+            stopCurrentAudio();
+            preloadAudioFiles(audioFiles).then(result => {
+                const loadedAudios = result.loaded;
+                if (result.missing.length > 0) {
+                    reportAudioIssue(queueId, result.missing);
+                }
+
                 if (loadedAudios.length === 0) {
                     debugLog('Audio files failed to load.');
                     return;
@@ -566,10 +593,14 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                         } else if (--repeatCount > 0) {
                             index = 0;
                             playNext();
+                        } else {
+                            activeAudios = [];
                         }
                     };
                     playNext();
                 };
+
+                activeAudios = loadedAudios;
 
                 if (notificationBefore) {
                     playNotificationSound();
@@ -586,7 +617,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Audio API response for queue:', response);
-                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, queueId);
                     } else if (attempt < 2) {
                         setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
                     } else {
@@ -833,23 +864,26 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         }
 
         function loadQueueData() {
-            const url = servicePointId ? 
-                `../api/get_monitor_data.php?service_point_id=${servicePointId}` : 
+            const url = servicePointId ?
+                `../api/get_monitor_data.php?service_point_id=${servicePointId}` :
                 '../api/get_monitor_data.php';
-                
-            $.get(url, function(data) {
+
+            $.get(url, { _: Date.now() }, function(data) {
                 displayCurrentQueue(data.current);
                 displayWaitingQueues(data.waiting);
                 updateLastUpdate();
-                
+
                 // Check for newly called queue or repeat call
                 if (data.current) {
                     const currentQueueId = data.current.queue_id;
                     const currentCalledCount = parseInt(data.current.called_count) || 1;
-                    
+                    const currentCallTime = data.current.last_called_time || null;
+
                     // Check if it's a new call or a repeat call
                     const isNewCall = currentQueueId !== lastCalledQueue;
-                    const isRepeatCall = currentQueueId === lastCalledQueue && currentCalledCount > lastCalledCount;
+                    const isRepeatCall = currentQueueId === lastCalledQueue && (
+                        currentCalledCount > lastCalledCount || currentCallTime !== lastCalledTime
+                    );
                     
                     if (isNewCall || isRepeatCall) {
                         debugLog('Queue call detected:', {
@@ -885,10 +919,12 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                     // Update last values
                     lastCalledQueue = currentQueueId;
                     lastCalledCount = currentCalledCount;
+                    lastCalledTime = currentCallTime;
                 } else {
                     // No current queue
                     lastCalledQueue = null;
                     lastCalledCount = 0;
+                    lastCalledTime = null;
                 }
             }).fail(function() {
                 console.error('Failed to load queue data');
