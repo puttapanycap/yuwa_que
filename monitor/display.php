@@ -499,18 +499,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         }
         
-        // Function to unlock audio context (required by browsers for autoplay)
-        function unlockAudioContext() {
-            if (audioContext && audioContext.state === 'suspended') {
-                debugLog('Unlocking audio context...');
-                audioContext.resume().then(() => {
-                    debugLog('Audio context unlocked:', audioContext.state);
-                }).catch(error => {
-                    debugLog('Failed to unlock audio context:', error);
-                });
-            }
-        }
-
         // Function to play a short notification sound
         function playNotificationSound() {
             debugLog('Playing notification sound.');
@@ -531,24 +519,46 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 const audio = new Audio();
                 audio.src = normalize(src);
                 audio.preload = 'auto';
-                audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+                audio.addEventListener('canplaythrough', () => resolve({ audio, src }), { once: true });
                 audio.addEventListener('error', () => {
                     debugLog('Failed to load audio file:', src);
-                    resolve(null);
+                    resolve({ audio: null, src });
                 }, { once: true });
                 audio.load();
             }));
 
-            return Promise.all(loaders).then(results => results.filter(a => a !== null));
+            return Promise.all(loaders).then(results => {
+                return {
+                    loaded: results.filter(r => r.audio).map(r => r.audio),
+                    missing: results.filter(r => !r.audio).map(r => r.src)
+                };
+            });
         }
 
-        function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
+        function reportAudioIssue(queueId, missingFiles) {
+            if (!missingFiles || missingFiles.length === 0) return;
+
+            $.post('../api/report_audio_issue.php', {
+                queue_id: queueId,
+                service_point_id: servicePointId,
+                missing_files: JSON.stringify(missingFiles)
+            }).fail(function() {
+                console.error('Failed to report audio issue');
+            });
+        }
+
+        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null) {
             if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
                 debugLog('No audio files to play.');
                 return;
             }
 
-            preloadAudioFiles(audioFiles).then(loadedAudios => {
+            preloadAudioFiles(audioFiles).then(result => {
+                const loadedAudios = result.loaded;
+                if (result.missing.length > 0) {
+                    reportAudioIssue(queueId, result.missing);
+                }
+
                 if (loadedAudios.length === 0) {
                     debugLog('Audio files failed to load.');
                     return;
@@ -586,7 +596,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Audio API response for queue:', response);
-                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, queueId);
                     } else if (attempt < 2) {
                         setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
                     } else {

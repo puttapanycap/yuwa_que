@@ -479,10 +479,11 @@ if (!$hasAccess) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
+
     <script>
         let currentQueueId = null;
         let servicePointId = <?php echo $selectedServicePoint; ?>;
+        const csrfToken = '<?php echo generateCSRFToken(); ?>';
         
         $(document).ready(function() {
             loadQueues();
@@ -491,6 +492,10 @@ if (!$hasAccess) {
 
             // Auto refresh every 10 seconds
             setInterval(loadQueues, 10000);
+
+            // Poll notifications
+            pollNotifications();
+            setInterval(pollNotifications, 10000);
         });
 
         function loadQueues() {
@@ -805,7 +810,25 @@ if (!$hasAccess) {
             loadQueues();
             showAlert('รีเฟรชข้อมูลแล้ว', 'info');
         }
-        
+
+        function pollNotifications() {
+            $.get('../api/get_notifications.php', { unread_only: true, limit: 5 }, function(response) {
+                if (response.success && Array.isArray(response.notifications)) {
+                    response.notifications.forEach(function(n) {
+                        const typeMap = { urgent: 'danger', high: 'warning', normal: 'info', low: 'secondary' };
+                        const msg = n.title ? n.title + ': ' + n.message : n.message;
+                        showAlert(msg, typeMap[n.priority] || 'info');
+
+                        $.post('../api/notification_action.php', {
+                            action: 'mark_read',
+                            notification_id: n.notification_id,
+                            csrf_token: csrfToken
+                        });
+                    });
+                }
+            });
+        }
+
         function formatTime(timeString) {
             if (!timeString) return '-';
             const date = new Date(timeString);
