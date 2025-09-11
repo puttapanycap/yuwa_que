@@ -12,9 +12,8 @@ if (!hasPermission('manage_audio_system')) {
     die('ไม่มีสิทธิ์เข้าถึงหน้านี้');
 }
 
-// Force disable TTS and load audio settings
-setSetting('tts_enabled', '0');
-$ttsEnabled = '0';
+// Load audio settings
+$audioProvider = getSetting('audio_provider', 'files'); // 'files' or 'google_tts'
 $audioVolume = getSetting('audio_volume', '1.0');
 $audioRepeatCount = getSetting('audio_repeat_count', '1');
 $soundNotificationBefore = getSetting('sound_notification_before', '1');
@@ -33,7 +32,7 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_POST['update_audio_settings'])) {
         // Update audio settings
-        setSetting('tts_enabled', '0');
+        setSetting('audio_provider', $_POST['audio_provider'] ?? 'files');
         setSetting('audio_volume', $_POST['audio_volume'] ?? '1.0');
         setSetting('audio_repeat_count', $_POST['audio_repeat_count'] ?? '1');
         setSetting('sound_notification_before', $_POST['sound_notification_before'] ?? '1');
@@ -42,6 +41,7 @@ if (isset($_POST['update_audio_settings'])) {
         $successMessage = 'บันทึกการตั้งค่าเรียบร้อยแล้ว';
 
         // Refresh settings
+        $audioProvider = $_POST['audio_provider'] ?? 'files';
         $audioVolume = $_POST['audio_volume'] ?? '1.0';
         $audioRepeatCount = $_POST['audio_repeat_count'] ?? '1';
         $soundNotificationBefore = $_POST['sound_notification_before'] ?? '1';
@@ -459,6 +459,33 @@ try {
                                 <form method="POST" action="">
                                     <!-- Basic Settings -->
                                     <div class="settings-section">
+                                        <div class="mb-3">
+                                            <label class="form-label">แหล่งเสียงเรียกคิว</label>
+                                            <div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerFiles" value="files" <?php echo $audioProvider === 'files' ? 'checked' : ''; ?>>
+                                                    <label class="form-check-label" for="providerFiles">
+                                                        <i class="fas fa-music me-1"></i> ใช้ไฟล์เสียงที่เตรียมไว้
+                                                    </label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerGoogleTTS" value="google_tts" <?php echo $audioProvider === 'google_tts' ? 'checked' : ''; ?>>
+                                                    <label class="form-check-label" for="providerGoogleTTS">
+                                                        <i class="fas fa-cloud me-1"></i> ใช้ Google TTS API
+                                                    </label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerGTTS" value="gtts" <?php echo $audioProvider === 'gtts' ? 'checked' : ''; ?>>
+                                                    <label class="form-check-label" for="providerGTTS">
+                                                        <i class="fas fa-globe me-1"></i> ใช้ gTTS (ไม่ต้องใช้คีย์)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">
+                                                - Google TTS: ติดตั้ง <code>google-cloud-texttospeech</code> และตั้งค่า <code>GOOGLE_APPLICATION_CREDENTIALS</code> หรือใช้ --credentials ในสคริปต์<br>
+                                                - gTTS: ใช้บริการเสียงจาก Google Translate ไม่ต้องใช้คีย์ เหมาะสำหรับทดสอบ/โหลดน้อย (อาจมีข้อจำกัดและเปลี่ยนแปลงได้)
+                                            </div>
+                                        </div>
                                         <div class="mb-3">
                                             <label for="audioRepeatCount" class="form-label">จำนวนครั้งที่เล่นเสียงซ้ำ</label>
                                             <select class="form-select" id="audioRepeatCount" name="audio_repeat_count">

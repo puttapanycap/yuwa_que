@@ -1,0 +1,2 @@
+google-cloud-texttospeech>=2.0.0,<3.0.0
+gTTS>=2.5.0,<3.0.0

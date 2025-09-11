@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $booleanSettings = [
             'enable_priority_queue',
             'auto_forward_enabled',
-            'sound_notification_before', // Added this setting
+            'sound_notification_before', // uses '1'/'0'
             'email_notifications',
             'telegram_notifications'
         ];
@@ -43,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($booleanSettings as $key) {
             if (!isset($settingsToUpdate[$key])) {
                 // If the checkbox value is not in the POST data, it means it was unchecked
-                setSetting($key, 'false');
+                // sound_notification_before stores numeric 1/0 for compatibility
+                setSetting($key, $key === 'sound_notification_before' ? '0' : 'false');
             }
         }
         
@@ -80,11 +81,9 @@ $currentSettings = [
     'working_hours_start' => getSetting('working_hours_start', '08:00'),
     'working_hours_end' => getSetting('working_hours_end', '16:00'),
     
-    // Audio Configuration
-    'audio_volume' => getSetting('audio_volume', '1.0'),
+    // Audio Configuration (only used settings)
     'audio_repeat_count' => getSetting('audio_repeat_count', '1'),
-    'sound_notification_before' => getSetting('sound_notification_before', 'true'), // Added this setting
-    'tts_call_format' => getSetting('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ'),
+    'sound_notification_before' => getSetting('sound_notification_before', '1'), // store as '1'/'0'
     
     // Email Configuration
     'email_notifications' => getSetting('email_notifications', 'false'),
@@ -358,37 +357,17 @@ $currentSettings = [
                             <div class="setting-group">
                                 <h6><i class="fas fa-volume-up me-2"></i>การตั้งค่าเสียง</h6>
 
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]"
-                           value="true" <?php echo $currentSettings['sound_notification_before'] == 'true' ? 'checked' : ''; ?>>
-                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
-                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]"
+                                           value="1" <?php echo $currentSettings['sound_notification_before'] == '1' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
+                                </div>
 
-                <div class="mb-3">
-                    <label class="form-label">รูปแบบประโยคเรียกคิว</label>
-                    <input type="text" class="form-control" name="settings[tts_call_format]"
-                           value="<?php echo htmlspecialchars($currentSettings['tts_call_format']); ?>">
-                    <div class="form-text">
-                        ใช้ {queue_number} สำหรับหมายเลขคิว และ {service_point} สำหรับชื่อจุดบริการ
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">ระดับเสียง: <span id="volume_value"><?php echo $currentSettings['audio_volume']; ?></span></label>
-                            <input type="range" class="form-range" name="settings[audio_volume]" id="audio_volume"
-                                   min="0.1" max="1.0" step="0.1" value="<?php echo $currentSettings['audio_volume']; ?>">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">จำนวนครั้งที่เล่นซ้ำ</label>
-                            <input type="number" class="form-control" name="settings[audio_repeat_count]"
-                                   value="<?php echo $currentSettings['audio_repeat_count']; ?>" min="1" max="5">
-                        </div>
-                    </div>
-                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">จำนวนครั้งที่เล่นซ้ำ</label>
+                                    <input type="number" class="form-control" name="settings[audio_repeat_count]"
+                                           value="<?php echo $currentSettings['audio_repeat_count']; ?>" min="1" max="5">
+                                </div>
                             </div>
                             
                             <!-- Email Settings -->
@@ -550,9 +529,7 @@ $currentSettings = [
     
     <script>
         // Update range value displays
-        $('#audio_volume').on('input', function() {
-            $('#volume_value').text($(this).val());
-        });
+        // Removed audio volume preview handler (setting not used)
 
         // Preview Telegram message template
         $('input[name="settings[telegram_notify_template]"]').on('input', function() {

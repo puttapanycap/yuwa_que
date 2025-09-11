@@ -31,6 +31,10 @@ if ($servicePointId) {
 }
 
 $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
+// Audio volume setting (0.0 - 1.0)
+$audioVolume = (float) getSetting('audio_volume', '1.0');
+if ($audioVolume < 0) { $audioVolume = 0.0; }
+if ($audioVolume > 1) { $audioVolume = 1.0; }
 // These settings will be fetched dynamically via API for real-time updates
 // $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
 ?>
@@ -447,6 +451,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         let audioEnabled = false; // Default to false, will be set by settings
         let audioContext = null;
         let activeAudios = []; // เก็บเสียงที่กำลังเล่นอยู่
+        const audioVolumeSetting = <?php echo json_encode($audioVolume); ?>; // 0.0 - 1.0
 
         // Debug mode toggle
         let debugMode = false; // Set to true for development, false for production
@@ -506,7 +511,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             debugLog('Playing notification sound.');
             unlockAudioContext();
             const audio = new Audio('../assets/audio/notification.mp3'); // Ensure this path is correct
-            audio.volume = 0.5; // Can be controlled by a setting
+            audio.volume = audioVolumeSetting; // Controlled by saved setting
             audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
         }
 
@@ -535,6 +540,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 // Cache busting query to ensure fresh load when recalling
                 audio.src = normalize(src) + `?v=${Date.now()}`;
                 audio.preload = 'auto';
+                audio.volume = audioVolumeSetting;
                 audio.addEventListener('canplaythrough', () => resolve({ audio, src }), { once: true });
                 audio.addEventListener('error', () => {
                     debugLog('Failed to load audio file:', src);
@@ -563,7 +569,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             });
         }
 
-        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null) {
+        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null, callId = null) {
             if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
                 debugLog('No audio files to play.');
                 return;
@@ -595,6 +601,11 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             playNext();
                         } else {
                             activeAudios = [];
+                            // mark audio as played
+                            if (callId) {
+                                $.post('../api/update_audio_status.php', { call_id: callId, status: 'played' })
+                                  .fail(function() { debugLog('Failed to update audio status.'); });
+                            }
                         }
                     };
                     playNext();
@@ -617,7 +628,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Audio API response for queue:', response);
-                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, queueId);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, queueId, response.call_id);
                         if (response.missing_words && response.missing_words.length) {
                             reportAudioIssue(queueId, response.missing_words);
                         }
@@ -692,7 +703,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Test audio API response:', response);
-                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
+                        playAudioSequence(response.audio_files, response.repeat_count, response.notification_before, null, response.call_id);
                         if (response.missing_words && response.missing_words.length) {
                             reportAudioIssue(null, response.missing_words);
                         }

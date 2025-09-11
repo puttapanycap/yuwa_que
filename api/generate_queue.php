@@ -36,13 +36,27 @@ try {
         throw new Exception('ประเภทคิวไม่ถูกต้อง');
     }
     
-    // Generate queue number
-    $today = date('Y-m-d');
-    $stmt = $db->prepare("SELECT COUNT(*) as count FROM queues WHERE DATE(creation_time) = ? AND queue_type_id = ?");
-    $stmt->execute([$today, $queueTypeId]);
-    $count = $stmt->fetch()['count'];
-    
-    $queueNumber = $queueType['prefix_char'] . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+    // Generate queue number with MySQL named lock to prevent race conditions
+    $lockKey = sprintf('gen_queue_%s_%s', (int)$queueTypeId, date('Ymd'));
+    $stmt = $db->prepare('SELECT GET_LOCK(?, 5)');
+    $stmt->execute([$lockKey]);
+    $gotLock = (int)$stmt->fetchColumn() === 1;
+    if (!$gotLock) {
+        throw new Exception('ระบบกำลังยุ่ง กรุณาลองใหม่');
+    }
+
+    // Find last number for today for this type, then increment
+    $stmt = $db->prepare("SELECT queue_number FROM queues WHERE queue_type_id = ? AND DATE(creation_time) = CURDATE() ORDER BY queue_id DESC LIMIT 1");
+    $stmt->execute([$queueTypeId]);
+    $lastQueueNumber = $stmt->fetchColumn();
+    $nextNo = 1;
+    if ($lastQueueNumber) {
+        // Extract numeric tail after prefix
+        $prefix = (string)$queueType['prefix_char'];
+        $digits = preg_replace('/^' . preg_quote($prefix, '/') . '/u', '', $lastQueueNumber);
+        $nextNo = max(1, ((int)preg_replace('/\D/', '', $digits)) + 1);
+    }
+    $queueNumber = $queueType['prefix_char'] . str_pad($nextNo, 3, '0', STR_PAD_LEFT);
     
     // Get first service point (screening)
     $stmt = $db->prepare("SELECT service_point_id FROM service_points WHERE position_key = 'SCREENING_01' AND is_active = 1");
@@ -88,6 +102,11 @@ try {
     ]);
     
     $db->commit();
+    // Release named lock
+    try {
+        $stmt = $db->prepare('DO RELEASE_LOCK(?)');
+        $stmt->execute([$lockKey]);
+    } catch (Exception $e) { /* ignore */ }
     
     echo json_encode([
         'success' => true,
@@ -102,6 +121,13 @@ try {
     
 } catch (Exception $e) {
     $db->rollBack();
+    // Best-effort release lock on error
+    if (isset($lockKey)) {
+        try {
+            $stmt = $db->prepare('DO RELEASE_LOCK(?)');
+            $stmt->execute([$lockKey]);
+        } catch (Exception $e2) { /* ignore */ }
+    }
     
     // Log error for debugging
     error_log("Generate Queue Error: " . $e->getMessage());

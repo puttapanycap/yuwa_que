@@ -353,6 +353,10 @@ if (!$hasAccess) {
                             <i class="fas fa-redo me-2"></i>เรียกซ้ำ
                         </button>
                         
+                        <button class="btn btn-secondary btn-action" onclick="startService()" id="startServiceBtn" disabled>
+                            <i class="fas fa-play me-2"></i>เริ่มให้บริการ
+                        </button>
+                        
                         <button class="btn btn-warning btn-action" onclick="holdQueue()" id="holdBtn" disabled>
                             <i class="fas fa-pause me-2"></i>พักคิว
                         </button>
@@ -631,12 +635,14 @@ if (!$hasAccess) {
         
         function updateButtons(currentQueue) {
             const hasCurrentQueue = currentQueue !== null;
+            const status = hasCurrentQueue ? (currentQueue.current_status || '') : '';
 
             $('#callNextBtn').prop('disabled', hasCurrentQueue);
             $('#recallBtn').prop('disabled', !hasCurrentQueue);
             $('#holdBtn').prop('disabled', !hasCurrentQueue);
             $('#completeBtn').prop('disabled', !hasCurrentQueue);
             $('#cancelBtn').prop('disabled', !hasCurrentQueue);
+            $('#startServiceBtn').prop('disabled', !(hasCurrentQueue && status === 'called'));
         }
 
         function loadCallTimeGroups() {
@@ -718,6 +724,26 @@ if (!$hasAccess) {
                 if (response.success) {
                     loadQueues();
                     showAlert('เรียกซ้ำสำเร็จ', 'success');
+                } else {
+                    showAlert('เกิดข้อผิดพลาด: ' + response.message, 'danger');
+                }
+            }).fail(function() {
+                showAlert('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'danger');
+            });
+        }
+
+        function startService() {
+            if (!currentQueueId) return;
+
+            $.post('../api/queue_action.php', {
+                action: 'start_processing',
+                queue_id: currentQueueId,
+                service_point_id: servicePointId,
+                csrf_token: csrfToken
+            }, function(response) {
+                if (response.success) {
+                    loadQueues();
+                    showAlert('เริ่มให้บริการแล้ว', 'success');
                 } else {
                     showAlert('เกิดข้อผิดพลาด: ' + response.message, 'danger');
                 }

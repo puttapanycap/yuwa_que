@@ -310,6 +310,30 @@ function getServicePointLabel() {
     return getSetting('service_point_label', 'จุดบริการ');
 }
 
+// Working hours helpers (used by staff/index.php)
+function getWorkingHoursStart() {
+    return getSetting('working_hours_start', '08:30');
+}
+
+function getWorkingHoursEnd() {
+    return getSetting('working_hours_end', '17:30');
+}
+
+function isWithinWorkingHours() {
+    $start = getWorkingHoursStart(); // HH:MM
+    $end = getWorkingHoursEnd();     // HH:MM
+
+    $now = new DateTime('now');
+    $startDt = DateTime::createFromFormat('H:i', $start) ?: new DateTime('08:30');
+    $endDt = DateTime::createFromFormat('H:i', $end) ?: new DateTime('17:30');
+
+    // Align to today
+    $startDt->setDate((int)$now->format('Y'), (int)$now->format('m'), (int)$now->format('d'));
+    $endDt->setDate((int)$now->format('Y'), (int)$now->format('m'), (int)$now->format('d'));
+
+    return ($now >= $startDt && $now <= $endDt);
+}
+
 function formatFileSize($bytes) {
     $units = ['B', 'KB', 'MB', 'GB'];
     $bytes = max($bytes, 0);
