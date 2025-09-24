@@ -959,7 +959,7 @@ function confirmDeleteAudio(audioId, audioName) {
 const previewVolume = parseFloat('<?php echo $audioVolume; ?>');
 
 function playNotificationSound() {
-    const audio = new Audio('../assets/audio/notification.mp3');
+    const audio = new Audio('../assets/audio/notification.wav');
     audio.volume = 0.5;
     audio.play().catch(e => console.error('Notification sound play failed:', e));
 }

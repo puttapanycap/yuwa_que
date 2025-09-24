@@ -850,7 +850,7 @@ CREATE TABLE `notification_types`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `icon` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT 'bell',
   `default_priority` enum('low','normal','high','urgent') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT 'normal',
-  `default_sound` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT 'notification.mp3',
+  `default_sound` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT 'notification.wav',
   `is_system` tinyint(1) NULL DEFAULT 0,
   `is_active` tinyint(1) NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -861,16 +861,16 @@ CREATE TABLE `notification_types`  (
 -- ----------------------------
 -- Records of notification_types
 -- ----------------------------
-INSERT INTO `notification_types` VALUES (1, 'queue_called', 'เรียกคิว', 'แจ้งเตือนเมื่อมีการเรียกคิว', 'bullhorn', 'high', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (2, 'queue_completed', 'คิวเสร็จสิ้น', 'แจ้งเตือนเมื่อคิวเสร็จสิ้น', 'check-circle', 'normal', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (3, 'queue_forwarded', 'คิวถูกส่งต่อ', 'แจ้งเตือนเมื่อคิวถูกส่งต่อไปยังจุดบริการอื่น', 'arrow-right', 'normal', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (4, 'queue_waiting_long', 'คิวรอนาน', 'แจ้งเตือนเมื่อมีคิวรอนานเกินกำหนด', 'clock', 'high', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (5, 'system_alert', 'การแจ้งเตือนระบบ', 'แจ้งเตือนจากระบบ', 'exclamation-triangle', 'high', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (6, 'auto_reset', 'Auto Reset', 'แจ้งเตือนเกี่ยวกับการ Reset คิวอัตโนมัติ', 'sync', 'normal', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (7, 'staff_message', 'ข้อความจากเจ้าหน้าที่', 'ข้อความจากเจ้าหน้าที่คนอื่น', 'comment', 'normal', 'notification.mp3', 0, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (8, 'system_update', 'อัปเดตระบบ', 'แจ้งเตือนเมื่อมีการอัปเดตระบบ', 'download', 'normal', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (9, 'backup_complete', 'สำรองข้อมูลเสร็จสิ้น', 'แจ้งเตือนเมื่อการสำรองข้อมูลเสร็จสิ้น', 'database', 'low', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
-INSERT INTO `notification_types` VALUES (10, 'user_login', 'การเข้าสู่ระบบ', 'แจ้งเตือนเมื่อมีการเข้าสู่ระบบ', 'sign-in-alt', 'low', 'notification.mp3', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (1, 'queue_called', 'เรียกคิว', 'แจ้งเตือนเมื่อมีการเรียกคิว', 'bullhorn', 'high', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (2, 'queue_completed', 'คิวเสร็จสิ้น', 'แจ้งเตือนเมื่อคิวเสร็จสิ้น', 'check-circle', 'normal', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (3, 'queue_forwarded', 'คิวถูกส่งต่อ', 'แจ้งเตือนเมื่อคิวถูกส่งต่อไปยังจุดบริการอื่น', 'arrow-right', 'normal', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (4, 'queue_waiting_long', 'คิวรอนาน', 'แจ้งเตือนเมื่อมีคิวรอนานเกินกำหนด', 'clock', 'high', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (5, 'system_alert', 'การแจ้งเตือนระบบ', 'แจ้งเตือนจากระบบ', 'exclamation-triangle', 'high', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (6, 'auto_reset', 'Auto Reset', 'แจ้งเตือนเกี่ยวกับการ Reset คิวอัตโนมัติ', 'sync', 'normal', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (7, 'staff_message', 'ข้อความจากเจ้าหน้าที่', 'ข้อความจากเจ้าหน้าที่คนอื่น', 'comment', 'normal', 'notification.wav', 0, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (8, 'system_update', 'อัปเดตระบบ', 'แจ้งเตือนเมื่อมีการอัปเดตระบบ', 'download', 'normal', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (9, 'backup_complete', 'สำรองข้อมูลเสร็จสิ้น', 'แจ้งเตือนเมื่อการสำรองข้อมูลเสร็จสิ้น', 'database', 'low', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
+INSERT INTO `notification_types` VALUES (10, 'user_login', 'การเข้าสู่ระบบ', 'แจ้งเตือนเมื่อมีการเข้าสู่ระบบ', 'sign-in-alt', 'low', 'notification.wav', 1, 1, '2025-06-19 16:30:13');
 
 -- ----------------------------
 -- Table structure for notifications

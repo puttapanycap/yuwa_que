@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $description = $_POST['description'] ?? '';
             $icon = $_POST['icon'] ?? 'bell';
             $defaultPriority = $_POST['default_priority'] ?? 'normal';
-            $defaultSound = $_POST['default_sound'] ?? 'notification.mp3';
+            $defaultSound = $_POST['default_sound'] ?? 'notification.wav';
             $isActive = isset($_POST['is_active']) ? 1 : 0;
             
             // ตรวจสอบว่ามีประเภทนี้อยู่แล้วหรือไม่
@@ -616,7 +616,7 @@ include '../includes/header.php';
                     
                     <div class="mb-3">
                         <label for="default_sound" class="form-label">เสียงเริ่มต้น</label>
-                        <input type="text" class="form-control" id="default_sound" name="default_sound" value="notification.mp3">
+                        <input type="text" class="form-control" id="default_sound" name="default_sound" value="notification.wav">
                     </div>
                     
                     <div class="mb-3 form-check">
@@ -737,7 +737,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('description').value = '';
         document.getElementById('modal_icon').value = 'bell';
         document.getElementById('default_priority').value = 'normal';
-        document.getElementById('default_sound').value = 'notification.mp3';
+        document.getElementById('default_sound').value = 'notification.wav';
         document.getElementById('is_active').checked = true;
         
         systemWarning.style.display = 'none';

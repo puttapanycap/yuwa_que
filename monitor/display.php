@@ -510,7 +510,7 @@ if ($audioVolume > 1) { $audioVolume = 1.0; }
         function playNotificationSound() {
             debugLog('Playing notification sound.');
             unlockAudioContext();
-            const audio = new Audio('../assets/audio/notification.mp3'); // Ensure this path is correct
+            const audio = new Audio('../assets/audio/notification.wav'); // Ensure this path is correct
             audio.volume = audioVolumeSetting; // Controlled by saved setting
             audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
         }
