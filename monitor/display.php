@@ -431,11 +431,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         </div>
     </div>
 
-    <?php
-    require '../components/notification-system.php';
-    renderMonitorNotificationSystem($servicePointId);
-    ?>
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <script>
@@ -447,6 +442,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         let audioEnabled = false; // Default to false, will be set by settings
         let audioContext = null;
         let activeAudios = []; // เก็บเสียงที่กำลังเล่นอยู่
+        let currentPlaybackMeta = null;
         const audioVolumeSetting = 1.0;
 
         // Debug mode toggle
@@ -502,15 +498,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         }
         
-        // Function to play a short notification sound
-        function playNotificationSound() {
-            debugLog('Playing notification sound.');
-            unlockAudioContext();
-            const audio = new Audio('../assets/audio/notification.wav'); // Ensure this path is correct
-            audio.volume = audioVolumeSetting; // Fixed playback volume
-            audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
-        }
-
         // Preload audio files before playing to avoid missing segments
         function stopCurrentAudio() {
             if (activeAudios.length) {
@@ -519,6 +506,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                         a.pause();
                         a.currentTime = 0;
                         a.onended = null;
+                        a.onerror = null;
                     } catch (e) {}
                 });
                 activeAudios = [];
@@ -565,23 +553,93 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             });
         }
 
-        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null, callId = null) {
-            if (!audioEnabled || !Array.isArray(audioFiles) || audioFiles.length === 0) {
-                debugLog('No audio files to play.');
+        function cleanupAudioResources(files, callId, status = 'played') {
+            if (!callId) {
                 return;
             }
 
+            const payload = {
+                call_id: callId,
+                status: status
+            };
+
+            if (Array.isArray(files) && files.length > 0) {
+                payload.audio_files = files;
+            }
+
+            $.ajax({
+                url: '../api/update_audio_status.php',
+                method: 'POST',
+                data: payload,
+                traditional: true
+            }).fail(function() {
+                debugLog('Failed to update audio status or clean audio files.');
+            });
+        }
+
+        function playAudioSequence(audioFiles, repeatCount, notificationBefore, queueId = null, callId = null) {
+            const preparedFiles = Array.isArray(audioFiles) ? audioFiles.filter(Boolean) : [];
+            const filesForCleanup = [...new Set(preparedFiles)];
+
+            if (currentPlaybackMeta) {
+                cleanupAudioResources(currentPlaybackMeta.files, currentPlaybackMeta.callId);
+                currentPlaybackMeta = null;
+            }
+
+            if (!audioEnabled) {
+                debugLog('Audio disabled, skipping playback.');
+                cleanupAudioResources(filesForCleanup, callId);
+                return;
+            }
+
+            if (preparedFiles.length === 0) {
+                debugLog('No audio files to play.');
+                cleanupAudioResources(filesForCleanup, callId, 'failed');
+                return;
+            }
+
+            if (callId) {
+                currentPlaybackMeta = {
+                    files: filesForCleanup,
+                    callId: callId
+                };
+            } else {
+                currentPlaybackMeta = null;
+            }
+
+            unlockAudioContext();
             stopCurrentAudio();
-            preloadAudioFiles(audioFiles).then(result => {
+            preloadAudioFiles(preparedFiles).then(result => {
                 const loadedAudios = result.loaded;
                 if (result.missing.length > 0) {
                     reportAudioIssue(queueId, result.missing);
                 }
 
+                let cleanedUp = false;
+                const finalizePlayback = (status = 'played') => {
+                    if (cleanedUp) {
+                        return;
+                    }
+                    cleanedUp = true;
+                    activeAudios = [];
+                    if (currentPlaybackMeta && currentPlaybackMeta.callId === callId) {
+                        currentPlaybackMeta = null;
+                    }
+                    cleanupAudioResources(filesForCleanup, callId, status);
+                };
+
                 if (loadedAudios.length === 0) {
                     debugLog('Audio files failed to load.');
+                    finalizePlayback('failed');
                     return;
                 }
+
+                repeatCount = parseInt(repeatCount, 10);
+                if (Number.isNaN(repeatCount) || repeatCount < 1) {
+                    repeatCount = 1;
+                }
+
+                activeAudios = loadedAudios;
 
                 const playSet = () => {
                     let index = 0;
@@ -590,31 +648,26 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             const audio = loadedAudios[index];
                             audio.currentTime = 0;
                             audio.onended = playNext;
-                            audio.play().catch(e => debugLog('Audio play failed:', e.message));
+                            audio.onerror = function() {
+                                debugLog('Audio element error encountered.');
+                                finalizePlayback('failed');
+                            };
+                            audio.play().catch(e => {
+                                debugLog('Audio play failed:', e.message);
+                                finalizePlayback('failed');
+                            });
                             index++;
                         } else if (--repeatCount > 0) {
                             index = 0;
                             playNext();
                         } else {
-                            activeAudios = [];
-                            // mark audio as played
-                            if (callId) {
-                                $.post('../api/update_audio_status.php', { call_id: callId, status: 'played' })
-                                  .fail(function() { debugLog('Failed to update audio status.'); });
-                            }
+                            finalizePlayback();
                         }
                     };
                     playNext();
                 };
 
-                activeAudios = loadedAudios;
-
-                if (notificationBefore) {
-                    playNotificationSound();
-                    setTimeout(playSet, 1000);
-                } else {
-                    playSet();
-                }
+                playSet();
             });
         }
 
@@ -688,7 +741,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             unlockAudioContext();
 
             if (!audioEnabled) {
-                alert('เสียงถูกปิดอยู่ กรุณาเปิดเสียงก่อน');
+                updateAudioStatus('เสียงปิดอยู่', 'disabled');
                 debugLog('Audio disabled by user, cannot test.');
                 return;
             }
@@ -704,12 +757,12 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             reportAudioIssue(null, response.missing_words);
                         }
                     } else {
-                        alert('เกิดข้อผิดพลาดในการทดสอบเสียง: ' + response.message);
+                        updateAudioStatus('ทดสอบเสียงล้มเหลว', 'disabled');
                         debugLog('Test audio API error response:', response.message);
                     }
                 })
                 .fail(function(xhr, status, error) {
-                    alert('ไม่สามารถเชื่อมต่อกับบริการเสียงได้: ' + error);
+                    updateAudioStatus('เชื่อมต่อบริการเสียงไม่ได้', 'disabled');
                     debugLog('Test audio AJAX failed:', error);
                 });
         }
@@ -905,25 +958,6 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             queueId: currentQueueId,
                             calledCount: currentCalledCount
                         });
-                        
-                        // Create notification for queue call
-                        if (typeof monitorNotificationSystem !== 'undefined') {
-                            const notificationData = {
-                                notification_id: Date.now(), // Use timestamp as temporary ID
-                                type: 'queue_called',
-                                title: 'เรียกคิวแล้ว',
-                                message: `หมายเลข ${data.current.queue_number} เชิญที่ ${data.current.service_point_name || 'จุดบริการ'}`,
-                                priority: 'high',
-                                color: '#28a745',
-                                bg_color: 'rgba(40, 167, 69, 0.1)',
-                                icon: 'fas fa-bullhorn',
-                                display_duration: 8000,
-                                formatted_message: `หมายเลข <strong>${htmlspecialchars(data.current.queue_number)}</strong> เชิญที่ <strong>${htmlspecialchars(data.current.service_point_name || 'จุดบริการ')}</strong>`,
-                                service_point_name: data.current.service_point_name
-                            };
-                            
-                            monitorNotificationSystem.showNotification(notificationData);
-                        }
                         
                         // Fetch audio parameters from backend API with retry
                         requestAudio(currentQueueId);
