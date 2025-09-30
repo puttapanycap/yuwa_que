@@ -30,7 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $booleanSettings = [
             'enable_priority_queue',
             'auto_forward_enabled',
-            'sound_notification_before', // uses '1'/'0'
             'email_notifications',
             'telegram_notifications'
         ];
@@ -42,9 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Explicitly handle boolean settings (checkboxes)
         foreach ($booleanSettings as $key) {
             if (!isset($settingsToUpdate[$key])) {
-                // If the checkbox value is not in the POST data, it means it was unchecked
-                // sound_notification_before stores numeric 1/0 for compatibility
-                setSetting($key, $key === 'sound_notification_before' ? '0' : 'false');
+                setSetting($key, 'false');
             }
         }
         
@@ -80,10 +77,6 @@ $currentSettings = [
     // Working Hours
     'working_hours_start' => getSetting('working_hours_start', '08:00'),
     'working_hours_end' => getSetting('working_hours_end', '16:00'),
-    
-    // Audio Configuration (only used settings)
-    'audio_repeat_count' => getSetting('audio_repeat_count', '1'),
-    'sound_notification_before' => getSetting('sound_notification_before', '1'), // store as '1'/'0'
     
     // Email Configuration
     'email_notifications' => getSetting('email_notifications', 'false'),
@@ -353,23 +346,6 @@ $currentSettings = [
                                 </div>
                             </div>
 
-                            <!-- Audio Settings -->
-                            <div class="setting-group">
-                                <h6><i class="fas fa-volume-up me-2"></i>การตั้งค่าเสียง</h6>
-
-                                <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" name="settings[sound_notification_before]"
-                                           value="1" <?php echo $currentSettings['sound_notification_before'] == '1' ? 'checked' : ''; ?>>
-                                    <label class="form-check-label">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">จำนวนครั้งที่เล่นซ้ำ</label>
-                                    <input type="number" class="form-control" name="settings[audio_repeat_count]"
-                                           value="<?php echo $currentSettings['audio_repeat_count']; ?>" min="1" max="5">
-                                </div>
-                            </div>
-                            
                             <!-- Email Settings -->
                             <div class="setting-group">
                                 <h6><i class="fas fa-envelope me-2"></i>การตั้งค่าอีเมล</h6>

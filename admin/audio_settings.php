@@ -1,10 +1,4 @@
 <?php
-/**
- * This file provides the audio settings page for the admin panel.
- *
- * @package Yuwa_Queue
- */
-
 require_once '../config/config.php';
 requireLogin();
 
@@ -12,1028 +6,575 @@ if (!hasPermission('manage_audio_system')) {
     die('ไม่มีสิทธิ์เข้าถึงหน้านี้');
 }
 
-// Load audio settings
-$audioProvider = getSetting('audio_provider', 'files'); // 'files' or 'google_tts'
-$audioVolume = getSetting('audio_volume', '1.0');
-$audioRepeatCount = getSetting('audio_repeat_count', '1');
-$soundNotificationBefore = getSetting('sound_notification_before', '1');
+$successMessage = null;
+$errorMessage = null;
 
-// Get voice templates
 try {
     $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
-    $stmt->execute();
-    $voiceTemplates = $stmt->fetchAll();
 } catch (Exception $e) {
-    $voiceTemplates = [];
+    die('ไม่สามารถเชื่อมต่อฐานข้อมูลได้');
 }
 
-// Handle form submissions
+$voiceTemplates = [];
+$ttsServices = [];
+
+$fetchTemplates = function () use (&$db) {
+    $stmt = $db->query("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
+    return $stmt->fetchAll();
+};
+
+$fetchServices = function () use (&$db) {
+    $stmt = $db->query("SELECT * FROM tts_api_services ORDER BY is_active DESC, provider_name");
+    return $stmt->fetchAll();
+};
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-if (isset($_POST['update_audio_settings'])) {
-        // Update audio settings
-        setSetting('audio_provider', $_POST['audio_provider'] ?? 'files');
-        setSetting('audio_volume', $_POST['audio_volume'] ?? '1.0');
-        setSetting('audio_repeat_count', $_POST['audio_repeat_count'] ?? '1');
-        setSetting('sound_notification_before', $_POST['sound_notification_before'] ?? '1');
+    try {
+        if (isset($_POST['add_template'])) {
+            $templateName = sanitizeInput($_POST['template_name'] ?? '');
+            $templateText = sanitizeInput($_POST['template_text'] ?? '');
 
-        logActivity('อัพเดทการตั้งค่าระบบเสียง');
-        $successMessage = 'บันทึกการตั้งค่าเรียบร้อยแล้ว';
-
-        // Refresh settings
-        $audioProvider = $_POST['audio_provider'] ?? 'files';
-        $audioVolume = $_POST['audio_volume'] ?? '1.0';
-        $audioRepeatCount = $_POST['audio_repeat_count'] ?? '1';
-        $soundNotificationBefore = $_POST['sound_notification_before'] ?? '1';
-    } elseif (isset($_POST['add_template'])) {
-        // Add new template
-        $templateName = sanitizeInput($_POST['template_name'] ?? '');
-        $templateText = sanitizeInput($_POST['template_text'] ?? '');
-        
-        if (!empty($templateName) && !empty($templateText)) {
-            try {
-                $db = getDB();
-                $stmt = $db->prepare("INSERT INTO voice_templates (template_name, template_text) VALUES (?, ?)");
-                $stmt->execute([$templateName, $templateText]);
-                
-                logActivity('เพิ่มรูปแบบข้อความเสียงเรียก: ' . $templateName);
-                $successMessage = 'เพิ่มรูปแบบข้อความเสียงเรียกเรียบร้อยแล้ว';
-                
-                // Refresh templates
-                $stmt = $db->prepare("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
-                $stmt->execute();
-                $voiceTemplates = $stmt->fetchAll();
-            } catch (Exception $e) {
-                $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+            if ($templateName === '' || $templateText === '') {
+                throw new Exception('กรุณากรอกชื่อและข้อความของประโยคเรียกคิว');
             }
-        } else {
-            $errorMessage = 'กรุณากรอกข้อมูลให้ครบถ้วน';
-        }
-    } elseif (isset($_POST['delete_template'])) {
-        // Delete template
-        $templateId = (int)$_POST['template_id'];
-        
-        try {
-            $db = getDB();
-            // Check if this is the default template
-            $stmt = $db->prepare("SELECT is_default FROM voice_templates WHERE template_id = ?");
+
+            $stmt = $db->prepare("INSERT INTO voice_templates (template_name, template_text) VALUES (?, ?)");
+            $stmt->execute([$templateName, $templateText]);
+            logActivity('เพิ่มรูปแบบข้อความเสียงเรียก: ' . $templateName);
+            $successMessage = 'เพิ่มประโยคเรียกคิวเรียบร้อยแล้ว';
+        } elseif (isset($_POST['update_template'])) {
+            $templateId = (int)($_POST['template_id'] ?? 0);
+            $templateName = sanitizeInput($_POST['template_name'] ?? '');
+            $templateText = sanitizeInput($_POST['template_text'] ?? '');
+
+            if ($templateId <= 0 || $templateName === '' || $templateText === '') {
+                throw new Exception('ข้อมูลไม่ครบถ้วนสำหรับการแก้ไขประโยคเรียกคิว');
+            }
+
+            $stmt = $db->prepare("UPDATE voice_templates SET template_name = ?, template_text = ? WHERE template_id = ?");
+            $stmt->execute([$templateName, $templateText, $templateId]);
+            logActivity('แก้ไขรูปแบบข้อความเสียงเรียก ID: ' . $templateId);
+            $successMessage = 'อัปเดตประโยคเรียกคิวเรียบร้อยแล้ว';
+        } elseif (isset($_POST['set_default_template'])) {
+            $templateId = (int)($_POST['template_id'] ?? 0);
+            if ($templateId <= 0) {
+                throw new Exception('ไม่พบรูปแบบข้อความที่ต้องการตั้งค่าเป็นค่าเริ่มต้น');
+            }
+
+            $db->beginTransaction();
+            $db->exec('UPDATE voice_templates SET is_default = 0');
+            $stmt = $db->prepare('UPDATE voice_templates SET is_default = 1 WHERE template_id = ?');
             $stmt->execute([$templateId]);
-            $isDefault = $stmt->fetch()['is_default'] ?? false;
-            
-            if ($isDefault) {
-                $errorMessage = 'ไม่สามารถลบรูปแบบข้อความเริ่มต้นได้';
-            } else {
-                // Update service points using this template to use default template
-                $stmt = $db->prepare(
-                    "
-                    UPDATE service_points 
-                    SET voice_template_id = (SELECT template_id FROM voice_templates WHERE is_default = 1 LIMIT 1)
-                    WHERE voice_template_id = ?
-                    "
-                );
-                $stmt->execute([$templateId]);
-                
-                // Delete template
-                $stmt = $db->prepare("DELETE FROM voice_templates WHERE template_id = ? AND is_default = 0");
-                $stmt->execute([$templateId]);
-                
-                logActivity('ลบรูปแบบข้อความเสียงเรียก ID: ' . $templateId);
-                $successMessage = 'ลบรูปแบบข้อความเสียงเรียกเรียบร้อยแล้ว';
-                
-                // Refresh templates
-                $stmt = $db->prepare("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
-                $stmt->execute();
-                $voiceTemplates = $stmt->fetchAll();
+            $db->commit();
+
+            logActivity('ตั้งค่ารูปแบบข้อความเสียงเรียกเริ่มต้น: ' . $templateId);
+            $successMessage = 'อัปเดตค่าเริ่มต้นเรียบร้อยแล้ว';
+        } elseif (isset($_POST['delete_template'])) {
+            $templateId = (int)($_POST['template_id'] ?? 0);
+            if ($templateId <= 0) {
+                throw new Exception('ไม่พบรูปแบบข้อความที่ต้องการลบ');
             }
-        } catch (Exception $e) {
-            $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
-        }
-    } elseif (isset($_POST['set_default_template'])) {
-        // Set default template
-        $templateId = (int)$_POST['template_id'];
-        
-        try {
-            $db = getDB();
-            // Remove default flag from all templates
-            $stmt = $db->prepare("UPDATE voice_templates SET is_default = 0");
-            $stmt->execute();
-            
-            // Set new default template
-            $stmt = $db->prepare("UPDATE voice_templates SET is_default = 1 WHERE template_id = ?");
+
+            $stmt = $db->prepare('SELECT is_default FROM voice_templates WHERE template_id = ?');
             $stmt->execute([$templateId]);
-            
-            logActivity('ตั้งค่ารูปแบบข้อความเริ่มต้น ID: ' . $templateId);
-            $successMessage = 'ตั้งค่ารูปแบบข้อความเริ่มต้นเรียบร้อยแล้ว';
-            
-            // Refresh templates
-            $stmt = $db->prepare("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
-            $stmt->execute();
-            $voiceTemplates = $stmt->fetchAll();
-        } catch (Exception $e) {
-            $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
-        }
-    } elseif (isset($_POST['edit_template'])) {
-        // Edit template
-        $templateId = (int)$_POST['template_id'];
-        $templateName = sanitizeInput($_POST['template_name'] ?? '');
-        $templateText = sanitizeInput($_POST['template_text'] ?? '');
-        
-        if (!empty($templateName) && !empty($templateText)) {
-            try {
-                $db = getDB();
-                $stmt = $db->prepare("UPDATE voice_templates SET template_name = ?, template_text = ? WHERE template_id = ?");
-                $stmt->execute([$templateName, $templateText, $templateId]);
-                
-                logActivity('แก้ไขรูปแบบข้อความเสียงเรียก ID: ' . $templateId);
-                $successMessage = 'แก้ไขรูปแบบข้อความเสียงเรียกเรียบร้อยแล้ว';
-                
-                // Refresh templates
-                $stmt = $db->prepare("SELECT * FROM voice_templates ORDER BY is_default DESC, template_name");
-                $stmt->execute();
-                $voiceTemplates = $stmt->fetchAll();
-            } catch (Exception $e) {
-                $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+            $isDefault = (int)($stmt->fetchColumn() ?? 0);
+            if ($isDefault === 1) {
+                throw new Exception('ไม่สามารถลบรูปแบบข้อความเริ่มต้นได้');
             }
-        } else {
-            $errorMessage = 'กรุณากรอกข้อมูลให้ครบถ้วน';
-        }
-    } elseif (isset($_POST['upload_audio'])) {
-        // Handle audio file upload
-        $displayName = sanitizeInput($_POST['display_name'] ?? '');
-        $audioType = sanitizeInput($_POST['audio_type'] ?? '');
-        
-        if (empty($displayName) || empty($audioType)) {
-            $errorMessage = 'กรุณากรอกข้อมูลให้ครบถ้วน';
-        } elseif (!isset($_FILES['audio_file']) || $_FILES['audio_file']['error'] != 0) {
-            $errorMessage = 'กรุณาอัพโหลดไฟล์เสียง';
-        } else {
-            $uploadDir = ROOT_PATH . '/uploads/audio/';
-            
-            // Create directory if it doesn't exist
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+
+            $stmt = $db->prepare('DELETE FROM voice_templates WHERE template_id = ?');
+            $stmt->execute([$templateId]);
+
+            $stmt = $db->prepare('UPDATE service_points SET voice_template_id = NULL WHERE voice_template_id = ?');
+            $stmt->execute([$templateId]);
+
+            logActivity('ลบรูปแบบข้อความเสียงเรียก ID: ' . $templateId);
+            $successMessage = 'ลบรูปแบบข้อความเรียบร้อยแล้ว';
+        } elseif (isset($_POST['add_api_service'])) {
+            $providerName = sanitizeInput($_POST['provider_name'] ?? '');
+            $curlCommand = trim($_POST['curl_command'] ?? '');
+
+            if ($providerName === '' || $curlCommand === '') {
+                throw new Exception('กรุณากรอกชื่อผู้ให้บริการและคำสั่ง curl');
             }
-            
-            $fileName = basename($_FILES['audio_file']['name']);
-            $fileExt = pathinfo($fileName, PATHINFO_EXTENSION);
-            $allowedExts = ['mp3', 'wav', 'ogg'];
-            
-            if (!in_array(strtolower($fileExt), $allowedExts)) {
-                $errorMessage = 'รูปแบบไฟล์ไม่ถูกต้อง กรุณาอัพโหลดไฟล์เสียง mp3, wav หรือ ogg';
-            } else {
-                // Generate unique filename
-                $newFileName = uniqid('audio_') . '.' . $fileExt;
-                $targetFile = $uploadDir . $newFileName;
-                
-                if (move_uploaded_file($_FILES['audio_file']['tmp_name'], $targetFile)) {
-                    try {
-                        $db = getDB();
-                        $filePath = '/uploads/audio/' . $newFileName;
-                        $stmt = $db->prepare("INSERT INTO audio_files (file_name, display_name, file_path, audio_type) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$newFileName, $displayName, $filePath, $audioType]);
-                        
-                        logActivity('อัพโหลดไฟล์เสียง: ' . $displayName);
-                        $successMessage = 'อัพโหลดไฟล์เสียงเรียบร้อยแล้ว';
-                    } catch (Exception $e) {
-                        $errorMessage = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' . $e->getMessage();
-                        // Delete uploaded file if database insert fails
-                        @unlink($targetFile);
-                    }
-                } else {
-                    $errorMessage = 'เกิดข้อผิดพลาดในการอัพโหลดไฟล์';
-                }
+
+            $stmt = $db->prepare('INSERT INTO tts_api_services (provider_name, curl_command) VALUES (?, ?)');
+            $stmt->execute([$providerName, $curlCommand]);
+            logActivity('เพิ่ม TTS API Service: ' . $providerName);
+            $successMessage = 'เพิ่มบริการ API เรียบร้อยแล้ว';
+        } elseif (isset($_POST['update_api_service'])) {
+            $serviceId = (int)($_POST['service_id'] ?? 0);
+            $providerName = sanitizeInput($_POST['provider_name'] ?? '');
+            $curlCommand = trim($_POST['curl_command'] ?? '');
+
+            if ($serviceId <= 0 || $providerName === '' || $curlCommand === '') {
+                throw new Exception('ข้อมูลไม่ครบถ้วนสำหรับการแก้ไขบริการ API');
             }
-        }
-    } elseif (isset($_POST['delete_audio'])) {
-        // Delete audio file
-        $audioId = (int)$_POST['audio_id'];
 
-        try {
-            $db = getDB();
-            // Fetch file information
-            $stmt = $db->prepare("SELECT file_path, display_name FROM audio_files WHERE audio_id = ?");
-            $stmt->execute([$audioId]);
-            $fileInfo = $stmt->fetch();
-
-            if ($fileInfo) {
-                $filePath = ROOT_PATH . ($fileInfo['file_path'] ?? '');
-                if (!empty($fileInfo['file_path']) && file_exists($filePath)) {
-                    @unlink($filePath);
-                }
-
-                $stmt = $db->prepare("DELETE FROM audio_files WHERE audio_id = ?");
-                $stmt->execute([$audioId]);
-
-                logActivity('ลบไฟล์เสียง: ' . ($fileInfo['display_name'] ?? ('ID: ' . $audioId)));
-                $successMessage = 'ลบไฟล์เสียงเรียบร้อยแล้ว';
-
-                // Refresh audio files list
-                $stmt = $db->prepare("SELECT * FROM audio_files ORDER BY audio_type, display_name");
-                $stmt->execute();
-                $audioFiles = $stmt->fetchAll();
-            } else {
-                $errorMessage = 'ไม่พบไฟล์เสียงที่ต้องการลบ';
+            $stmt = $db->prepare('UPDATE tts_api_services SET provider_name = ?, curl_command = ? WHERE service_id = ?');
+            $stmt->execute([$providerName, $curlCommand, $serviceId]);
+            logActivity('แก้ไข TTS API Service ID: ' . $serviceId);
+            $successMessage = 'อัปเดตบริการ API เรียบร้อยแล้ว';
+        } elseif (isset($_POST['set_active_service'])) {
+            $serviceId = (int)($_POST['service_id'] ?? 0);
+            if ($serviceId <= 0) {
+                throw new Exception('กรุณาเลือกบริการ API ที่ต้องการใช้งาน');
             }
-        } catch (Exception $e) {
-            $errorMessage = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+
+            $db->beginTransaction();
+            $db->exec('UPDATE tts_api_services SET is_active = 0');
+            $stmt = $db->prepare('UPDATE tts_api_services SET is_active = 1 WHERE service_id = ?');
+            $stmt->execute([$serviceId]);
+            $db->commit();
+
+            logActivity('ตั้งค่า TTS API Service ที่ใช้งาน: ' . $serviceId);
+            $successMessage = 'อัปเดตบริการที่ใช้งานเรียบร้อยแล้ว';
+        } elseif (isset($_POST['delete_api_service'])) {
+            $serviceId = (int)($_POST['service_id'] ?? 0);
+            if ($serviceId <= 0) {
+                throw new Exception('ไม่พบบริการ API ที่ต้องการลบ');
+            }
+
+            $stmt = $db->prepare('SELECT is_active FROM tts_api_services WHERE service_id = ?');
+            $stmt->execute([$serviceId]);
+            $isActive = (int)($stmt->fetchColumn() ?? 0);
+            if ($isActive === 1) {
+                throw new Exception('ไม่สามารถลบบริการ API ที่กำลังใช้งานอยู่ได้');
+            }
+
+            $stmt = $db->prepare('DELETE FROM tts_api_services WHERE service_id = ?');
+            $stmt->execute([$serviceId]);
+
+            logActivity('ลบ TTS API Service ID: ' . $serviceId);
+            $successMessage = 'ลบบริการ API เรียบร้อยแล้ว';
         }
+    } catch (Exception $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        $errorMessage = $e->getMessage();
     }
 }
 
-// Get audio files
 try {
-    $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM audio_files ORDER BY audio_type, display_name");
-    $stmt->execute();
-    $audioFiles = $stmt->fetchAll();
+    $voiceTemplates = $fetchTemplates();
+    $ttsServices = $fetchServices();
 } catch (Exception $e) {
-    $audioFiles = [];
+    $errorMessage = $errorMessage ?: 'เกิดข้อผิดพลาดในการโหลดข้อมูล: ' . $e->getMessage();
 }
-
 ?>
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตั้งค่าระบบเสียงเรียกคิว - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
-    
+    <title>ตั้งค่าระบบเสียงเรียกคิว</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f5f7fb;
         }
-        
-        .sidebar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .nav-sidebar {
             min-height: 100vh;
-            padding: 0;
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+            color: white;
         }
-        
-        .sidebar .nav-link {
+        .nav-sidebar .nav-link {
             color: rgba(255,255,255,0.8);
             padding: 1rem 1.5rem;
-            border-radius: 0;
-            transition: all 0.3s;
         }
-        
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            color: white;
+        .nav-sidebar .nav-link.active,
+        .nav-sidebar .nav-link:hover {
+            color: #fff;
             background-color: rgba(255,255,255,0.1);
         }
-        
-        .sidebar .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .content-card {
-            background: white;
-            border-radius: 15px;
-            padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .settings-section {
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 1rem;
-        }
-        
-        .form-check-input:checked {
-            background-color: #4e73df;
-            border-color: #4e73df;
-        }
-        
-        .nav-tabs .nav-link {
+        .card-setting {
             border: none;
-            color: #495057;
-            border-bottom: 2px solid transparent;
-            padding: 0.5rem 1rem;
-            margin-right: 1rem;
+            border-radius: 18px;
+            box-shadow: 0 10px 30px rgba(82, 63, 105, 0.1);
         }
-        
-        .nav-tabs .nav-link.active {
-            color: #4e73df;
-            border-bottom: 2px solid #4e73df;
-            background: transparent;
+        .badge-active {
+            background: linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%);
         }
-        
-        .audio-control {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        
-        .audio-control button {
-            margin-left: 1rem;
-        }
-        
-        .template-card {
-            border: 1px solid #ddd;
-            border-radius: 10px;
+        pre.curl-preview {
+            background: #212529;
+            color: #f8f9fa;
             padding: 1rem;
-            margin-bottom: 1rem;
-            position: relative;
-        }
-        
-        .template-card-default {
-            border-color: #4e73df;
-            background-color: #f8f9ff;
-        }
-        
-        .template-badge {
-            position: absolute;
-            top: -10px;
-            right: 10px;
-            background-color: #4e73df;
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 15px;
-            font-size: 0.75rem;
-        }
-        
-        .audio-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
-        .audio-item {
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .audio-item .badge {
-            margin-right: 0.5rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar">
-                <div class="p-3">
-                    <h5 class="text-white mb-4">
-                        <i class="fas fa-cogs me-2"></i>
-                        จัดการระบบ
-                    </h5>
-                    
-                    <?php include 'nav.php'; ?>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-3 col-xl-2 nav-sidebar d-none d-lg-block">
+            <?php include 'nav.php'; ?>
+        </div>
+        <div class="col-lg-9 col-xl-10 ms-auto px-4 py-5">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4">
+                <div>
+                    <h2 class="fw-bold mb-1">ตั้งค่าระบบเสียงเรียกคิว</h2>
+                    <p class="text-muted mb-0">จัดการประโยคเรียกคิวและบริการ API สำหรับสังเคราะห์เสียง</p>
+                </div>
+                <div class="mt-3 mt-lg-0">
+                    <a href="tts_test_modern.php" class="btn btn-outline-primary"><i class="fas fa-play-circle me-2"></i>เปิดหน้าทดสอบเสียง</a>
                 </div>
             </div>
-            
-            <!-- Main Content -->
-            <div class="col-md-9 col-lg-10">
-                <div class="p-4">
-                    <!-- Header -->
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <div>
-                            <h2>ตั้งค่าระบบเสียงเรียกคิว</h2>
-                            <p class="text-muted">จัดการการตั้งค่าเสียงเรียกคิวและ Text-to-Speech</p>
+
+            <?php if ($successMessage): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($successMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($errorMessage): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i><?php echo htmlspecialchars($errorMessage); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
+
+            <div class="row g-4">
+                <div class="col-12">
+                    <div class="card card-setting">
+                        <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0"><i class="fas fa-comment-dots me-2 text-primary"></i>ประโยคเรียกคิว</h5>
+                                <small class="text-muted">ใช้ตัวแปร {queue_number}, {service_point_name}, {patient_name} ได้ตามต้องการ</small>
+                            </div>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+                                <i class="fas fa-plus me-2"></i>เพิ่มประโยคใหม่
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-primary" id="testAudio">
-                            <i class="fas fa-play-circle me-2"></i>ทดสอบเสียง
-                        </button>
-                    </div>
-                    
-                    <!-- Alert Messages -->
-                    <?php if (isset($successMessage)): ?>
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <i class="fas fa-check-circle me-2"></i><?php echo $successMessage; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if (isset($errorMessage)): ?>
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i><?php echo $errorMessage; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <!-- Tabs -->
-                    <ul class="nav nav-tabs mb-4">
-                        <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#general-settings">
-                                <i class="fas fa-sliders-h me-2"></i>ตั้งค่าทั่วไป
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#voice-templates">
-                                <i class="fas fa-file-alt me-2"></i>รูปแบบข้อความ
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#audio-files">
-                                <i class="fas fa-music me-2"></i>ไฟล์เสียง
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#call-history">
-                                <i class="fas fa-history me-2"></i>ประวัติการเรียกเสียง
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#voice-templates-management">
-                                <i class="fas fa-file-alt me-2"></i>จัดการรูปแบบข้อความ
-                            </a>
-                        </li>
-                    </ul>
-                    
-                    <div class="tab-content">
-                        <!-- General Settings Tab -->
-                        <div class="tab-pane fade show active" id="general-settings">
-                            <div class="content-card">
-                                <h5 class="mb-4">การตั้งค่าทั่วไป</h5>
-                                
-                                <form method="POST" action="">
-                                    <!-- Basic Settings -->
-                                    <div class="settings-section">
-                                        <div class="mb-3">
-                                            <label class="form-label">แหล่งเสียงเรียกคิว</label>
+                        <div class="card-body p-4">
+                            <?php if (empty($voiceTemplates)): ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                    <p class="mb-0">ยังไม่มีประโยคเรียกคิว</p>
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($voiceTemplates as $template): ?>
+                                    <div class="border rounded-3 p-3 mb-3 <?php echo $template['is_default'] ? 'border-primary bg-light' : 'border-light'; ?>">
+                                        <div class="d-flex justify-content-between align-items-start">
                                             <div>
-                                                <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerFiles" value="files" <?php echo $audioProvider === 'files' ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label" for="providerFiles">
-                                                        <i class="fas fa-music me-1"></i> ใช้ไฟล์เสียงที่เตรียมไว้
-                                                    </label>
-                                                </div>
-                                                <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerGoogleTTS" value="google_tts" <?php echo $audioProvider === 'google_tts' ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label" for="providerGoogleTTS">
-                                                        <i class="fas fa-cloud me-1"></i> ใช้ Google TTS API
-                                                    </label>
-                                                </div>
-                                                <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="radio" name="audio_provider" id="providerGTTS" value="gtts" <?php echo $audioProvider === 'gtts' ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label" for="providerGTTS">
-                                                        <i class="fas fa-globe me-1"></i> ใช้ gTTS (ไม่ต้องใช้คีย์)
-                                                    </label>
-                                                </div>
+                                                <h6 class="mb-1 fw-semibold">
+                                                    <?php echo htmlspecialchars($template['template_name']); ?>
+                                                    <?php if ($template['is_default']): ?>
+                                                        <span class="badge badge-active ms-2">ค่าเริ่มต้น</span>
+                                                    <?php endif; ?>
+                                                </h6>
+                                                <p class="text-muted mb-2" style="white-space: pre-line;"><?php echo htmlspecialchars($template['template_text']); ?></p>
                                             </div>
-                                            <div class="form-text">
-                                                - Google TTS: ติดตั้ง <code>google-cloud-texttospeech</code> และตั้งค่า <code>GOOGLE_APPLICATION_CREDENTIALS</code> หรือใช้ --credentials ในสคริปต์<br>
-                                                - gTTS: ใช้บริการเสียงจาก Google Translate ไม่ต้องใช้คีย์ เหมาะสำหรับทดสอบ/โหลดน้อย (อาจมีข้อจำกัดและเปลี่ยนแปลงได้)
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="audioRepeatCount" class="form-label">จำนวนครั้งที่เล่นเสียงซ้ำ</label>
-                                            <select class="form-select" id="audioRepeatCount" name="audio_repeat_count">
-                                                <option value="1" <?php echo $audioRepeatCount == '1' ? 'selected' : ''; ?>>1 ครั้ง</option>
-                                                <option value="2" <?php echo $audioRepeatCount == '2' ? 'selected' : ''; ?>>2 ครั้ง</option>
-                                                <option value="3" <?php echo $audioRepeatCount == '3' ? 'selected' : ''; ?>>3 ครั้ง</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="soundNotificationBefore" name="sound_notification_before" value="1" <?php echo $soundNotificationBefore == '1' ? 'checked' : ''; ?>>
-                                                <label class="form-check-label" for="soundNotificationBefore">เล่นเสียงแจ้งเตือนก่อนเรียกคิว</label>
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="audioVolume" class="form-label">ความดังของเสียง: <span id="volumeValue"><?php echo $audioVolume; ?></span></label>
-                                            <input type="range" class="form-range" min="0" max="1" step="0.1" id="audioVolume" name="audio_volume" value="<?php echo $audioVolume; ?>">
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-4">
-                                        <button type="submit" name="update_audio_settings" class="btn btn-primary">
-                                            <i class="fas fa-save me-2"></i>บันทึกการตั้งค่า
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        
-                        <!-- Voice Templates Tab -->
-                        <div class="tab-pane fade" id="voice-templates">
-                            <div class="content-card">
-                                <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h5 class="mb-0">รูปแบบข้อความเสียงเรียก</h5>
-                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
-                                        <i class="fas fa-plus me-2"></i>เพิ่มรูปแบบใหม่
-                                    </button>
-                                </div>
-                                
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    <strong>คำแนะนำ:</strong> คุณสามารถใช้ตัวแปรดังต่อไปนี้ในรูปแบบข้อความ
-                                    <div class="mt-2">
-                                        <code>{queue_number}</code> - หมายเลขคิว<br>
-                                        <code>{service_point_name}</code> - ชื่อจุดบริการ<br>
-                                        <code>{patient_name}</code> - ชื่อผู้ป่วย (หากมีข้อมูล)
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-4">
-                                    <?php if (empty($voiceTemplates)): ?>
-                                        <div class="text-center text-muted py-5">
-                                            <i class="fas fa-file-alt fa-3x mb-3"></i>
-                                            <p>ยังไม่มีรูปแบบข้อความเสียงเรียก</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <?php foreach ($voiceTemplates as $template): ?>
-                                            <div class="template-card <?php echo $template['is_default'] ? 'template-card-default' : ''; ?>">
-                                                <?php if ($template['is_default']): ?>
-                                                    <span class="template-badge">ค่าเริ่มต้น</span>
-                                                <?php endif; ?>
-                                                
-                                                <div class="d-flex justify-content-between">
-                                                    <h6><?php echo htmlspecialchars($template['template_name']); ?></h6>
-                                                    <div>
-                                                        <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="playTemplate(<?php echo $template['template_id']; ?>, '<?php echo htmlspecialchars($template['template_text'], ENT_QUOTES); ?>')">
-                                                            <i class="fas fa-play"></i>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editTemplateModal"
+                                                        data-template-id="<?php echo (int)$template['template_id']; ?>"
+                                                        data-template-name="<?php echo htmlspecialchars($template['template_name'], ENT_QUOTES); ?>"
+                                                        data-template-text="<?php echo htmlspecialchars($template['template_text'], ENT_QUOTES); ?>">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <?php if (!$template['is_default']): ?>
+                                                    <form method="POST" class="d-inline">
+                                                        <input type="hidden" name="template_id" value="<?php echo (int)$template['template_id']; ?>">
+                                                        <button type="submit" name="set_default_template" class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-star"></i>
                                                         </button>
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="editTemplate(<?php echo $template['template_id']; ?>, '<?php echo htmlspecialchars($template['template_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($template['template_text'], ENT_QUOTES); ?>')">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                        <?php if (!$template['is_default']): ?>
-                                                            <button type="button" class="btn btn-sm btn-outline-danger me-2" onclick="confirmDeleteTemplate(<?php echo $template['template_id']; ?>, '<?php echo htmlspecialchars($template['template_name'], ENT_QUOTES); ?>')">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-outline-success" onclick="confirmDefaultTemplate(<?php echo $template['template_id']; ?>, '<?php echo htmlspecialchars($template['template_name'], ENT_QUOTES); ?>')">
-                                                                <i class="fas fa-check"></i> ตั้งเป็นค่าเริ่มต้น
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-2 p-2 bg-light rounded">
-                                                    <?php echo htmlspecialchars($template['template_text']); ?>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Audio Files Tab -->
-                        <div class="tab-pane fade" id="audio-files">
-                            <div class="content-card">
-                                <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h5 class="mb-0">จัดการไฟล์เสียง</h5>
-                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadAudioModal">
-                                        <i class="fas fa-upload me-2"></i>อัพโหลดไฟล์เสียงใหม่
-                                    </button>
-                                </div>
-                                
-                                <div class="audio-list mt-4">
-                                    <?php if (empty($audioFiles)): ?>
-                                        <div class="text-center text-muted py-5">
-                                            <i class="fas fa-music fa-3x mb-3"></i>
-                                            <p>ยังไม่มีไฟล์เสียงที่อัพโหลด</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <?php 
-                                        $audioTypeLabels = [
-                                            'queue_number' => 'หมายเลขคิว',
-                                            'service_point' => 'จุดบริการ',
-                                            'message' => 'ข้อความ',
-                                            'system' => 'ระบบ'
-                                        ];
-                                        
-                                        $audioTypeBadgeClass = [
-                                            'queue_number' => 'bg-primary',
-                                            'service_point' => 'bg-success',
-                                            'message' => 'bg-info',
-                                            'system' => 'bg-warning'
-                                        ];
-                                        ?>
-                                        
-                                        <?php foreach ($audioFiles as $audio): ?>
-                                            <div class="audio-item">
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <div>
-                                                        <span class="badge <?php echo $audioTypeBadgeClass[$audio['audio_type']] ?? 'bg-secondary'; ?>">
-                                                            <?php echo $audioTypeLabels[$audio['audio_type']] ?? 'อื่นๆ'; ?>
-                                                        </span>
-                                                        <strong><?php echo htmlspecialchars($audio['display_name']); ?></strong>
-                                                    </div>
-                                                    <div>
-                                                        <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="playAudio('<?php echo $audio['file_path']; ?>')">
-                                                            <i class="fas fa-play"></i>
-                                                        </button>
-                                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteAudio(<?php echo $audio['audio_id']; ?>, '<?php echo htmlspecialchars($audio['display_name'], ENT_QUOTES); ?>')">
+                                                    </form>
+                                                    <form method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบประโยคนี้หรือไม่?');">
+                                                        <input type="hidden" name="template_id" value="<?php echo (int)$template['template_id']; ?>">
+                                                        <button type="submit" name="delete_template" class="btn btn-sm btn-outline-danger">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
-                                                    </div>
-                                                </div>
-                                                <div class="mt-2">
-                                                    <small class="text-muted">ไฟล์: <?php echo $audio['file_name']; ?></small>
-                                                </div>
-                                                <audio class="d-none" id="audio-<?php echo $audio['audio_id']; ?>" src="<?php echo $audio['file_path']; ?>"></audio>
+                                                    </form>
+                                                <?php endif; ?>
                                             </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Call History Tab -->
-                        <div class="tab-pane fade" id="call-history">
-                            <div class="content-card">
-                                <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h5 class="mb-0">ประวัติการเรียกเสียง</h5>
-                                    <div>
-                                        <button type="button" class="btn btn-outline-primary" id="refreshCallHistory">
-                                            <i class="fas fa-sync-alt me-2"></i>รีเฟรช
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div id="callHistoryTable" class="mt-4">
-                                    <div class="text-center">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">กำลังโหลด...</span>
-                                        </div>
-                                        <p class="mt-2">กำลังโหลดข้อมูล...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Voice Templates Management Tab -->
-                        <div class="tab-pane fade" id="voice-templates-management">
-                            <div class="content-card">
-                                <h5 class="mb-4">จัดการรูปแบบข้อความ</h5>
-                                <form method="POST" action="">
-                                    <div class="mb-3">
-                                        <label for="template_name" class="form-label">ชื่อรูปแบบ</label>
-                                        <input type="text" class="form-control" id="template_name" name="template_name" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="template_text" class="form-label">ข้อความเสียงเรียก</label>
-                                        <textarea class="form-control" id="template_text" name="template_text" rows="3" required></textarea>
-                                        <div class="form-text">
-                                            ตัวแปรที่ใช้ได้: {queue_number}, {service_point_name}, {patient_name}
                                         </div>
                                     </div>
-                                    <button type="submit" name="add_template" class="btn btn-primary">
-                                        <i class="fas fa-plus me-2"></i>เพิ่มรูปแบบ
-                                    </button>
-                                </form>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card card-setting">
+                        <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0"><i class="fas fa-wave-square me-2 text-primary"></i>บริการ API เสียง</h5>
+                                <small class="text-muted">เพิ่มคำสั่ง curl สำหรับเรียกใช้งาน Text-to-Speech โดยใช้ตัวแปร {{_TEXT_TO_SPECH_}}</small>
                             </div>
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                                <i class="fas fa-plus me-2"></i>เพิ่ม API Service
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <?php if (empty($ttsServices)): ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-cloud-upload-alt fa-2x mb-2"></i>
+                                    <p class="mb-0">ยังไม่มีการตั้งค่า API Service</p>
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($ttsServices as $service): ?>
+                                    <div class="border rounded-3 p-3 mb-3">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="mb-1 fw-semibold">
+                                                    <?php echo htmlspecialchars($service['provider_name']); ?>
+                                                    <?php if ($service['is_active']): ?>
+                                                        <span class="badge badge-active ms-2">ใช้งานอยู่</span>
+                                                    <?php endif; ?>
+                                                </h6>
+                                                <pre class="curl-preview mb-3"><?php echo htmlspecialchars($service['curl_command']); ?></pre>
+                                            </div>
+                                            <div class="btn-group flex-shrink-0">
+                                                <button class="btn btn-sm btn-outline-secondary btn-edit-service" data-bs-toggle="modal" data-bs-target="#editServiceModal"
+                                                        data-service-id="<?php echo (int)$service['service_id']; ?>"
+                                                        data-provider-name="<?php echo htmlspecialchars($service['provider_name'], ENT_QUOTES); ?>"
+                                                        data-curl-command="<?php echo htmlspecialchars($service['curl_command'], ENT_QUOTES); ?>">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-info btn-test-service"
+                                                        data-service-id="<?php echo (int)$service['service_id']; ?>"
+                                                        data-service-name="<?php echo htmlspecialchars($service['provider_name'], ENT_QUOTES); ?>">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                                <?php if (!$service['is_active']): ?>
+                                                    <form method="POST" class="d-inline">
+                                                        <input type="hidden" name="service_id" value="<?php echo (int)$service['service_id']; ?>">
+                                                        <button type="submit" name="set_active_service" class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบบริการนี้หรือไม่?');">
+                                                        <input type="hidden" name="service_id" value="<?php echo (int)$service['service_id']; ?>">
+                                                        <button type="submit" name="delete_api_service" class="btn btn-sm btn-outline-danger">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Add Template Modal -->
-    <div class="modal fade" id="addTemplateModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">เพิ่มรูปแบบข้อความเสียงเรียก</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="template_name" class="form-label">ชื่อรูปแบบ</label>
-                            <input type="text" class="form-control" id="template_name" name="template_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="template_text" class="form-label">ข้อความเสียงเรียก</label>
-                            <textarea class="form-control" id="template_text" name="template_text" rows="3" required></textarea>
-                            <div class="form-text">
-                                ตัวแปรที่ใช้ได้: {queue_number}, {service_point_name}, {patient_name}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="add_template" class="btn btn-primary">บันทึก</button>
-                    </div>
-                </form>
+<!-- Modals -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">เพิ่มประโยคเรียกคิว</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ชื่อประโยค</label>
+                    <input type="text" name="template_name" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">ข้อความประโยค</label>
+                    <textarea name="template_text" class="form-control" rows="4" required></textarea>
+                    <small class="text-muted">รองรับตัวแปร {queue_number}, {service_point_name}, {patient_name}</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" name="add_template" class="btn btn-primary">บันทึก</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Edit Template Modal -->
-    <div class="modal fade" id="editTemplateModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">แก้ไขรูปแบบข้อความเสียงเรียก</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="">
-                    <div class="modal-body">
-                        <input type="hidden" id="edit_template_id" name="template_id">
-                        <div class="mb-3">
-                            <label for="edit_template_name" class="form-label">ชื่อรูปแบบ</label>
-                            <input type="text" class="form-control" id="edit_template_name" name="template_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_template_text" class="form-label">ข้อความเสียงเรียก</label>
-                            <textarea class="form-control" id="edit_template_text" name="template_text" rows="3" required></textarea>
-                            <div class="form-text">
-                                ตัวแปรที่ใช้ได้: {queue_number}, {service_point_name}, {patient_name}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="edit_template" class="btn btn-primary">บันทึกการแก้ไข</button>
-                    </div>
-                </form>
+<div class="modal fade" id="editTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="template_id" id="editTemplateId">
+            <div class="modal-header">
+                <h5 class="modal-title">แก้ไขประโยคเรียกคิว</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
-    </div>
-    
-    <!-- Delete Template Confirmation Modal -->
-    <div class="modal fade" id="deleteTemplateModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ยืนยันการลบ</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ชื่อประโยค</label>
+                    <input type="text" name="template_name" id="editTemplateName" class="form-control" required>
                 </div>
-                <div class="modal-body">
-                    <p>คุณแน่ใจหรือไม่ว่าต้องการลบรูปแบบข้อความนี้?</p>
-                    <p id="delete_template_name" class="fw-bold"></p>
-                </div>
-                <div class="modal-footer">
-                    <form method="POST" action="">
-                        <input type="hidden" id="delete_template_id" name="template_id">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="delete_template" class="btn btn-danger">ลบ</button>
-                    </form>
+                <div class="mb-3">
+                    <label class="form-label">ข้อความประโยค</label>
+                    <textarea name="template_text" id="editTemplateText" class="form-control" rows="4" required></textarea>
                 </div>
             </div>
-        </div>
-    </div>
-    
-    <!-- Set Default Template Confirmation Modal -->
-    <div class="modal fade" id="defaultTemplateModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ยืนยันการตั้งค่าเริ่มต้น</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>คุณแน่ใจหรือไม่ว่าต้องการตั้งรูปแบบนี้เป็นค่าเริ่มต้น?</p>
-                    <p id="default_template_name" class="fw-bold"></p>
-                </div>
-                <div class="modal-footer">
-                    <form method="POST" action="">
-                        <input type="hidden" id="default_template_id" name="template_id">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="set_default_template" class="btn btn-success">ยืนยัน</button>
-                    </form>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" name="update_template" class="btn btn-primary">บันทึก</button>
             </div>
-        </div>
+        </form>
     </div>
-    
-    <!-- Upload Audio Modal -->
-    <div class="modal fade" id="uploadAudioModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">อัพโหลดไฟล์เสียง</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="display_name" class="form-label">ชื่อที่ต้องการแสดง</label>
-                            <input type="text" class="form-control" id="display_name" name="display_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="audio_type" class="form-label">ประเภทเสียง</label>
-                            <select class="form-select" id="audio_type" name="audio_type" required>
-                                <option value="">-- เลือกประเภท --</option>
-                                <option value="queue_number">หมายเลขคิว</option>
-                                <option value="service_point">จุดบริการ</option>
-                                <option value="message">ข้อความ</option>
-                                <option value="system">ระบบ</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="audio_file" class="form-label">ไฟล์เสียง (MP3, WAV, OGG)</label>
-                            <input type="file" class="form-control" id="audio_file" name="audio_file" accept=".mp3,.wav,.ogg" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="upload_audio" class="btn btn-primary">อัพโหลด</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Delete Audio Confirmation Modal -->
-    <div class="modal fade" id="deleteAudioModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ยืนยันการลบ</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์เสียงนี้?</p>
-                    <p id="delete_audio_name" class="fw-bold"></p>
-                </div>
-                <div class="modal-footer">
-                    <form method="POST" action="">
-                        <input type="hidden" id="delete_audio_id" name="audio_id">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                        <button type="submit" name="delete_audio" class="btn btn-danger">ลบ</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
-    <script>
-        $(document).ready(function() {
-            // Update range input display values
-            $('#audioVolume').on('input', function() {
-                $('#volumeValue').text($(this).val());
-            });
+<div class="modal fade" id="addServiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">เพิ่ม API Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ชื่อผู้ให้บริการ</label>
+                    <input type="text" name="provider_name" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">คำสั่ง cURL</label>
+                    <textarea name="curl_command" class="form-control" rows="6" placeholder="curl --location 'http://example.com/tts' \&#10;--header 'Content-Type: application/json' \&#10;--data '{&#10;    &quot;text&quot;: &quot;{{_TEXT_TO_SPECH_}}&quot;&#10}'" required></textarea>
+                    <small class="text-muted">ใช้ตัวแปร <code>{{_TEXT_TO_SPECH_}}</code> เพื่อแทนข้อความที่จะส่งไปยัง API</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" name="add_api_service" class="btn btn-success">บันทึก</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-            // Load call history
-            loadCallHistory();
-            
-            // Refresh call history
-            $('#refreshCallHistory').on('click', function() {
-                loadCallHistory();
-            });
+<div class="modal fade" id="editServiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="service_id" id="editServiceId">
+            <div class="modal-header">
+                <h5 class="modal-title">แก้ไข API Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ชื่อผู้ให้บริการ</label>
+                    <input type="text" name="provider_name" id="editServiceName" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">คำสั่ง cURL</label>
+                    <textarea name="curl_command" id="editServiceCommand" class="form-control" rows="6" required></textarea>
+                    <small class="text-muted">ตรวจสอบให้แน่ใจว่ามี <code>{{_TEXT_TO_SPECH_}}</code> อยู่ในคำสั่ง</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" name="update_api_service" class="btn btn-primary">บันทึก</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="testServiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">ทดสอบเสียงจาก API</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">กรอกข้อความที่ต้องการทดสอบ</p>
+                <input type="hidden" id="testServiceId">
+                <div class="mb-3">
+                    <label class="form-label">ข้อความตัวอย่าง</label>
+                    <textarea class="form-control" id="testServiceText" rows="3">ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1</textarea>
+                </div>
+                <div id="testServiceResult" class="d-none">
+                    <div class="alert alert-success py-2">สร้างไฟล์เสียงเรียบร้อยแล้ว</div>
+                    <audio id="testServiceAudio" controls class="w-100"></audio>
+                </div>
+                <div id="testServiceError" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                <button type="button" class="btn btn-primary" id="runServiceTest">ทดสอบเสียง</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const editTemplateModal = document.getElementById('editTemplateModal');
+    if (editTemplateModal) {
+        editTemplateModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('editTemplateId').value = button.getAttribute('data-template-id');
+            document.getElementById('editTemplateName').value = button.getAttribute('data-template-name');
+            document.getElementById('editTemplateText').value = button.getAttribute('data-template-text');
         });
-        
-function loadCallHistory() {
-    $('#callHistoryTable').html('<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">กำลังโหลด...</span></div><p class="mt-2">กำลังโหลดข้อมูล...</p></div>');
-    
-    $.get('../api/get_audio_call_history.php', function(data) {
-        if (data.success) {
-            let html = '';
-            if (data.history.length === 0) {
-                html = '<div class="text-center text-muted py-5"><i class="fas fa-history fa-3x mb-3"></i><p>ยังไม่มีประวัติการเรียกเสียง</p></div>';
-            } else {
-                html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>วันที่/เวลา</th><th>หมายเลขคิว</th><th>จุดบริการ</th><th>เจ้าหน้าที่</th><th>ข้อความ</th><th>สถานะ</th></tr></thead><tbody>';
-                
-                data.history.forEach(function(item) {
-                    const statusBadge = item.audio_status === 'played' ? 'bg-success' : 
-                                       item.audio_status === 'failed' ? 'bg-danger' : 'bg-warning';
-                    const statusText = item.audio_status === 'played' ? 'เล่นแล้ว' : 
-                                      item.audio_status === 'failed' ? 'ล้มเหลว' : 'รอดำเนินการ';
-                    
-                    html += `<tr>
-                        <td>${formatDateTime(item.call_time)}</td>
-                        <td><strong>${item.queue_number || '-'}</strong></td>
-                        <td>${item.service_point_name || '-'}</td>
-                        <td>${item.staff_name || '-'}</td>
-                        <td>${item.message || '-'}</td>
-                        <td><span class="badge ${statusBadge}">${statusText}</span></td>
-                    </tr>`;
-                });
-                
-                html += '</tbody></table></div>';
-            }
-            $('#callHistoryTable').html(html);
-        } else {
-            $('#callHistoryTable').html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>เกิดข้อผิดพลาดในการโหลดข้อมูล</div>');
-        }
-    }).fail(function() {
-        $('#callHistoryTable').html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>เกิดข้อผิดพลาดในการเชื่อมต่อ</div>');
-    });
-}
-
-function formatDateTime(dateTimeString) {
-    const date = new Date(dateTimeString);
-    return date.toLocaleString('th-TH', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function editTemplate(templateId, templateName, templateText) {
-    $('#edit_template_id').val(templateId);
-    $('#edit_template_name').val(templateName);
-    $('#edit_template_text').val(templateText);
-    $('#editTemplateModal').modal('show');
-}
-
-function confirmDeleteTemplate(templateId, templateName) {
-    $('#delete_template_id').val(templateId);
-    $('#delete_template_name').text(templateName);
-    $('#deleteTemplateModal').modal('show');
-}
-
-function confirmDefaultTemplate(templateId, templateName) {
-    $('#default_template_id').val(templateId);
-    $('#default_template_name').text(templateName);
-    $('#defaultTemplateModal').modal('show');
-}
-
-function confirmDeleteAudio(audioId, audioName) {
-    $('#delete_audio_id').val(audioId);
-    $('#delete_audio_name').text(audioName);
-    $('#deleteAudioModal').modal('show');
-}
-
-const previewVolume = parseFloat('<?php echo $audioVolume; ?>');
-
-function playNotificationSound() {
-    const audio = new Audio('../assets/audio/notification.wav');
-    audio.volume = 0.5;
-    audio.play().catch(e => console.error('Notification sound play failed:', e));
-}
-
-function playAudioSequence(audioFiles, repeatCount, notificationBefore) {
-    if (!Array.isArray(audioFiles) || audioFiles.length === 0) {
-        console.error('No audio files to play.');
-        return;
     }
 
-    const playSet = () => {
-        let index = 0;
-        const playNext = () => {
-            if (index < audioFiles.length) {
-                const audio = new Audio(audioFiles[index]);
-                audio.volume = previewVolume;
-                audio.onended = playNext;
-                audio.play().catch(e => console.error('Audio play failed:', e));
-                index++;
-            } else if (--repeatCount > 0) {
-                index = 0;
-                playNext();
-            }
-        };
-        playNext();
-    };
-
-    if (notificationBefore) {
-        playNotificationSound();
-        setTimeout(playSet, 1000);
-    } else {
-        playSet();
+    const editServiceModal = document.getElementById('editServiceModal');
+    if (editServiceModal) {
+        editServiceModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('editServiceId').value = button.getAttribute('data-service-id');
+            document.getElementById('editServiceName').value = button.getAttribute('data-provider-name');
+            document.getElementById('editServiceCommand').value = button.getAttribute('data-curl-command');
+        });
     }
-}
 
-function playTemplate(templateId, templateText) {
-    // Replace template variables with sample data
-    let sampleText = templateText
-        .replace('{queue_number}', 'A001')
-        .replace('{service_point_name}', 'ห้องตรวจ 1')
-        .replace('{patient_name}', 'คุณสมชาย');
+    const testServiceModal = document.getElementById('testServiceModal');
+    const testServiceId = document.getElementById('testServiceId');
+    const testServiceText = document.getElementById('testServiceText');
+    const testServiceResult = document.getElementById('testServiceResult');
+    const testServiceAudio = document.getElementById('testServiceAudio');
+    const testServiceError = document.getElementById('testServiceError');
 
-    $.post('../api/play_queue_audio.php', { custom_message: sampleText, template_id: templateId, service_point_id: 1 })
-        .done(function(response) {
-            if (response.success) {
-                playAudioSequence(response.audio_files, response.repeat_count, response.notification_before);
-            } else {
-                playTTSFallback(sampleText);
-            }
+    document.querySelectorAll('.btn-test-service').forEach(function (button) {
+        button.addEventListener('click', function () {
+            testServiceId.value = button.getAttribute('data-service-id');
+            testServiceResult.classList.add('d-none');
+            testServiceAudio.removeAttribute('src');
+            testServiceError.classList.add('d-none');
+            const modal = new bootstrap.Modal(testServiceModal);
+            modal.show();
+        });
+    });
+
+    document.getElementById('runServiceTest').addEventListener('click', function () {
+        const serviceId = testServiceId.value;
+        const text = testServiceText.value.trim();
+        testServiceError.classList.add('d-none');
+        testServiceResult.classList.add('d-none');
+
+        fetch('../api/test_audio.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                service_id: serviceId,
+                text: text
+            })
         })
-        .fail(function() {
-            playTTSFallback(sampleText);
-        });
-}
-
-function playTTSFallback(text) {
-    if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'th-TH';
-        utterance.rate = 0.8;
-        utterance.pitch = 1;
-        speechSynthesis.speak(utterance);
-    } else {
-        alert('เบราว์เซอร์ของคุณไม่รองรับการเล่นเสียง');
-    }
-}
-
-function playAudio(filePath) {
-    const audio = new Audio(filePath);
-    audio.play().catch(function(error) {
-        console.error('Error playing audio:', error);
-        alert('ไม่สามารถเล่นไฟล์เสียงได้');
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    testServiceAudio.src = '../' + data.audio_path + '?_=' + Date.now();
+                    testServiceResult.classList.remove('d-none');
+                    testServiceAudio.play();
+                } else {
+                    testServiceError.textContent = data.error || 'ไม่สามารถทดสอบเสียงได้';
+                    testServiceError.classList.remove('d-none');
+                }
+            })
+            .catch(() => {
+                testServiceError.textContent = 'ไม่สามารถติดต่อ API ได้';
+                testServiceError.classList.remove('d-none');
+            });
     });
-}
-    </script>
+</script>
 </body>
 </html>

@@ -1427,8 +1427,6 @@ INSERT INTO `settings` VALUES ('app_language', 'th', 'ภาษาของแ�
 INSERT INTO `settings` VALUES ('app_logo', '', 'โลโก้แอปพลิเคชัน', '2025-06-19 16:30:13');
 INSERT INTO `settings` VALUES ('app_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์', 'ชื่อแอปพลิเคชัน', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('app_timezone', 'Asia/Bangkok', 'เขตเวลาของแอปพลิเคชัน', '2025-08-29 10:22:18');
-INSERT INTO `settings` VALUES ('audio_repeat_count', '1', 'จำนวนครั้งที่เล่นซ้ำ', '2025-08-29 10:22:18');
-INSERT INTO `settings` VALUES ('audio_volume', '1', 'ระดับเสียง', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('auto_backup_enabled', 'false', 'เปิดใช้งานการสำรองอัตโนมัติ', '2025-06-19 16:30:13');
 INSERT INTO `settings` VALUES ('auto_backup_time', '02:00', 'เวลาสำรองข้อมูลอัตโนมัติ', '2025-06-19 16:30:13');
 INSERT INTO `settings` VALUES ('auto_forward_enabled', 'false', 'เปิดใช้งานการส่งต่ออัตโนมัติ', '2025-08-29 10:22:18');
@@ -1468,21 +1466,12 @@ INSERT INTO `settings` VALUES ('rate_limit_enabled', '1', 'เปิดใช้
 INSERT INTO `settings` VALUES ('report_cache_enabled', 'true', 'เปิดใช้งาน cache สำหรับรายงาน', '2025-06-19 16:30:13');
 INSERT INTO `settings` VALUES ('report_cache_ttl', '1800', 'เวลา cache รายงาน (วินาที)', '2025-06-19 16:30:13');
 INSERT INTO `settings` VALUES ('session_timeout', '3600', 'เวลาหมดอายุเซสชัน (วินาที)', '2025-06-19 16:30:13');
-INSERT INTO `settings` VALUES ('sound_notification_before', 'true', 'เล่นเสียงแจ้งเตือนก่อน', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_admin_chat_id', '', 'Telegram Admin Chat ID', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_bot_token', '', 'Telegram Bot Token', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_chat_id', '', 'Telegram Chat ID (ทั่วไป)', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_group_chat_id', '', 'Telegram Group Chat ID', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_notifications', 'false', 'เปิดใช้งาน Telegram Notifications', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('telegram_notify_template', '<br /><b>Warning</b>:  Undefined array key ', 'เทมเพลตข้อความ Telegram', '2025-08-29 10:22:18');
-INSERT INTO `settings` VALUES ('tts_api_url', '', 'URL API ของ TTS', '2025-08-26 11:10:06');
-INSERT INTO `settings` VALUES ('tts_call_format', 'ขอเชิญหมายเลข {queue_number} ที่ {service_point} ครับ', '', '2025-08-29 10:22:18');
-INSERT INTO `settings` VALUES ('tts_enabled', '0', 'เปิดใช้งาน TTS', '2025-08-29 11:08:33');
-INSERT INTO `settings` VALUES ('tts_language', 'th-TH', 'ภาษาของ TTS', '2025-08-29 09:54:28');
-INSERT INTO `settings` VALUES ('tts_pitch', '0', 'ระดับเสียงของ TTS', '2025-08-26 11:10:06');
-INSERT INTO `settings` VALUES ('tts_provider', 'google_free', 'ผู้ให้บริการ TTS', '2025-08-29 09:54:28');
-INSERT INTO `settings` VALUES ('tts_speed', '0.6', 'ความเร็วของ TTS', '2025-08-29 09:54:28');
-INSERT INTO `settings` VALUES ('tts_voice', 'th-TH-Wavenet-B', 'เสียงของ TTS', '2025-08-26 11:10:06');
 INSERT INTO `settings` VALUES ('working_hours_end', '16:00', 'เวลาสิ้นสุดการทำงาน', '2025-08-29 10:22:18');
 INSERT INTO `settings` VALUES ('working_hours_start', '08:00', 'เวลาเริ่มทำงาน', '2025-08-29 10:22:18');
 
@@ -1550,6 +1539,20 @@ CREATE TABLE `voice_templates`  (
   PRIMARY KEY (`template_id`) USING BTREE,
   UNIQUE INDEX `template_name`(`template_name` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for tts_api_services
+-- ----------------------------
+DROP TABLE IF EXISTS `tts_api_services`;
+CREATE TABLE `tts_api_services`  (
+  `service_id` int NOT NULL AUTO_INCREMENT,
+  `provider_name` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `curl_command` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`service_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of voice_templates

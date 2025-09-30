@@ -31,10 +31,6 @@ if ($servicePointId) {
 }
 
 $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
-// Audio volume setting (0.0 - 1.0)
-$audioVolume = (float) getSetting('audio_volume', '1.0');
-if ($audioVolume < 0) { $audioVolume = 0.0; }
-if ($audioVolume > 1) { $audioVolume = 1.0; }
 // These settings will be fetched dynamically via API for real-time updates
 // $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
 ?>
@@ -451,7 +447,7 @@ if ($audioVolume > 1) { $audioVolume = 1.0; }
         let audioEnabled = false; // Default to false, will be set by settings
         let audioContext = null;
         let activeAudios = []; // เก็บเสียงที่กำลังเล่นอยู่
-        const audioVolumeSetting = <?php echo json_encode($audioVolume); ?>; // 0.0 - 1.0
+        const audioVolumeSetting = 1.0;
 
         // Debug mode toggle
         let debugMode = false; // Set to true for development, false for production
@@ -511,7 +507,7 @@ if ($audioVolume > 1) { $audioVolume = 1.0; }
             debugLog('Playing notification sound.');
             unlockAudioContext();
             const audio = new Audio('../assets/audio/notification.wav'); // Ensure this path is correct
-            audio.volume = audioVolumeSetting; // Controlled by saved setting
+            audio.volume = audioVolumeSetting; // Fixed playback volume
             audio.play().catch(e => debugLog('Notification sound play failed:', e.message));
         }
 

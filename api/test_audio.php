@@ -1,48 +1,40 @@
 <?php
 require_once '../config/config.php';
+require_once '../includes/tts_helpers.php';
 requireLogin();
 
 header('Content-Type: application/json');
 
 try {
-    // Get TTS settings
-    $ttsEnabled = getSetting('tts_enabled', '0');
-    $ttsApiUrl = getSetting('tts_api_url', '');
-    $ttsProvider = getSetting('tts_provider', 'google');
-    $queueCallTemplate = getSetting('queue_call_template', 'หมายเลข {queue_number} เชิญที่ {service_point_name}');
-    
-    if ($ttsEnabled != '1') {
-        throw new Exception('ระบบเสียงถูกปิดใช้งาน');
+    $text = trim($_POST['text'] ?? 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1');
+    if ($text === '') {
+        throw new Exception('กรุณาระบุข้อความสำหรับทดสอบเสียง');
     }
-    
-    // Create test message
-    $testMessage = str_replace(
-        ['{queue_number}', '{service_point_name}', '{patient_name}'],
-        ['A001', 'ห้องตรวจ 1', 'คุณทดสอบ'],
-        $queueCallTemplate
-    );
-    
-    // Log test audio call
+
+    $serviceId = isset($_POST['service_id']) ? (int)$_POST['service_id'] : null;
+    $result = synthesizeTtsAudio($text, $serviceId);
+
     $db = getDB();
-    $stmt = $db->prepare("
-        INSERT INTO audio_call_history (staff_id, message, tts_used, audio_status)
-        VALUES (?, ?, 1, 'played')
-    ");
-    $stmt->execute([$_SESSION['staff_id'], 'ทดสอบระบบเสียง: ' . $testMessage]);
-    
+    $stmt = $db->prepare(
+        "INSERT INTO audio_call_history (staff_id, message, tts_used, audio_status) VALUES (?, ?, 1, 'played')"
+    );
+    $stmt->execute([
+        $_SESSION['staff_id'] ?? null,
+        'ทดสอบระบบเสียง: ' . $text
+    ]);
+
     logActivity('ทดสอบระบบเสียงเรียกคิว');
-    
+
     echo json_encode([
         'success' => true,
-        'message' => $testMessage,
-        'tts_provider' => $ttsProvider,
-        'tts_api_url' => $ttsApiUrl
+        'message' => $text,
+        'audio_path' => $result['path'],
+        'bytes' => $result['bytes'],
+        'service_id' => $result['service_id']
     ]);
-    
 } catch (Exception $e) {
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()
     ]);
 }
-?>
