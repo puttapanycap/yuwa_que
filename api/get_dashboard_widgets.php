@@ -17,7 +17,40 @@ try {
     $stmt = $db->prepare("SELECT * FROM dashboard_widgets WHERE is_active = 1 ORDER BY display_order");
     $stmt->execute();
     $widgets = $stmt->fetchAll();
-    
+
+    // Remove deprecated currency layout widgets entirely
+    $deprecatedWidgetIds = [];
+    $filteredWidgets = [];
+    foreach ($widgets as $widget) {
+        if (($widget['widget_type'] ?? '') === 'currency_section_layout') {
+            $deprecatedWidgetIds[] = (int) $widget['widget_id'];
+            continue;
+        }
+        $filteredWidgets[] = $widget;
+    }
+    $widgets = $filteredWidgets;
+
+    if (!empty($deprecatedWidgetIds)) {
+        // Clean up saved layout preferences that may still reference removed widgets
+        $layoutChanged = false;
+        foreach ($deprecatedWidgetIds as $deprecatedId) {
+            if (isset($layout[$deprecatedId])) {
+                unset($layout[$deprecatedId]);
+                $layoutChanged = true;
+            }
+        }
+
+        if ($layoutChanged) {
+            $stmt = $db->prepare("UPDATE dashboard_user_preferences SET widget_layout = ?, updated_at = CURRENT_TIMESTAMP WHERE staff_id = ?");
+            $stmt->execute([json_encode($layout), $_SESSION['staff_id']]);
+        }
+
+        // Remove the deprecated widgets from the dashboard configuration store
+        $placeholders = implode(',', array_fill(0, count($deprecatedWidgetIds), '?'));
+        $stmt = $db->prepare("DELETE FROM dashboard_widgets WHERE widget_id IN ($placeholders)");
+        $stmt->execute($deprecatedWidgetIds);
+    }
+
     // Merge with user layout preferences
     foreach ($widgets as &$widget) {
         $widgetId = $widget['widget_id'];

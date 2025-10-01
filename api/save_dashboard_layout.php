@@ -28,10 +28,27 @@ try {
             ];
         }
     }
-    
+
+    // Remove deprecated currency layout widgets from layout data and database
+    $stmt = $db->prepare("SELECT widget_id FROM dashboard_widgets WHERE widget_type = 'currency_section_layout'");
+    $stmt->execute();
+    $deprecatedWidgetIds = array_map('intval', array_column($stmt->fetchAll(), 'widget_id'));
+
+    if (!empty($deprecatedWidgetIds)) {
+        foreach ($deprecatedWidgetIds as $deprecatedId) {
+            if (isset($widgetLayout[$deprecatedId])) {
+                unset($widgetLayout[$deprecatedId]);
+            }
+        }
+
+        $placeholders = implode(',', array_fill(0, count($deprecatedWidgetIds), '?'));
+        $stmt = $db->prepare("DELETE FROM dashboard_widgets WHERE widget_id IN ($placeholders)");
+        $stmt->execute($deprecatedWidgetIds);
+    }
+
     // Save or update user preferences
     $stmt = $db->prepare("
-        INSERT INTO dashboard_user_preferences (staff_id, widget_layout) 
+        INSERT INTO dashboard_user_preferences (staff_id, widget_layout)
         VALUES (?, ?) 
         ON DUPLICATE KEY UPDATE 
         widget_layout = ?, 
