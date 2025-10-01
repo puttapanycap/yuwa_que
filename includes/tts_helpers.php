@@ -62,13 +62,64 @@ if (!function_exists('synthesizeTtsAudio')) {
         if ($jsonEncoded === false) {
             throw new Exception('ไม่สามารถเตรียมข้อความสำหรับส่งไปยัง API ได้');
         }
-        $jsonEncoded = substr($jsonEncoded, 1, -1); // remove surrounding quotes
+        $jsonWithoutQuotes = substr($jsonEncoded, 1, -1); // remove surrounding quotes
 
-        $command = str_replace(
-            [$placeholder, $altPlaceholder],
-            $jsonEncoded,
-            $commandTemplate
-        );
+        $command = $commandTemplate;
+
+        $envExport = 'TTS_TEXT_JSON_SAFE=' . escapeshellarg($jsonWithoutQuotes)
+            . ' TTS_TEXT_RAW=' . escapeshellarg($text);
+
+        $placeholders = [$placeholder, $altPlaceholder];
+
+        foreach ($placeholders as $ph) {
+            if ($ph === '') {
+                continue;
+            }
+
+            // Handle placeholders that live inside single quoted strings
+            $command = preg_replace_callback(
+                "/'([^']*?)" . preg_quote($ph, '/') . "([^']*?)'/",
+                function (array $matches): string {
+                    $segments = [];
+
+                    if ($matches[1] !== '') {
+                        $segments[] = "'" . $matches[1] . "'";
+                    }
+
+                    $segments[] = '"$TTS_TEXT_JSON_SAFE"';
+
+                    if ($matches[2] !== '') {
+                        $segments[] = "'" . $matches[2] . "'";
+                    }
+
+                    $filtered = [];
+                    foreach ($segments as $segment) {
+                        if ($segment !== "''") {
+                            $filtered[] = $segment;
+                        }
+                    }
+
+                    return implode('', $filtered);
+                },
+                $command
+            );
+
+            // Handle placeholders wrapped in double quotes
+            $command = preg_replace(
+                '/"' . preg_quote($ph, '/') . '"/',
+                '"$TTS_TEXT_JSON_SAFE"',
+                $command
+            );
+
+            // Replace any remaining occurrences with a shell-safe default
+            $command = str_replace($ph, '"$TTS_TEXT_JSON_SAFE"', $command);
+        }
+
+        if (strpos($command, $placeholder) !== false || strpos($command, $altPlaceholder) !== false) {
+            throw new Exception('ไม่สามารถเตรียมคำสั่งเรียก API ได้: พบตัวแปร {{_TEXT_TO_SPECH_}} ที่ไม่ได้ถูกแทนค่า');
+        }
+
+        $command = $envExport . ' ' . $command;
 
         $descriptorspec = [
             0 => ['pipe', 'r'],
