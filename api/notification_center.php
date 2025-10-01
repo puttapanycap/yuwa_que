@@ -1,5 +1,5 @@
 <?php
-require_once '../config/config.php';
+// require_once '../config/config.php';
 
 /**
  * ระบบศูนย์กลางการแจ้งเตือน (Notification Center)
@@ -104,7 +104,7 @@ function createNotification($type, $title, $message, $options = []) {
             }
             
             // ถ้าปิดการแจ้งเตือนทั้งหมด ให้ข้ามไป
-            if ($preferences && !$preferences['browser_enabled'] && !$preferences['email_enabled'] && !$preferences['line_enabled']) {
+            if ($preferences && !$preferences['browser_enabled'] && !$preferences['email_enabled']) {
                 continue;
             }
             
@@ -152,15 +152,6 @@ function createNotification($type, $title, $message, $options = []) {
                     $stmt->execute([$notificationId]);
                 }
                 
-                // LINE notification
-                if ($preferences['line_enabled']) {
-                    $stmt = $db->prepare("
-                        INSERT INTO notification_deliveries 
-                        (notification_id, channel, status) 
-                        VALUES (?, 'line', 'pending')
-                    ");
-                    $stmt->execute([$notificationId]);
-                }
             }
         }
         
@@ -671,13 +662,12 @@ function saveNotificationPreferences($staffId, $preferences) {
                 // อัปเดตการตั้งค่า
                 $stmt = $db->prepare("
                     UPDATE notification_preferences
-                    SET email_enabled = ?, browser_enabled = ?, line_enabled = ?, sound_enabled = ?
+                    SET email_enabled = ?, browser_enabled = ?, sound_enabled = ?
                     WHERE preference_id = ?
                 ");
                 $stmt->execute([
                     $settings['email'] ? 1 : 0,
                     $settings['browser'] ? 1 : 0,
-                    $settings['line'] ? 1 : 0,
                     $settings['sound'] ? 1 : 0,
                     $existing['preference_id']
                 ]);
@@ -685,15 +675,14 @@ function saveNotificationPreferences($staffId, $preferences) {
                 // สร้างการตั้งค่าใหม่
                 $stmt = $db->prepare("
                     INSERT INTO notification_preferences
-                    (staff_id, notification_type, email_enabled, browser_enabled, line_enabled, sound_enabled)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (staff_id, notification_type, email_enabled, browser_enabled, sound_enabled)
+                    VALUES (?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $staffId,
                     $type,
                     $settings['email'] ? 1 : 0,
                     $settings['browser'] ? 1 : 0,
-                    $settings['line'] ? 1 : 0,
                     $settings['sound'] ? 1 : 0
                 ]);
             }
@@ -764,7 +753,6 @@ function getNotificationPreferences($staffId) {
                 'is_system' => $type['is_system'] ? true : false,
                 'email' => $pref ? ($pref['email_enabled'] ? true : false) : false,
                 'browser' => $pref ? ($pref['browser_enabled'] ? true : false) : true,
-                'line' => $pref ? ($pref['line_enabled'] ? true : false) : false,
                 'sound' => $pref ? ($pref['sound_enabled'] ? true : false) : true
             ];
         }

@@ -46,7 +46,7 @@ try {
                 last_reset_date = NOW(),
                 last_reset_by = ?
         ");
-        $stmt->execute([$_SESSION['user_id']]);
+        $stmt->execute([$_SESSION['staff_id']]);
         $resetCount = $stmt->rowCount();
         
         // ดึงรายชื่อประเภทคิวที่ reset
@@ -63,7 +63,7 @@ try {
                 last_reset_by = ?
             WHERE queue_type_id = ? AND is_active = 1
         ");
-        $stmt->execute([$_SESSION['user_id'], $queueTypeId]);
+        $stmt->execute([$_SESSION['staff_id'], $queueTypeId]);
         $resetCount = $stmt->rowCount();
         
         if ($resetCount > 0) {
@@ -82,7 +82,7 @@ try {
                 qt.last_reset_by = ?
             WHERE qtsp.service_point_id = ? AND qt.is_active = 1
         ");
-        $stmt->execute([$_SESSION['user_id'], $servicePointId]);
+        $stmt->execute([$_SESSION['staff_id'], $servicePointId]);
         $resetCount = $stmt->rowCount();
         
         if ($resetCount > 0) {
@@ -101,11 +101,11 @@ try {
     if ($resetCount > 0) {
         $logMessage = "Reset หมายเลขคิว: " . implode(', ', $affectedTypes);
         $stmt = $db->prepare("
-            INSERT INTO audit_logs (user_id, action, table_name, record_id, old_values, new_values, ip_address, user_agent)
+            INSERT INTO audit_logs (staff_id, action_description, table_name, record_id, old_values, new_values, ip_address, user_agent)
             VALUES (?, 'reset_queue_numbers', 'queue_types', NULL, ?, ?, ?, ?)
         ");
         $stmt->execute([
-            $_SESSION['user_id'],
+            $_SESSION['staff_id'],
             json_encode(['reset_type' => $resetType, 'affected_types' => $affectedTypes]),
             json_encode(['current_number' => 0, 'reset_date' => date('Y-m-d H:i:s')]),
             $_SERVER['REMOTE_ADDR'] ?? '',

@@ -69,8 +69,8 @@ try {
                 throw new Exception('Queue ID required');
             }
             // Ensure no current queue is already being served at this service point
-            $stmt = $db->prepare("SELECT queue_id FROM queues WHERE current_service_point_id = ? AND current_status IN ('called','processing') LIMIT 1");
-            $stmt->execute([$servicePointId]);
+            $stmt = $db->prepare("SELECT queue_id FROM queues WHERE current_service_point_id = ? AND queue_id = ? AND current_status IN ('called','processing') LIMIT 1");
+            $stmt->execute([$servicePointId, $queueId]);
             if ($stmt->fetch()) {
                 throw new Exception('มีคิวที่กำลังให้บริการอยู่แล้ว');
             }

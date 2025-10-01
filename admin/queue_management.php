@@ -7,6 +7,7 @@ if (!hasPermission('manage_queues')) {
 }
 
 try {
+    
     $db = getDB();
     
     // ดึงข้อมูลประเภทคิว
@@ -27,27 +28,49 @@ try {
     
     // ดึงข้อมูลจุดบริการ
     $stmt = $db->prepare("
-        SELECT sp.*,
-               COUNT(DISTINCT qt.queue_type_id) as queue_types_count,
-               COUNT(q.queue_id) as active_queues
-        FROM service_points sp
-        LEFT JOIN queue_type_service_points qtsp ON sp.service_point_id = qtsp.service_point_id
-        LEFT JOIN queue_types qt ON qtsp.queue_type_id = qt.queue_type_id AND qt.is_active = 1
-        LEFT JOIN queues q ON qt.queue_type_id = q.queue_type_id 
-                           AND DATE(q.creation_time) = CURDATE()
-                           AND q.current_status IN ('waiting', 'called', 'processing')
-        WHERE sp.is_active = 1
-        GROUP BY sp.service_point_id
-        ORDER BY sp.display_order, sp.point_name
+        SELECT
+            sp.*,
+            COUNT(q.queue_id) AS active_queues
+        FROM
+            service_points sp
+            LEFT JOIN queues q ON q.current_service_point_id = sp.service_point_id AND DATE(q.creation_time) = CURDATE()
+            AND q.current_status IN ('waiting', 'called', 'processing')
+        WHERE
+            sp.is_active = 1
+        GROUP BY
+            sp.service_point_id
+        ORDER BY
+            sp.display_order,
+            sp.point_name;
     ");
     $stmt->execute();
     $servicePoints = $stmt->fetchAll();
     
+    // $stmt = $db->prepare("
+    //     SELECT
+    //         qt.*,
+    //         COUNT(q.queue_id) AS active_queues
+    //     FROM
+    //         queue_types qt
+    //         LEFT JOIN queues q ON DATE(q.creation_time) = CURDATE() AND q.current_status IN ('waiting', 'called', 'processing')
+    //     WHERE
+    //         qt.is_active = 1
+    //     GROUP BY
+    //         qt.queue_type_id
+    //     ORDER BY
+    //         qt.prefix_char;
+    // ");
+    // $stmt->execute();
+    // $queueTypes = $stmt->fetchAll();
 } catch (Exception $e) {
     $queueTypes = [];
     $servicePoints = [];
+    // $queueTypes = [];
     $error = $e->getMessage();
+    error_log('is Catch');
 }
+
+error_log(json_encode($queueTypes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 ?>
 
 <!DOCTYPE html>
@@ -257,7 +280,6 @@ try {
                                         <div class="d-flex justify-content-between align-items-start mb-3">
                                             <div>
                                                 <h6 class="mb-1"><?php echo htmlspecialchars($type['type_name']); ?></h6>
-                                                <small class="text-muted"><?php echo htmlspecialchars($type['prefix']); ?></small>
                                             </div>
                                             <span class="status-badge <?php echo $type['is_active'] ? 'status-active' : 'status-inactive'; ?>">
                                                 <?php echo $type['is_active'] ? 'เปิดใช้งาน' : 'ปิดใช้งาน'; ?>
@@ -315,11 +337,7 @@ try {
                                         </div>
                                         
                                         <div class="row text-center mb-3">
-                                            <div class="col-6">
-                                                <div class="queue-number text-success"><?php echo $point['queue_types_count']; ?></div>
-                                                <small class="text-muted">ประเภทคิว</small>
-                                            </div>
-                                            <div class="col-6">
+                                            <div class="col-12">
                                                 <div class="queue-number text-warning"><?php echo $point['active_queues']; ?></div>
                                                 <small class="text-muted">คิวที่รอ</small>
                                             </div>

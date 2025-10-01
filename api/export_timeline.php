@@ -67,7 +67,7 @@ try {
         'flow_history' => $flowHistory,
         'export_info' => [
             'exported_at' => date('Y-m-d H:i:s'),
-            'exported_by' => $_SESSION['user_id'] ?? 'system',
+            'exported_by' => $_SESSION['staff_id'] ?? 'system',
             'format' => $format
         ]
     ];

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     (template_name, template_description, report_type, template_config, created_by) 
                     VALUES (?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$templateName, $templateDescription, $reportType, $templateConfig, $_SESSION['user_id']]);
+                $stmt->execute([$templateName, $templateDescription, $reportType, $templateConfig, $_SESSION['staff_id']]);
                 
                 logActivity("สร้าง Report Template: {$templateName}");
                 
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     (template_id, schedule_name, schedule_frequency, schedule_time, recipients, created_by) 
                     VALUES (?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$templateId, $scheduleName, $frequency, $scheduleTime, $recipients, $_SESSION['user_id']]);
+                $stmt->execute([$templateId, $scheduleName, $frequency, $scheduleTime, $recipients, $_SESSION['staff_id']]);
                 
                 logActivity("สร้างตารางรายงาน: {$scheduleName}");
                 
@@ -144,7 +144,7 @@ function generateReport($templateId, $parameters) {
         (template_id, execution_type, parameters, status, executed_by) 
         VALUES (?, 'manual', ?, 'running', ?)
     ");
-    $stmt->execute([$templateId, json_encode($parameters), $_SESSION['user_id']]);
+    $stmt->execute([$templateId, json_encode($parameters), $_SESSION['staff_id']]);
     $executionId = $db->lastInsertId();
     
     try {

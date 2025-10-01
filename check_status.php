@@ -21,7 +21,7 @@ if (!$queueId) {
         if (!$db) {
             throw new Exception('ไม่สามารถเชื่อมต่อฐานข้อมูลได้');
         }
-        
+
         // Get queue info with better error handling
         $stmt = $db->prepare("
             SELECT q.*, qt.type_name, sp.point_label as current_service_point_label, sp.point_name as current_service_point_name
@@ -30,16 +30,16 @@ if (!$queueId) {
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
             WHERE q.queue_id = ?
         ");
-        
+
         if (!$stmt) {
             throw new Exception('ไม่สามารถเตรียม SQL statement ได้: ' . implode(', ', $db->errorInfo()));
         }
-        
+
         $result = $stmt->execute([$queueId]);
         if (!$result) {
             throw new Exception('ไม่สามารถดำเนินการ query ได้: ' . implode(', ', $stmt->errorInfo()));
         }
-        
+
         $queue = $stmt->fetch();
         if ($queue) {
             $queue['current_service_point_name'] = trim(($queue['current_service_point_label'] ? $queue['current_service_point_label'] . ' ' : '') . $queue['current_service_point_name']);
@@ -127,11 +127,11 @@ if (!$queueId) {
                 WHERE sfh.queue_id = ?
                 ORDER BY sfh.timestamp ASC
             ");
-            
+
             if ($stmt && $stmt->execute([$queueId])) {
                 $flowHistory = $stmt->fetchAll();
             }
-            
+
             // Get all service points for this queue type to build complete timeline
             $stmt = $db->prepare("
                 SELECT DISTINCT sp.service_point_id, TRIM(CONCAT(COALESCE(sp.point_label,''),' ', sp.point_name)) as point_name, sp.display_order
@@ -146,7 +146,7 @@ if (!$queueId) {
 
             if ($stmt && $stmt->execute([$queue['queue_type_id']])) {
                 $allServicePoints = $stmt->fetchAll();
-                
+
                 // ถ้าไม่พบจุดบริการที่เกี่ยวข้อง ให้เพิ่มจุดบริการปัจจุบันเข้าไป
                 if (empty($allServicePoints) && !empty($queue['current_service_point_id'])) {
                     $currentPointStmt = $db->prepare("
@@ -154,7 +154,7 @@ if (!$queueId) {
                         FROM service_points
                         WHERE service_point_id = ? AND is_active = 1
                     ");
-                    
+
                     if ($currentPointStmt && $currentPointStmt->execute([$queue['current_service_point_id']])) {
                         $currentPoint = $currentPointStmt->fetch();
                         if ($currentPoint) {
@@ -191,7 +191,7 @@ if (!$queueId) {
                     FROM service_points
                     WHERE service_point_id = ?
                 ");
-                
+
                 if ($currentPointStmt && $currentPointStmt->execute([$queue['current_service_point_id']])) {
                     $currentPoint = $currentPointStmt->fetch();
                     if ($currentPoint) {
@@ -200,7 +200,7 @@ if (!$queueId) {
                 }
             }
         }
-        
+
     } catch (PDOException $e) {
         $error_message = 'ข้อผิดพลาดฐานข้อมูล: ' . $e->getMessage();
         error_log("Database error in check_status.php: " . $e->getMessage());
@@ -215,13 +215,15 @@ if ($error_message) {
     ?>
     <!DOCTYPE html>
     <html lang="th">
+
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>ข้อผิดพลาด - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
         <style>
             body {
                 font-family: 'Sarabun', sans-serif;
@@ -231,14 +233,16 @@ if ($error_message) {
                 align-items: center;
                 justify-content: center;
             }
+
             .error-container {
                 background: white;
                 border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
                 padding: 3rem;
                 text-align: center;
                 max-width: 500px;
             }
+
             .error-icon {
                 font-size: 4rem;
                 color: #dc3545;
@@ -246,6 +250,7 @@ if ($error_message) {
             }
         </style>
     </head>
+
     <body>
         <div class="error-container">
             <div class="error-icon">
@@ -253,7 +258,7 @@ if ($error_message) {
             </div>
             <h2 class="text-danger mb-3">เกิดข้อผิดพลาด</h2>
             <p class="text-muted mb-4"><?php echo htmlspecialchars($error_message); ?></p>
-            
+
             <div class="mb-3">
                 <small class="text-muted">
                     <strong>ข้อมูลการแก้ไขปัญหา:</strong><br>
@@ -262,7 +267,7 @@ if ($error_message) {
                     - ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่
                 </small>
             </div>
-            
+
             <div class="d-flex gap-2 justify-content-center">
                 <button class="btn btn-primary" onclick="history.back()">
                     <i class="fas fa-arrow-left me-2"></i>ย้อนกลับ
@@ -274,19 +279,20 @@ if ($error_message) {
                     <i class="fas fa-home me-2"></i>หน้าแรก
                 </button>
             </div>
-            
+
             <?php if (isset($_GET['debug']) && $_GET['debug'] == '1'): ?>
-            <div class="mt-4 p-3 bg-light rounded">
-                <h6>Debug Information:</h6>
-                <small class="text-muted">
-                    Queue ID: <?php echo htmlspecialchars($queueId ?? 'null'); ?><br>
-                    Error: <?php echo htmlspecialchars($error_message); ?><br>
-                    Time: <?php echo date('Y-m-d H:i:s'); ?>
-                </small>
-            </div>
+                <div class="mt-4 p-3 bg-light rounded">
+                    <h6>Debug Information:</h6>
+                    <small class="text-muted">
+                        Queue ID: <?php echo htmlspecialchars($queueId ?? 'null'); ?><br>
+                        Error: <?php echo htmlspecialchars($error_message); ?><br>
+                        Time: <?php echo date('Y-m-d H:i:s'); ?>
+                    </small>
+                </div>
             <?php endif; ?>
         </div>
     </body>
+
     </html>
     <?php
     exit;
@@ -295,15 +301,17 @@ if ($error_message) {
 
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>สถานะคิว <?php echo htmlspecialchars($queue['queue_number']); ?> - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
-    
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
@@ -311,50 +319,50 @@ if ($error_message) {
             min-height: 100vh;
             padding: 2rem 0;
         }
-        
+
         .status-container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             padding: 2rem;
             max-width: 800px;
             margin: 0 auto;
         }
-        
+
         .queue-header {
             text-align: center;
             padding-bottom: 1rem;
             border-bottom: 3px solid #007bff;
             margin-bottom: 2rem;
         }
-        
+
         .queue-number {
             font-size: 3rem;
             font-weight: bold;
             color: #007bff;
         }
-        
+
         .status-badge {
             font-size: 1.1rem;
             padding: 0.5rem 1rem;
             border-radius: 25px;
         }
-        
+
         .timeline-container {
             display: flex;
             gap: 2rem;
             margin-top: 2rem;
         }
-        
+
         .timeline-section {
             flex: 1;
         }
-        
+
         .timeline {
             position: relative;
             padding: 1rem 0;
         }
-        
+
         .timeline::before {
             content: '';
             position: absolute;
@@ -365,13 +373,13 @@ if ($error_message) {
             background: linear-gradient(to top, #28a745, #ffc107, #dc3545);
             border-radius: 2px;
         }
-        
+
         .timeline-item {
             position: relative;
             padding: 1rem 0 1rem 4rem;
             margin-bottom: 1rem;
         }
-        
+
         .timeline-item::before {
             content: '';
             position: absolute;
@@ -381,60 +389,79 @@ if ($error_message) {
             height: 20px;
             border-radius: 50%;
             border: 4px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             z-index: 2;
         }
-        
+
         .timeline-item.completed::before {
             background-color: #28a745;
         }
-        
+
         .timeline-item.current::before {
             background-color: #ffc107;
             animation: pulse-timeline 2s infinite;
         }
-        
+
         .timeline-item.pending::before {
             background-color: #dee2e6;
         }
-        
+
         @keyframes pulse-timeline {
-            0% { transform: scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-            50% { transform: scale(1.2); box-shadow: 0 4px 16px rgba(255,193,7,0.4); }
-            100% { transform: scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            0% {
+                transform: scale(1);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            50% {
+                transform: scale(1.2);
+                box-shadow: 0 4px 16px rgba(255, 193, 7, 0.4);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
         }
-        
+
         .timeline-content {
             background: white;
             padding: 1rem 1.5rem;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             border-left: 4px solid transparent;
         }
-        
+
         .timeline-item.completed .timeline-content {
             border-left-color: #28a745;
             background: #f8fff9;
         }
-        
+
         .timeline-item.current .timeline-content {
             border-left-color: #ffc107;
             background: #fffdf0;
             animation: glow-current 2s infinite;
         }
-        
+
         .timeline-item.pending .timeline-content {
             border-left-color: #dee2e6;
             background: #f8f9fa;
             opacity: 0.7;
         }
-        
+
         @keyframes glow-current {
-            0% { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            50% { box-shadow: 0 4px 20px rgba(255,193,7,0.3); }
-            100% { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            0% {
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+
+            50% {
+                box-shadow: 0 4px 20px rgba(255, 193, 7, 0.3);
+            }
+
+            100% {
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
         }
-        
+
         .timeline-title {
             font-size: 1.2rem;
             font-weight: 600;
@@ -443,52 +470,52 @@ if ($error_message) {
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .timeline-time {
             font-size: 0.9rem;
             color: #6c757d;
             margin-bottom: 0.5rem;
         }
-        
+
         .timeline-status {
             font-size: 0.8rem;
             padding: 0.2rem 0.6rem;
             border-radius: 12px;
             font-weight: 500;
         }
-        
+
         .timeline-item.completed .timeline-status {
             background-color: #d4edda;
             color: #155724;
         }
-        
+
         .timeline-item.current .timeline-status {
             background-color: #fff3cd;
             color: #856404;
         }
-        
+
         .timeline-item.pending .timeline-status {
             background-color: #e2e3e5;
             color: #6c757d;
         }
-        
+
         .flow-step {
             padding: 1rem;
             margin-bottom: 1rem;
             border-radius: 10px;
             border-left: 4px solid #dee2e6;
         }
-        
+
         .flow-step.completed {
             background-color: #d4edda;
             border-left-color: #28a745;
         }
-        
+
         .flow-step.current {
             background-color: #fff3cd;
             border-left-color: #ffc107;
         }
-        
+
         .flow-step.pending {
             background-color: #f8f9fa;
             border-left-color: #dee2e6;
@@ -503,7 +530,7 @@ if ($error_message) {
             margin: 0 auto;
             display: block;
         }
-        
+
         .section-title {
             font-size: 1.3rem;
             font-weight: 600;
@@ -512,7 +539,7 @@ if ($error_message) {
             border-bottom: 2px solid #e9ecef;
             padding-bottom: 0.5rem;
         }
-        
+
         .progress-indicator {
             text-align: center;
             margin-bottom: 1rem;
@@ -520,13 +547,13 @@ if ($error_message) {
             background: linear-gradient(135deg, #f8f9fa, #e9ecef);
             border-radius: 10px;
         }
-        
+
         .progress-text {
             font-size: 1.1rem;
             color: #495057;
             margin-bottom: 0.5rem;
         }
-        
+
         .progress-bar-custom {
             height: 8px;
             background: #e9ecef;
@@ -534,7 +561,7 @@ if ($error_message) {
             overflow: hidden;
             margin: 0.5rem 0;
         }
-        
+
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #28a745, #ffc107);
@@ -546,34 +573,34 @@ if ($error_message) {
             .timeline-container {
                 flex-direction: column;
             }
-            
+
             .timeline-section {
                 width: 100%;
             }
-            
+
             .queue-number {
                 font-size: 2.5rem;
             }
-            
+
             .status-badge {
                 font-size: 1rem;
                 padding: 0.4rem 0.8rem;
             }
-            
+
             .timeline::before {
                 left: 20px;
             }
-            
+
             .timeline-item {
                 padding-left: 3rem;
             }
-            
+
             .timeline-item::before {
                 left: 12px;
                 width: 16px;
                 height: 16px;
             }
-            
+
             .qr-code canvas {
                 width: 150px !important;
                 height: 150px !important;
@@ -584,128 +611,130 @@ if ($error_message) {
             .status-container {
                 padding: 1rem;
             }
-            
+
             .queue-number {
                 font-size: 2rem;
             }
-            
+
             .timeline-item {
                 padding-left: 2.5rem;
             }
-            
+
             .timeline::before {
                 left: 15px;
             }
-            
+
             .timeline-item::before {
                 left: 7px;
             }
-            
+
             .timeline-title {
                 font-size: 1rem;
             }
-            
+
             .qr-code canvas {
                 width: 120px !important;
                 height: 120px !important;
             }
         }
 
-.queue-info-container {
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    border-radius: 15px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-}
+        .queue-info-container {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
 
-.queue-info-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    text-align: center;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+        .queue-info-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-.queue-info-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-}
+        .queue-info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
 
-.queue-info-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-}
+        .queue-info-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
 
-.queue-info-number {
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: #495057;
-    margin-bottom: 0.25rem;
-}
+        .queue-info-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 0.25rem;
+        }
 
-.queue-info-label {
-    font-size: 0.9rem;
-    color: #6c757d;
-    font-weight: 500;
-}
+        .queue-info-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
 
-.queue-alert {
-    animation: fadeInUp 0.5s ease;
-}
+        .queue-alert {
+            animation: fadeInUp 0.5s ease;
+        }
 
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
 
-@media (max-width: 768px) {
-    .queue-info-card {
-        padding: 0.75rem;
-    }
-    
-    .queue-info-number {
-        font-size: 1.5rem;
-    }
-    
-    .queue-info-label {
-        font-size: 0.8rem;
-    }
-    
-    .queue-info-icon {
-        font-size: 1.5rem;
-    }
-}
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-@media (max-width: 480px) {
-    .queue-info-container {
-        padding: 1rem;
-    }
-    
-    .queue-info-card {
-        padding: 0.5rem;
-    }
-    
-    .queue-info-number {
-        font-size: 1.3rem;
-    }
-    
-    .queue-info-label {
-        font-size: 0.75rem;
-    }
-}
+        @media (max-width: 768px) {
+            .queue-info-card {
+                padding: 0.75rem;
+            }
+
+            .queue-info-number {
+                font-size: 1.5rem;
+            }
+
+            .queue-info-label {
+                font-size: 0.8rem;
+            }
+
+            .queue-info-icon {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .queue-info-container {
+                padding: 1rem;
+            }
+
+            .queue-info-card {
+                padding: 0.5rem;
+            }
+
+            .queue-info-number {
+                font-size: 1.3rem;
+            }
+
+            .queue-info-label {
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="status-container">
@@ -748,7 +777,7 @@ if ($error_message) {
                     </span>
                 </div>
             </div>
-            
+
             <?php
             // สร้าง timeline data
             $timelineSteps = [];
@@ -775,7 +804,7 @@ if ($error_message) {
                 $status = 'pending';
                 $timestamp = null;
                 $isCurrentPoint = ($sp['service_point_id'] == $queue['current_service_point_id']);
-                
+
                 // ตรวจสอบว่าเป็นจุดที่ผ่านมาแล้วหรือไม่
                 if (in_array($sp['service_point_id'], $completedSteps)) {
                     $isInFlow = true;
@@ -792,13 +821,13 @@ if ($error_message) {
                             break;
                         }
                     }
-                } 
+                }
                 // ตรวจสอบว่าเป็นจุดปัจจุบันหรือไม่
                 else if ($isCurrentPoint) {
                     $isInFlow = true;
                     $status = 'current';
                 }
-                
+
                 // เพิ่มเฉพาะจุดที่อยู่ใน flow หรือเป็นจุดปัจจุบัน
                 if ($isInFlow) {
                     $timelineSteps[] = [
@@ -812,15 +841,15 @@ if ($error_message) {
             }
 
             // เรียงลำดับจากล่างขึ้นบน (sequence_order น้อยไปมาก)
-            usort($timelineSteps, function($a, $b) {
+            usort($timelineSteps, function ($a, $b) {
                 return $a['display_order'] - $b['display_order'];
             });
-            
+
             // คำนวณความคืบหน้า
             $totalSteps = count($timelineSteps);
             $completedCount = 0;
             $currentStepIndex = -1;
-            
+
             foreach ($timelineSteps as $index => $step) {
                 if ($step['status'] == 'completed') {
                     $completedCount++;
@@ -829,10 +858,10 @@ if ($error_message) {
                     break;
                 }
             }
-            
+
             $progressPercentage = $totalSteps > 0 ? ($completedCount / $totalSteps) * 100 : 0;
             ?>
-            
+
             <div class="progress-indicator">
                 <div class="progress-text">
                     ความคืบหน้า: <?php echo $completedCount; ?> จาก <?php echo $totalSteps; ?> ขั้นตอน
@@ -842,7 +871,7 @@ if ($error_message) {
                 </div>
                 <small class="text-muted"><?php echo number_format($progressPercentage, 1); ?>% เสร็จสิ้น</small>
             </div>
-            
+
             <!-- Queue Position Information -->
             <div class="queue-info-container mt-3">
                 <div class="row g-3">
@@ -857,7 +886,7 @@ if ($error_message) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3 col-6">
                         <div class="queue-info-card">
                             <div class="queue-info-icon">
@@ -869,7 +898,7 @@ if ($error_message) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3 col-6">
                         <div class="queue-info-card">
                             <div class="queue-info-icon">
@@ -877,7 +906,7 @@ if ($error_message) {
                             </div>
                             <div class="queue-info-content">
                                 <div class="queue-info-number">
-                                    <?php 
+                                    <?php
                                     if ($estimatedWaitTime > 60) {
                                         echo floor($estimatedWaitTime / 60) . 'ชม ' . ($estimatedWaitTime % 60) . 'น';
                                     } else {
@@ -889,7 +918,7 @@ if ($error_message) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-3 col-6">
                         <div class="queue-info-card">
                             <div class="queue-info-icon">
@@ -902,37 +931,37 @@ if ($error_message) {
                         </div>
                     </div>
                 </div>
-                
+
                 <?php if ($totalQueuesAhead > 0): ?>
-                <div class="queue-alert mt-3">
-                    <div class="alert alert-info d-flex align-items-center">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <div>
-                            <strong>มีคิวรออยู่ข้างหน้า <?php echo $totalQueuesAhead; ?> คิว</strong><br>
-                            <small>คาดว่าจะถึงคิวของคุณในอีกประมาณ <?php echo $estimatedWaitTime; ?> นาที</small>
+                    <div class="queue-alert mt-3">
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <div>
+                                <strong>มีคิวรออยู่ข้างหน้า <?php echo $totalQueuesAhead; ?> คิว</strong><br>
+                                <small>คาดว่าจะถึงคิวของคุณในอีกประมาณ <?php echo $estimatedWaitTime; ?> นาที</small>
+                            </div>
                         </div>
                     </div>
-                </div>
                 <?php elseif ($queue['current_status'] == 'waiting'): ?>
-                <div class="queue-alert mt-3">
-                    <div class="alert alert-success d-flex align-items-center">
-                        <i class="fas fa-star me-2"></i>
-                        <div>
-                            <strong>คิวของคุณถึงแล้ว!</strong><br>
-                            <small>กรุณาเตรียมตัวเข้ารับบริการ</small>
+                    <div class="queue-alert mt-3">
+                        <div class="alert alert-success d-flex align-items-center">
+                            <i class="fas fa-star me-2"></i>
+                            <div>
+                                <strong>คิวของคุณถึงแล้ว!</strong><br>
+                                <small>กรุณาเตรียมตัวเข้ารับบริการ</small>
+                            </div>
                         </div>
                     </div>
-                </div>
                 <?php endif; ?>
             </div>
-            
+
             <div class="timeline-container">
                 <!-- Timeline Section -->
                 <div class="timeline-section">
                     <h4 class="section-title">
                         <i class="fas fa-route me-2"></i>เส้นทางการให้บริการ
                     </h4>
-                    
+
                     <div class="timeline">
                         <?php foreach (array_reverse($timelineSteps) as $index => $step): ?>
                             <div class="timeline-item <?php echo $step['status']; ?>">
@@ -947,14 +976,14 @@ if ($error_message) {
                                         <?php endif; ?>
                                         <?php echo htmlspecialchars($step['point_name']); ?>
                                     </div>
-                                    
+
                                     <?php if ($step['timestamp']): ?>
                                         <div class="timeline-time">
                                             <i class="fas fa-calendar-alt me-1"></i>
                                             <?php echo date('d/m/Y H:i', strtotime($step['timestamp'])); ?>
                                         </div>
                                     <?php endif; ?>
-                                    
+
                                     <div class="timeline-status">
                                         <?php
                                         switch ($step['status']) {
@@ -975,21 +1004,22 @@ if ($error_message) {
                         <?php endforeach; ?>
                     </div>
                 </div>
-                
+
                 <!-- History Section -->
                 <div class="timeline-section">
                     <h4 class="section-title">
                         <i class="fas fa-history me-2"></i>ประวัติการดำเนินการ
                     </h4>
-                    
+
                     <?php if (!empty($flowHistory)): ?>
-                        <?php 
+                        <?php
                         // เรียงลำดับประวัติจากใหม่ไปเก่า
                         $sortedHistory = array_reverse($flowHistory);
-                        foreach ($sortedHistory as $step): 
+                        foreach ($sortedHistory as $step):
                             // ข้ามรายการที่ไม่มีจุดบริการปลายทาง
-                            if (empty($step['to_point_name'])) continue;
-                            
+                            if (empty($step['to_point_name']))
+                                continue;
+
                             // กำหนดสถานะของขั้นตอน
                             $stepStatus = 'pending';
                             if ($step['action'] == 'completed') {
@@ -997,7 +1027,7 @@ if ($error_message) {
                             } else if ($step['to_service_point_id'] == $queue['current_service_point_id']) {
                                 $stepStatus = 'current';
                             }
-                        ?>
+                            ?>
                             <div class="flow-step <?php echo $stepStatus; ?>">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -1062,7 +1092,7 @@ if ($error_message) {
                 <canvas id="qrcode"></canvas>
                 <p class="mt-2">สแกน QR Code เพื่อตรวจสอบสถานะคิว</p>
             </div>
-            
+
             <div class="text-center mt-4">
                 <button class="btn btn-outline-primary" onclick="location.reload()">
                     <i class="fas fa-sync-alt me-2"></i>รีเฟรช
@@ -1072,22 +1102,28 @@ if ($error_message) {
                         <i class="fas fa-download me-2"></i>Export
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=json" target="_blank">
-                            <i class="fas fa-file-code me-2"></i>JSON
-                        </a></li>
-                        <li><a class="dropdown-item" href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=csv" target="_blank">
-                            <i class="fas fa-file-csv me-2"></i>CSV
-                        </a></li>
-                        <li><a class="dropdown-item" href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=html" target="_blank">
-                            <i class="fas fa-file-alt me-2"></i>HTML Report
-                        </a></li>
+                        <li><a class="dropdown-item"
+                                href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=json"
+                                target="_blank">
+                                <i class="fas fa-file-code me-2"></i>JSON
+                            </a></li>
+                        <li><a class="dropdown-item"
+                                href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=csv"
+                                target="_blank">
+                                <i class="fas fa-file-csv me-2"></i>CSV
+                            </a></li>
+                        <li><a class="dropdown-item"
+                                href="api/export_timeline.php?queue_id=<?php echo $queue['queue_id']; ?>&format=html"
+                                target="_blank">
+                                <i class="fas fa-file-alt me-2"></i>HTML Report
+                            </a></li>
                     </ul>
                 </div>
                 <button class="btn btn-primary ms-2" onclick="window.location.href='index.php'">
                     <i class="fas fa-home me-2"></i>หน้าแรก
                 </button>
             </div>
-            
+
             <div class="text-center mt-3">
                 <small class="text-muted">
                     อัปเดตล่าสุด: <?php echo date('d/m/Y H:i:s'); ?>
@@ -1095,22 +1131,22 @@ if ($error_message) {
             </div>
         </div>
     </div>
-    
+
     <!-- QR Code Libraries - Multiple fallbacks -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         // Generate QR Code with fallback
-        $(document).ready(function() {
+        $(document).ready(function () {
             const queueId = <?php echo json_encode($queue['queue_id']); ?>;
             const qrData = window.location.href; // Use current URL
-            
+
             // Function to create QR Code
             function createQRCode() {
                 // Load QRious library
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-                script.onload = function() {
+                script.onload = function () {
                     try {
                         new QRious({
                             element: document.getElementById('qrcode'),
@@ -1126,14 +1162,14 @@ if ($error_message) {
                         drawFallbackText();
                     }
                 };
-                
-                script.onerror = function() {
+
+                script.onerror = function () {
                     drawFallbackText();
                 };
-                
+
                 document.head.appendChild(script);
             }
-            
+
             // Fallback function to draw text if QR code fails
             function drawFallbackText() {
                 const canvas = document.getElementById('qrcode');
@@ -1148,24 +1184,24 @@ if ($error_message) {
                 ctx.fillText('QR Code', 100, 90);
                 ctx.fillText('ไม่สามารถสร้างได้', 100, 110);
             }
-            
+
             // Try to create QR Code
             createQRCode();
         });
-        
+
         // Auto refresh every 30 seconds
-        setTimeout(function() {
+        setTimeout(function () {
             location.reload();
         }, 30000);
     </script>
-    
+
     <!-- Fallback script if main QR library fails -->
     <script>
         // Check if QRCode library loaded, if not load alternative
         if (typeof QRCode === 'undefined') {
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-            script.onload = function() {
+            script.onload = function () {
                 if (typeof QRious !== 'undefined') {
                     const qr = new QRious({
                         element: document.getElementById('qrcode'),
@@ -1177,6 +1213,7 @@ if ($error_message) {
             document.head.appendChild(script);
         }
     </script>
-    <?php include 'components/notification-system.php'; renderNotificationSystem(); ?>
+
 </body>
+
 </html>
