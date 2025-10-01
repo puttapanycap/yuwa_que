@@ -62,13 +62,35 @@ if (!function_exists('synthesizeTtsAudio')) {
         if ($jsonEncoded === false) {
             throw new Exception('ไม่สามารถเตรียมข้อความสำหรับส่งไปยัง API ได้');
         }
-        $jsonEncoded = substr($jsonEncoded, 1, -1); // remove surrounding quotes
+        $jsonWithoutQuotes = substr($jsonEncoded, 1, -1); // remove surrounding quotes
 
+        $command = $commandTemplate;
+
+        // Handle placeholders wrapped in single quotes (shell safe replacement)
+        foreach ([$placeholder, $altPlaceholder] as $ph) {
+            if (strpos($command, "'{$ph}'") !== false) {
+                $command = str_replace("'{$ph}'", escapeshellarg($jsonWithoutQuotes), $command);
+            }
+        }
+
+        // Handle placeholders wrapped in double quotes
+        foreach ([$placeholder, $altPlaceholder] as $ph) {
+            if (strpos($command, "\"{$ph}\"") !== false) {
+                $doubleSafe = addcslashes($jsonWithoutQuotes, "\\\"$`");
+                $command = str_replace("\"{$ph}\"", '"' . $doubleSafe . '"', $command);
+            }
+        }
+
+        // Replace any remaining placeholder occurrences without quotes
         $command = str_replace(
             [$placeholder, $altPlaceholder],
-            $jsonEncoded,
-            $commandTemplate
+            $jsonWithoutQuotes,
+            $command
         );
+
+        if (strpos($command, $placeholder) !== false || strpos($command, $altPlaceholder) !== false) {
+            throw new Exception('ไม่สามารถเตรียมคำสั่งเรียก API ได้: พบตัวแปร {{_TEXT_TO_SPECH_}} ที่ไม่ได้ถูกแทนค่า');
+        }
 
         $descriptorspec = [
             0 => ['pipe', 'r'],
