@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>gTTS + FastAPI Demo</title>
+  <!-- Load jQuery from a CDN. In production you might serve this from your own server. -->
+  <script
+  src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+    label { display: block; margin-top: 1rem; }
+    textarea { width: 100%; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; }
+    audio { width: 100%; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Convert text to speech</h1>
+  <p>
+    This page demonstrates how to call the FastAPI/gTTS backend using jQuery.  It
+    sends a JSON request to the API and plays back the resulting MP3
+    without needing to reload the page.
+  </p>
+  <form id="ttsForm">
+    <label for="text">Text to read:</label>
+    <textarea id="text" name="text" rows="4">สวัสดีค่ะ นี่คือการทดสอบ</textarea>
+
+    <label for="lang">Language:</label>
+    <select id="lang" name="lang">
+      <option value="th" selected>Thai</option>
+      <option value="en">English</option>
+      <option value="ja">Japanese</option>
+      <option value="zh-CN">Chinese (Simplified)</option>
+      <option value="hi">Hindi</option>
+      <option value="de">German</option>
+    </select>
+
+    <label>
+      <input type="checkbox" id="slow" name="slow"> Slow speech
+    </label>
+
+    <label for="tld">Accent / TLD:</label>
+    <select id="tld" name="tld">
+      <option value="com">com (default)</option>
+      <option value="co.uk">co.uk</option>
+      <option value="co.in">co.in</option>
+      <option value="com.au">com.au</option>
+    </select>
+
+    <button type="submit">Generate Speech</button>
+  </form>
+  <audio id="audio" controls></audio>
+
+  <script>
+    $('#ttsForm').on('submit', function(e) {
+      e.preventDefault();
+      const text = $('#text').val();
+      const lang = $('#lang').val();
+      const slow = $('#slow').is(':checked');
+      const tld = $('#tld').val();
+
+      // Make an AJAX POST request to the FastAPI /tts endpoint
+      $.ajax({
+        url: 'http://127.0.0.1:8000/tts',
+        method: 'POST',
+        data: JSON.stringify({ text: text, lang: lang, slow: slow, tld: tld }),
+        processData: false,
+        contentType: 'application/json',
+        xhrFields: { responseType: 'blob' },
+        success: function(data) {
+          // Convert the returned blob into a URL that can be used in an <audio> element
+          const url = URL.createObjectURL(data);
+          $('#audio').attr('src', url).get(0).play();
+        },
+        error: function(xhr) {
+          alert('Error generating speech: ' + xhr.responseText);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

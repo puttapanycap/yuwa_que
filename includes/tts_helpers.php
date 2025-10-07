@@ -58,95 +58,52 @@ if (!function_exists('synthesizeTtsAudio')) {
             throw new Exception('คำสั่งต้องมีตัวแปร {{_TEXT_TO_SPECH_}} สำหรับแทนข้อความที่จะสังเคราะห์เสียง');
         }
 
-        $jsonEncoded = json_encode($text, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($jsonEncoded === false) {
-            throw new Exception('ไม่สามารถเตรียมข้อความสำหรับส่งไปยัง API ได้');
-        }
-        $jsonWithoutQuotes = substr($jsonEncoded, 1, -1); // remove surrounding quotes
+        // Use cURL directly for better error handling and performance
+        $ch = curl_init();
+        
+        // Extract URL from the original command template, handling optional quotes
+        preg_match('/[\'"]?(https?:\/\/[^\s\'"]+)[\'"]?/', $commandTemplate, $matches);
+        $url = $matches[1] ?? '';
 
-        $command = $commandTemplate;
-
-        $envExport = 'TTS_TEXT_JSON_SAFE=' . escapeshellarg($jsonWithoutQuotes)
-            . ' TTS_TEXT_RAW=' . escapeshellarg($text);
-
-        $placeholders = [$placeholder, $altPlaceholder];
-
-        foreach ($placeholders as $ph) {
-            if ($ph === '') {
-                continue;
-            }
-
-            // Handle placeholders that live inside single quoted strings
-            $command = preg_replace_callback(
-                "/'([^']*?)" . preg_quote($ph, '/') . "([^']*?)'/",
-                function (array $matches): string {
-                    $segments = [];
-
-                    if ($matches[1] !== '') {
-                        $segments[] = "'" . $matches[1] . "'";
-                    }
-
-                    $segments[] = '"$TTS_TEXT_JSON_SAFE"';
-
-                    if ($matches[2] !== '') {
-                        $segments[] = "'" . $matches[2] . "'";
-                    }
-
-                    $filtered = [];
-                    foreach ($segments as $segment) {
-                        if ($segment !== "''") {
-                            $filtered[] = $segment;
-                        }
-                    }
-
-                    return implode('', $filtered);
-                },
-                $command
-            );
-
-            // Handle placeholders wrapped in double quotes
-            $command = preg_replace(
-                '/"' . preg_quote($ph, '/') . '"/',
-                '"$TTS_TEXT_JSON_SAFE"',
-                $command
-            );
-
-            // Replace any remaining occurrences with a shell-safe default
-            $command = str_replace($ph, '"$TTS_TEXT_JSON_SAFE"', $command);
+        if (empty($url)) {
+            throw new Exception('ไม่พบ URL ในคำสั่ง cURL');
         }
 
-        if (strpos($command, $placeholder) !== false || strpos($command, $altPlaceholder) !== false) {
-            throw new Exception('ไม่สามารถเตรียมคำสั่งเรียก API ได้: พบตัวแปร {{_TEXT_TO_SPECH_}} ที่ไม่ได้ถูกแทนค่า');
-        }
+        // Extract headers from the original command template
+        preg_match_all('/-H [\'"]([^\'"]+)[\'"]/', $commandTemplate, $headerMatches);
+        $headers = $headerMatches[1] ?? [];
 
-        $command = $envExport . ' ' . $command;
-
-        $descriptorspec = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w']
+        // Build the JSON payload directly for the FastAPI service to ensure it's always valid.
+        $payload = [
+            'text' => $text,
+            'lang' => 'th',
+            'slow' => false,
+            'tld' => 'com'
         ];
 
-        $process = @proc_open($command, $descriptorspec, $pipes, ROOT_PATH);
-        if (!is_resource($process)) {
-            throw new Exception('ไม่สามารถเรียกใช้คำสั่งทดสอบ API ได้');
+        $postData = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if ($postData === false) {
+            throw new Exception('ไม่สามารถสร้าง JSON payload สำหรับส่งไปยัง TTS API ได้');
         }
 
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $exitCode = proc_close($process);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 seconds timeout
+        curl_setopt($ch, CURLOPT_FAILONERROR, true); // Fail on HTTP status code >= 400
 
-        if ($stdout === false) {
-            $stdout = '';
-        }
-        if ($stderr === false) {
-            $stderr = '';
-        }
+        $audioData = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        
+        curl_close($ch);
 
-        $audioData = $stdout;
+        if ($audioData === false) {
+            throw new Exception("cURL Error ({$httpCode}): {$curlError}");
+        }
         $trimmedAudio = trim($audioData);
         if ($trimmedAudio !== '' && ($trimmedAudio[0] === '{' || $trimmedAudio[0] === '[')) {
             $decoded = json_decode($trimmedAudio, true);
