@@ -62,3 +62,4 @@ config/local.php
 keys/
 secrets/
 pnpm-lock.yaml
+/storage

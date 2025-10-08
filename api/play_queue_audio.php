@@ -177,10 +177,10 @@ try {
  */
 function processQueueNumberForSpeech($message, $queueNumber)
 {
-    // Split the queue number into individual characters
-    $characters = str_split($queueNumber);
-    $spacedNumber = implode(' ', $characters);
-    
+    // Split the queue number into individual characters, supporting multi-byte (Unicode) characters
+    $characters = preg_split('//u', $queueNumber, -1, PREG_SPLIT_NO_EMPTY);
+    $spacedNumber = implode(',', $characters);
+
     // Replace the queue number in the message
     return str_replace($queueNumber, $spacedNumber, $message);
 }
