@@ -501,6 +501,21 @@
 
         // Auto-refresh service types every 30 seconds
         setInterval(loadServiceTypes, 30000);
+        
+    </script>
+
+    <script>
+        window.addEventListener('barcode-scan', function(e){
+            const code = e.detail?.code || '';
+            console.log('Barcode from native:', code);
+            // ตัวอย่าง: ใส่ค่าแล้ว submit
+            const input = document.querySelector('#idCardNumber');
+            if (input) {
+            input.value = code;
+            input.dispatchEvent(new Event('input'));
+            // submit หรือ fetch ไปค้นสินค้า
+            }
+        });
     </script>
 </body>
 </html>
