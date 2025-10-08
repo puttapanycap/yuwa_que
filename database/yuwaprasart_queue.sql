@@ -1,17 +1,17 @@
 /*
  Navicat Premium Dump SQL
 
- Source Server         : localhost
+ Source Server         : HostEx01_yuwaprasart-queue
  Source Server Type    : MySQL
- Source Server Version : 80030 (8.0.30)
- Source Host           : localhost:3306
- Source Schema         : yuwaprasart_queue
+ Source Server Version : 80036 (8.0.36-28)
+ Source Host           : 192.168.10.12:3306
+ Source Schema         : yuwaprasart-queue
 
  Target Server Type    : MySQL
- Target Server Version : 80030 (8.0.30)
+ Target Server Version : 80036 (8.0.36-28)
  File Encoding         : 65001
 
- Date: 01/10/2025 10:17:05
+ Date: 08/10/2025 14:03:47
 */
 
 SET NAMES utf8mb4;
@@ -27,7 +27,7 @@ CREATE TABLE `api_settings`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`setting_key`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of api_settings
@@ -54,7 +54,7 @@ CREATE TABLE `api_usage_logs`  (
   INDEX `idx_created_at`(`created_at` ASC) USING BTREE,
   INDEX `idx_registration_id`(`registration_id` ASC) USING BTREE,
   CONSTRAINT `fk_aul_reg` FOREIGN KEY (`registration_id`) REFERENCES `mobile_app_registrations` (`registration_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of api_usage_logs
@@ -80,7 +80,7 @@ CREATE TABLE `audio_call_history`  (
   CONSTRAINT `fk_ach_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_ach_sp` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_ach_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 247 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 274 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of audio_call_history
@@ -331,6 +331,33 @@ INSERT INTO `audio_call_history` VALUES (243, 3, 1, 1, 'ขอเชิญ ห�
 INSERT INTO `audio_call_history` VALUES (244, 1, 2, 1, 'ขอเชิญ หมายเลข A 0 0 1 ที่ ห้องตรวจ  1 ครับ', '2025-10-01 09:33:07', 1, 'failed');
 INSERT INTO `audio_call_history` VALUES (245, 5, 1, 1, 'ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '2025-10-01 10:16:10', 1, 'failed');
 INSERT INTO `audio_call_history` VALUES (246, NULL, 1, 1, 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', '2025-10-01 10:16:19', 1, 'failed');
+INSERT INTO `audio_call_history` VALUES (247, 5, 1, 1, 'ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '2025-10-01 10:18:51', 1, 'failed');
+INSERT INTO `audio_call_history` VALUES (248, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 10:22:31', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (249, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 10:27:42', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (250, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 10:51:06', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (251, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 10:51:18', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (252, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 10:51:53', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (253, 5, 1, 1, 'ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '2025-10-01 10:52:21', 1, 'failed');
+INSERT INTO `audio_call_history` VALUES (254, NULL, 1, 1, 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', '2025-10-01 10:52:24', 1, 'failed');
+INSERT INTO `audio_call_history` VALUES (255, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-01 11:08:38', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (256, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-07 16:35:25', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (257, 7, 1, 1, 'ขอเชิญ หมายเลข T 0 0 2 ที่ จุด คัดกรอง ครับ', '2025-10-07 16:37:59', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (258, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ ห้องตรวจ 1', '2025-10-08 09:05:10', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (259, 7, 1, 1, 'ขอเชิญ หมายเลข T 0 0 2 ที่ จุด คัดกรอง ครับ', '2025-10-08 09:06:11', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (260, 7, 1, 1, '&#039;ขอเชิญหมายเลข&#039; T 0 0 2 ที่ จุด คัดกรอง &#039;ค่ะ&#039;', '2025-10-08 09:07:12', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (261, 7, 1, 1, 'ขอเชิญหมายเลข T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:08:27', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (262, 7, 1, 1, 'ขอเชิญหมายเลข T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:09:30', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (263, 7, 1, 1, '\\&#039;ขอเชิญหมายเลข\\&#039; T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:12:39', 1, 'pending');
+INSERT INTO `audio_call_history` VALUES (264, 7, 1, 1, 'ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:13:23', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (265, 7, 1, 1, 'ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:13:24', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (266, 7, 1, 1, 'ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:13:35', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (267, NULL, NULL, 1, 'ทดสอบระบบเสียง: ทดสอบระบบเสียง หมายเลข, A,0,0,1 เชิญที่ ห้องตรวจ 1', '2025-10-08 09:14:38', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (268, 7, 1, 1, 'ขอเชิญหมายเลข, T,0,0,2 ที่ จุด คัดกรอง ค่ะ', '2025-10-08 09:20:12', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (269, 7, 1, 1, 'ขอเชิญหมายเลข, T,0,0,2, ที่, จุด คัดกรอง, ค่ะ', '2025-10-08 09:20:54', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (270, 7, 1, 1, 'ขอเชิญหมายเลข, T,0,0,2, ที่จุด คัดกรอง, ค่ะ', '2025-10-08 09:21:10', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (271, 8, 1, 1, 'ขอเชิญหมายเลข, B,0,0,1, ที่ จุด คัดกรอง, ค่ะ', '2025-10-08 09:21:43', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (272, 1, 2, 1, 'ขอเชิญหมายเลข, A,0,0,1, ที่ ห้องตรวจ  1, ค่ะ', '2025-10-08 09:21:49', 1, 'played');
+INSERT INTO `audio_call_history` VALUES (273, 3, 2, 1, 'ขอเชิญหมายเลข, A,0,0,1, ที่ ห้องตรวจ,  1,, ค่ะ', '2025-10-08 09:22:28', 1, 'played');
 
 -- ----------------------------
 -- Table structure for audio_files
@@ -346,7 +373,7 @@ CREATE TABLE `audio_files`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`audio_id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 64 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 64 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of audio_files
@@ -432,7 +459,7 @@ CREATE TABLE `audit_logs`  (
   INDEX `idx_audit_logs_date`(`timestamp` ASC) USING BTREE,
   INDEX `fk_al_staff`(`staff_id` ASC) USING BTREE,
   CONSTRAINT `fk_al_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 595 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 692 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of audit_logs
@@ -1031,6 +1058,103 @@ INSERT INTO `audit_logs` VALUES (591, NULL, 'สร้างคิว A003 จ�
 INSERT INTO `audit_logs` VALUES (592, 1, 'เรียกคิว A003 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:16:10', NULL, NULL, NULL, NULL);
 INSERT INTO `audit_logs` VALUES (593, 1, 'เล่นเสียงเรียกคิว: ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:16:10', NULL, NULL, NULL, NULL);
 INSERT INTO `audit_logs` VALUES (594, 1, 'เล่นเสียงเรียกคิว: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:16:19', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (595, 1, 'เล่นเสียงเรียกคิว: ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:18:51', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (596, 1, 'Admin area access denied: Insufficient permissions', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:21:24', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (597, NULL, 'Admin area access denied: Not logged in', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:21:24', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (598, 1, 'เข้าสู่ระบบ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:21:32', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (599, 1, 'อัปเดตการตั้งค่า Environment Variables', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:22:16', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (600, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:22:31', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (601, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:27:42', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (602, NULL, 'Admin area access denied: Not logged in', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-10-01 10:29:29', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (603, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:51:06', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (604, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:51:18', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (605, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:51:53', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (606, 1, 'เล่นเสียงเรียกคิว: ขอเชิญ หมายเลข A 0 0 3 ที่ จุด คัดกรอง ครับ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:52:21', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (607, 1, 'เล่นเสียงเรียกคิว: ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 10:52:24', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (608, 1, 'เพิ่ม TTS API Service: Localhost', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:06:54', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (609, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:07:15', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (610, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:08:29', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (611, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:08:38', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (612, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:35:49', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (613, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:35:52', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (614, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:36:18', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (615, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:36:46', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (616, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 11:37:08', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (617, 1, 'reset_queue_numbers', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 13:34:05', 'queue_types', NULL, '{\"reset_type\":\"all\",\"affected_types\":[\"\\u0e04\\u0e34\\u0e27\\u0e17\\u0e31\\u0e48\\u0e27\\u0e44\\u0e1b\",\"\\u0e04\\u0e34\\u0e27\\u0e19\\u0e31\\u0e14\\u0e2b\\u0e21\\u0e32\\u0e22\",\"\\u0e04\\u0e34\\u0e27\\u0e40\\u0e23\\u0e48\\u0e07\\u0e14\\u0e48\\u0e27\\u0e19\",\"\\u0e04\\u0e34\\u0e27\\u0e1c\\u0e39\\u0e49\\u0e2a\\u0e39\\u0e07\\u0e2d\\u0e32\\u0e22\\u0e38\\/\\u0e1e\\u0e34\\u0e01\\u0e32\\u0e23\"]}', '{\"current_number\":0,\"reset_date\":\"2025-10-01 13:34:05\"}');
+INSERT INTO `audit_logs` VALUES (618, 1, 'เรียกคิว T001 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 13:57:32', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (619, 1, 'เรียกคิว T002 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 13:57:33', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (620, NULL, 'Admin area access denied: Not logged in', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 16:37:35', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (621, 1, 'เข้าสู่ระบบ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', '2025-10-01 16:37:44', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (622, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:09:26', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (623, 1, 'ตั้งค่า TTS API Service ที่ใช้งาน: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:10:21', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (624, 1, 'ตั้งค่า TTS API Service ที่ใช้งาน: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:11:14', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (625, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:13:25', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (626, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:30:33', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (627, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:35:03', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (628, 1, 'แก้ไข TTS API Service ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:35:05', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (629, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:35:25', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (630, 1, 'เล่นเสียงเรียกคิว: ขอเชิญ หมายเลข T 0 0 2 ที่ จุด คัดกรอง ครับ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-07 16:37:59', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (631, NULL, 'Admin area access denied: Not logged in', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:03:43', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (632, 1, 'เข้าสู่ระบบ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:03:48', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (633, 1, 'แก้ไข TTS API Service ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:05:03', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (634, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:05:10', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (635, 1, 'ลบรูปแบบข้อความเสียงเรียก ID: 4', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:05:37', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (636, 1, 'เล่นเสียงเรียกคิว: ขอเชิญ หมายเลข T 0 0 2 ที่ จุด คัดกรอง ครับ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:06:11', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (637, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:07:04', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (638, 1, 'เล่นเสียงเรียกคิว: &#039;ขอเชิญหมายเลข&#039; T 0 0 2 ที่ จุด คัดกรอง &#039;ค่ะ&#039;', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:07:12', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (639, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:08:25', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (640, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:08:27', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (641, 1, 'เรียกคิว T002 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:09:29', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (642, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:09:30', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (643, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:10:42', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (644, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:12:27', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (645, 1, 'เล่นเสียงเรียกคิว: \\&#039;ขอเชิญหมายเลข\\&#039; T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:12:39', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (646, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:12:58', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (647, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:13:23', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (648, 1, 'เรียกคิว T002 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:13:23', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (649, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:13:24', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (650, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T 0 0 2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:13:35', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (651, 1, 'ทดสอบระบบเสียงเรียกคิว', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:14:38', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (652, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T,0,0,2 ที่ จุด คัดกรอง ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:20:12', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (653, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:20:51', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (654, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T,0,0,2, ที่, จุด คัดกรอง, ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:20:54', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (655, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:08', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (656, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, T,0,0,2, ที่จุด คัดกรอง, ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:10', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (657, 1, 'แก้ไขรูปแบบข้อความเสียงเรียก ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:23', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (658, NULL, 'สร้างคิว B001 จาก Kiosk - บัตรประชาชน: 1111****1111', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:34', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (659, 1, 'เรียกคิว B001 ที่จุดบริการ ID: 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:40', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (660, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, B,0,0,1, ที่ จุด คัดกรอง, ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:43', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (661, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, A,0,0,1, ที่ ห้องตรวจ  1, ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:21:49', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (662, 1, 'แก้ไขจุดบริการ: ห้องตรวจ, 1,', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:22:18', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (663, 1, 'เรียกคิว A001 ที่จุดบริการ ID: 2', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:22:27', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (664, 1, 'เล่นเสียงเรียกคิว: ขอเชิญหมายเลข, A,0,0,1, ที่ ห้องตรวจ,  1,, ค่ะ', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:22:28', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (665, 1, 'แก้ไขจุดบริการ: ห้องตรวจ 1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 09:25:48', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (666, NULL, 'สร้างคิว A001 จาก Kiosk - บัตรประชาชน: 1329****0000', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 7.1.2; K1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.117 Safari/537.36', '2025-10-08 10:51:50', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (667, NULL, 'สร้างคิว A002 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.132', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Safari/537.36', '2025-10-08 11:05:09', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (668, NULL, 'สร้างคิว A003 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:48:07', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (669, NULL, 'สร้างคิว C001 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:54:04', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (670, NULL, 'สร้างคิว A004 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:54:16', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (671, NULL, 'สร้างคิว A005 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:55:37', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (672, NULL, 'สร้างคิว A006 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:56:03', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (673, NULL, 'สร้างคิว A007 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:57:04', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (674, NULL, 'สร้างคิว A008 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 11:59:33', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (675, NULL, 'สร้างคิว A009 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 12:00:57', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (676, NULL, 'สร้างคิว A010 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.132', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Safari/537.36', '2025-10-08 12:06:41', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (677, NULL, 'สร้างคิว A011 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 12:12:27', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (678, NULL, 'สร้างคิว A012 จาก Kiosk - บัตรประชาชน: 1222****2222', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:12:01', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (679, NULL, 'สร้างคิว A013 จาก Kiosk - บัตรประชาชน: 1222****2222', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:12:17', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (680, NULL, 'สร้างคิว A014 จาก Kiosk - บัตรประชาชน: 1222****2222', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:14:06', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (681, NULL, 'สร้างคิว A015 จาก Kiosk - บัตรประชาชน: 1222****2222', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:15:49', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (682, NULL, 'สร้างคิว A016 จาก Kiosk - บัตรประชาชน: 1222****2222', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:17:04', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (683, NULL, 'สร้างคิว A017 จาก Kiosk - บัตรประชาชน: 1111****1111', '172.68.44.163', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Safari/537.36', '2025-10-08 13:20:05', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (684, NULL, 'Staff area access denied: Not logged in', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:45:21', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (685, 1, 'เข้าสู่ระบบ', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:45:26', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (686, 1, 'ลบประเภทคิว ID: 4', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:45:46', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (687, 1, 'แก้ไ��ประเภทคิว: คิวทั่วไป', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:46:35', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (688, 1, 'แก้ไ��ประเภทคิว: คิวทั่วไป', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:46:49', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (689, 1, 'แก้ไ��ประเภทคิว: คิวทั่วไป', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:47:03', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (690, 1, 'แก้ไ��ประเภทคิว: คิวเร่งด่วน', '192.168.10.6', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', '2025-10-08 13:47:20', NULL, NULL, NULL, NULL);
+INSERT INTO `audit_logs` VALUES (691, NULL, 'สร้างคิว A018 จาก Kiosk - บัตรประชาชน: 1111****1111', '192.168.200.133', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2025-10-08 13:49:47', NULL, NULL, NULL, NULL);
 
 -- ----------------------------
 -- Table structure for auto_reset_logs
@@ -1050,7 +1174,7 @@ CREATE TABLE `auto_reset_logs`  (
   PRIMARY KEY (`log_id`) USING BTREE,
   INDEX `fk_arl_schedule`(`schedule_id` ASC) USING BTREE,
   CONSTRAINT `fk_arl_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `auto_reset_schedules` (`schedule_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of auto_reset_logs
@@ -1076,7 +1200,7 @@ CREATE TABLE `auto_reset_schedules`  (
   PRIMARY KEY (`schedule_id`) USING BTREE,
   INDEX `fk_ars_created_by`(`created_by` ASC) USING BTREE,
   CONSTRAINT `fk_ars_created_by` FOREIGN KEY (`created_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of auto_reset_schedules
@@ -1100,7 +1224,7 @@ CREATE TABLE `backup_logs`  (
   PRIMARY KEY (`backup_id`) USING BTREE,
   INDEX `created_by`(`created_by` ASC) USING BTREE,
   CONSTRAINT `backup_logs_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of backup_logs
@@ -1133,7 +1257,7 @@ CREATE TABLE `daily_performance_summary`  (
   INDEX `fk_dps_sp`(`service_point_id` ASC) USING BTREE,
   CONSTRAINT `fk_dps_queue_type` FOREIGN KEY (`queue_type_id`) REFERENCES `queue_types` (`queue_type_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_dps_sp` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of daily_performance_summary
@@ -1154,7 +1278,7 @@ CREATE TABLE `dashboard_alerts`  (
   `expires_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`alert_id`) USING BTREE,
   INDEX `idx_active_alerts`(`is_active` ASC, `created_at` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of dashboard_alerts
@@ -1175,7 +1299,7 @@ CREATE TABLE `dashboard_user_preferences`  (
   PRIMARY KEY (`preference_id`) USING BTREE,
   INDEX `fk_dup_staff`(`staff_id` ASC) USING BTREE,
   CONSTRAINT `fk_dup_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of dashboard_user_preferences
@@ -1195,7 +1319,7 @@ CREATE TABLE `dashboard_widgets`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`widget_id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of dashboard_widgets
@@ -1261,7 +1385,7 @@ CREATE TABLE `mobile_app_registrations`  (
   `expires_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`registration_id`) USING BTREE,
   UNIQUE INDEX `api_key`(`api_key` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mobile_app_registrations
@@ -1286,7 +1410,7 @@ CREATE TABLE `mobile_sessions`  (
   INDEX `fk_ms_reg`(`registration_id` ASC) USING BTREE,
   CONSTRAINT `fk_ms_reg` FOREIGN KEY (`registration_id`) REFERENCES `mobile_app_registrations` (`registration_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_ms_user` FOREIGN KEY (`mobile_user_id`) REFERENCES `mobile_users` (`mobile_user_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mobile_sessions
@@ -1313,7 +1437,7 @@ CREATE TABLE `mobile_users`  (
   INDEX `idx_device_id`(`device_id` ASC) USING BTREE,
   INDEX `fk_mu_reg`(`registration_id` ASC) USING BTREE,
   CONSTRAINT `fk_mu_reg` FOREIGN KEY (`registration_id`) REFERENCES `mobile_app_registrations` (`registration_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mobile_users
@@ -1338,18 +1462,11 @@ CREATE TABLE `notification_deliveries`  (
   INDEX `idx_delivery_channel`(`channel` ASC) USING BTREE,
   INDEX `fk_nd_notification`(`notification_id` ASC) USING BTREE,
   CONSTRAINT `fk_nd_notification` FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`notification_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 75 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 84 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of notification_deliveries
 -- ----------------------------
-INSERT INTO `notification_deliveries` VALUES (1, 2, 'browser', 'sent', NULL, '2025-09-03 16:13:17', NULL, NULL, '2025-09-03 16:13:17');
-INSERT INTO `notification_deliveries` VALUES (2, 3, 'browser', 'sent', NULL, '2025-09-03 16:13:28', NULL, NULL, '2025-09-03 16:13:28');
-INSERT INTO `notification_deliveries` VALUES (3, 4, 'browser', 'sent', NULL, '2025-09-03 16:13:40', NULL, NULL, '2025-09-03 16:13:40');
-INSERT INTO `notification_deliveries` VALUES (4, 5, 'browser', 'sent', NULL, '2025-09-03 16:21:49', NULL, NULL, '2025-09-03 16:21:49');
-INSERT INTO `notification_deliveries` VALUES (5, 6, 'browser', 'sent', NULL, '2025-09-03 16:24:30', NULL, NULL, '2025-09-03 16:24:30');
-INSERT INTO `notification_deliveries` VALUES (6, 7, 'browser', 'sent', NULL, '2025-09-03 16:24:52', NULL, NULL, '2025-09-03 16:24:52');
-INSERT INTO `notification_deliveries` VALUES (7, 8, 'browser', 'sent', NULL, '2025-09-03 16:25:09', NULL, NULL, '2025-09-03 16:25:09');
 INSERT INTO `notification_deliveries` VALUES (8, 9, 'browser', 'sent', NULL, '2025-09-08 15:40:13', NULL, NULL, '2025-09-08 15:40:13');
 INSERT INTO `notification_deliveries` VALUES (9, 10, 'browser', 'sent', NULL, '2025-09-09 14:06:01', NULL, NULL, '2025-09-09 14:06:01');
 INSERT INTO `notification_deliveries` VALUES (10, 11, 'browser', 'sent', NULL, '2025-09-09 14:06:40', NULL, NULL, '2025-09-09 14:06:40');
@@ -1417,6 +1534,15 @@ INSERT INTO `notification_deliveries` VALUES (71, 73, 'browser', 'sent', NULL, '
 INSERT INTO `notification_deliveries` VALUES (72, 74, 'browser', 'sent', NULL, '2025-10-01 10:16:10', NULL, NULL, '2025-10-01 10:16:10');
 INSERT INTO `notification_deliveries` VALUES (73, 75, 'browser', 'sent', NULL, '2025-10-01 10:16:10', NULL, NULL, '2025-10-01 10:16:10');
 INSERT INTO `notification_deliveries` VALUES (74, 76, 'browser', 'sent', NULL, '2025-10-01 10:16:19', NULL, NULL, '2025-10-01 10:16:19');
+INSERT INTO `notification_deliveries` VALUES (75, 77, 'browser', 'sent', NULL, '2025-10-01 10:18:51', NULL, NULL, '2025-10-01 10:18:51');
+INSERT INTO `notification_deliveries` VALUES (76, 78, 'browser', 'sent', NULL, '2025-10-01 10:52:21', NULL, NULL, '2025-10-01 10:52:21');
+INSERT INTO `notification_deliveries` VALUES (77, 79, 'browser', 'sent', NULL, '2025-10-01 10:52:24', NULL, NULL, '2025-10-01 10:52:24');
+INSERT INTO `notification_deliveries` VALUES (78, 80, 'browser', 'sent', NULL, '2025-10-01 13:57:32', NULL, NULL, '2025-10-01 13:57:32');
+INSERT INTO `notification_deliveries` VALUES (79, 81, 'browser', 'sent', NULL, '2025-10-01 13:57:33', NULL, NULL, '2025-10-01 13:57:33');
+INSERT INTO `notification_deliveries` VALUES (80, 82, 'browser', 'sent', NULL, '2025-10-08 09:09:29', NULL, NULL, '2025-10-08 09:09:29');
+INSERT INTO `notification_deliveries` VALUES (81, 83, 'browser', 'sent', NULL, '2025-10-08 09:13:23', NULL, NULL, '2025-10-08 09:13:23');
+INSERT INTO `notification_deliveries` VALUES (82, 84, 'browser', 'sent', NULL, '2025-10-08 09:21:40', NULL, NULL, '2025-10-08 09:21:40');
+INSERT INTO `notification_deliveries` VALUES (83, 85, 'browser', 'sent', NULL, '2025-10-08 09:22:27', NULL, NULL, '2025-10-08 09:22:27');
 
 -- ----------------------------
 -- Table structure for notification_preferences
@@ -1435,7 +1561,7 @@ CREATE TABLE `notification_preferences`  (
   PRIMARY KEY (`preference_id`) USING BTREE,
   UNIQUE INDEX `unique_staff_notification_type`(`staff_id` ASC, `notification_type` ASC) USING BTREE,
   CONSTRAINT `fk_np_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of notification_preferences
@@ -1460,7 +1586,7 @@ CREATE TABLE `notification_types`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`type_id`) USING BTREE,
   UNIQUE INDEX `type_code`(`type_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of notification_types
@@ -1507,19 +1633,11 @@ CREATE TABLE `notifications`  (
   INDEX `fk_n_sender`(`sender_id` ASC) USING BTREE,
   CONSTRAINT `fk_n_recipient` FOREIGN KEY (`recipient_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_n_sender` FOREIGN KEY (`sender_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 77 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 86 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of notifications
 -- ----------------------------
-INSERT INTO `notifications` VALUES (1, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 18) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:13:16', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (2, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: ห้องตรวจ (Queue ID: 7) (Service Point: ห้องตรวจ 1)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:13:17', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (3, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:13:28', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (4, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:13:40', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (5, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: ห้องตรวจ (Queue ID: 7) (Service Point: ห้องตรวจ 1)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:21:49', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (6, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:24:30', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (7, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:24:52', NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `notifications` VALUES (8, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-03 16:25:09', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO `notifications` VALUES (9, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-08 15:40:13', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO `notifications` VALUES (10, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-09 14:06:01', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO `notifications` VALUES (11, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: คัดกรอง (Queue ID: 19) (Service Point: จุด คัดกรอง)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-09-09 14:06:40', NULL, NULL, NULL, NULL, NULL);
@@ -1588,6 +1706,15 @@ INSERT INTO `notifications` VALUES (73, 'system_alert', 'ปัญหาเส�
 INSERT INTO `notifications` VALUES (74, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข A003 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:16:10', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO `notifications` VALUES (75, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: storage/tts/tts_service_1_49fb2598a9634f19f866a4cdeba1b96f.mp3 (Queue ID: 5)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:16:10', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO `notifications` VALUES (76, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: storage/tts/tts_service_1_072cb6656b4de99b5088c10e478f2c97.mp3', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:16:19', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (77, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: storage/tts/tts_service_1_49fb2598a9634f19f866a4cdeba1b96f.mp3 (Queue ID: 5)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:18:51', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (78, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: storage/tts/tts_service_1_49fb2598a9634f19f866a4cdeba1b96f.mp3 (Queue ID: 5)', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:52:21', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (79, 'system_alert', 'ปัญหาเสียงเรียกคิว', 'ไม่สามารถโหลดไฟล์เสียงต่อไปนี้ได้: storage/tts/tts_service_1_072cb6656b4de99b5088c10e478f2c97.mp3', 'exclamation-triangle', 'urgent', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 10:52:24', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (80, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข T001 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 13:57:32', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (81, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข T002 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-01 13:57:33', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (82, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข T002 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-08 09:09:29', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (83, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข T002 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-08 09:13:23', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (84, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข B001 เชิญที่ จุด คัดกรอง', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-08 09:21:40', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `notifications` VALUES (85, 'queue_called', 'เรียกคิวแล้ว', 'หมายเลข A001 เชิญที่ ห้องตรวจ, 1,', 'bullhorn', 'high', NULL, 1, 0, 0, 1, NULL, 1, '2025-10-08 09:22:27', NULL, NULL, NULL, NULL, NULL);
 
 -- ----------------------------
 -- Table structure for patients
@@ -1602,7 +1729,7 @@ CREATE TABLE `patients`  (
   PRIMARY KEY (`patient_id`) USING BTREE,
   UNIQUE INDEX `id_card_number`(`id_card_number` ASC) USING BTREE,
   INDEX `idx_patients_id_card`(`id_card_number` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 26 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 46 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of patients
@@ -1612,6 +1739,8 @@ INSERT INTO `patients` VALUES (2, '1111111111111', NULL, NULL, '2025-06-19 16:35
 INSERT INTO `patients` VALUES (3, '2132213212313', NULL, NULL, '2025-07-29 14:28:41');
 INSERT INTO `patients` VALUES (6, '5645456456456', NULL, NULL, '2025-07-29 15:23:29');
 INSERT INTO `patients` VALUES (9, '8456545446464', NULL, NULL, '2025-07-29 17:03:47');
+INSERT INTO `patients` VALUES (27, '1329900000000', NULL, NULL, '2025-10-08 10:51:50');
+INSERT INTO `patients` VALUES (39, '1222222222222', NULL, NULL, '2025-10-08 13:12:01');
 
 -- ----------------------------
 -- Table structure for permissions
@@ -1624,7 +1753,7 @@ CREATE TABLE `permissions`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`permission_id`) USING BTREE,
   UNIQUE INDEX `permission_name`(`permission_name` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of permissions
@@ -1658,7 +1787,7 @@ CREATE TABLE `push_notifications`  (
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_mobile_user_id`(`mobile_user_id` ASC) USING BTREE,
   CONSTRAINT `fk_pn_user` FOREIGN KEY (`mobile_user_id`) REFERENCES `mobile_users` (`mobile_user_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of push_notifications
@@ -1672,6 +1801,7 @@ CREATE TABLE `queue_types`  (
   `queue_type_id` int NOT NULL AUTO_INCREMENT,
   `type_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
+  `icon_class` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
   `prefix_char` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'A',
   `is_active` tinyint(1) NULL DEFAULT 1,
   `current_number` int NULL DEFAULT 0,
@@ -1685,15 +1815,14 @@ CREATE TABLE `queue_types`  (
   INDEX `idx_queue_types_prefix`(`prefix_char` ASC) USING BTREE,
   INDEX `fk_qt_reset_by`(`last_reset_by` ASC) USING BTREE,
   CONSTRAINT `fk_qt_reset_by` FOREIGN KEY (`last_reset_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of queue_types
 -- ----------------------------
-INSERT INTO `queue_types` VALUES (1, 'คิวทั่วไป', 'คิวสำหรับผู้ป่วยทั่วไป', 'A', 1, 0, '2025-10-01 10:15:15', 1, 'manual', '2025-06-19 16:30:13');
-INSERT INTO `queue_types` VALUES (2, 'คิวนัดหมาย', 'คิวสำหรับผู้ป่วยที่มีการนัดหมาย', 'B', 1, 0, '2025-10-01 10:15:15', 1, 'manual', '2025-06-19 16:30:13');
-INSERT INTO `queue_types` VALUES (3, 'คิวเร่งด่วน', 'คิวสำหรับผู้ป่วยเร่งด่วน', 'C', 1, 0, '2025-10-01 10:15:15', 1, 'manual', '2025-06-19 16:30:13');
-INSERT INTO `queue_types` VALUES (4, 'คิวผู้สูงอายุ/พิการ', 'คิวสำหรับผู้สูงอายุและผู้พิการ', 'D', 1, 0, '2025-10-01 10:15:15', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (1, 'คิวทั่วไป', 'สำหรับผู้ป่วย ไม่มีนัด/ผิดนัด', 'fas fa-clipboard-list', 'A', 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (2, 'คิวนัดหมาย', 'คิวสำหรับผู้ป่วยที่มีการนัดหมาย', 'fa-solid fa-calendar-clock', 'B', 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (3, 'คิวเร่งด่วน', 'คิวสำหรับผู้ป่วยเร่งด่วน', 'fas fa-clipboard-list', 'C', 0, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
 
 -- ----------------------------
 -- Table structure for queues
@@ -1722,16 +1851,38 @@ CREATE TABLE `queues`  (
   INDEX `fk_q_queue_type`(`queue_type_id` ASC) USING BTREE,
   CONSTRAINT `fk_q_queue_type` FOREIGN KEY (`queue_type_id`) REFERENCES `queue_types` (`queue_type_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_q_service_point` FOREIGN KEY (`current_service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 28 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of queues
 -- ----------------------------
 INSERT INTO `queues` VALUES (1, 'A001', 1, '1111111111111', 'KIOSK_01', '2025-09-24 15:53:40', 'called', 2, '2025-09-29 10:02:38', 4, 0, 0, '2025-09-24 15:53:40');
 INSERT INTO `queues` VALUES (2, 'A001', 1, '1111111111111', 'KIOSK_01', '2025-09-30 15:38:28', 'cancelled', 1, '2025-10-01 08:43:04', 5, 0, 0, '2025-09-30 15:38:28');
-INSERT INTO `queues` VALUES (3, 'A001', 1, '1111111111111', 'KIOSK_01', '2025-10-01 08:43:15', 'waiting', 2, '2025-10-01 08:43:31', 1, 0, 0, '2025-10-01 08:43:15');
+INSERT INTO `queues` VALUES (3, 'A001', 1, '1111111111111', 'KIOSK_01', '2025-10-01 08:43:15', 'called', 2, '2025-10-08 09:22:27', 2, 0, 0, '2025-10-01 08:43:15');
 INSERT INTO `queues` VALUES (4, 'A002', 1, '1111111111111', 'KIOSK_01', '2025-10-01 08:59:17', 'completed', 1, '2025-10-01 09:32:05', 1, 0, 0, '2025-10-01 08:59:17');
 INSERT INTO `queues` VALUES (5, 'A003', 1, '1111111111111', 'KIOSK_01', '2025-10-01 10:15:59', 'called', 1, '2025-10-01 10:16:10', 1, 0, 0, '2025-10-01 10:15:59');
+INSERT INTO `queues` VALUES (6, 'T001', 1, NULL, NULL, '2025-10-01 12:10:29', 'called', 1, '2025-10-01 13:57:32', 1, 1, 0, '2025-10-01 12:10:29');
+INSERT INTO `queues` VALUES (7, 'T002', 1, NULL, NULL, '2025-10-01 12:10:42', 'called', 1, '2025-10-08 09:13:23', 3, 1, 0, '2025-10-01 12:10:42');
+INSERT INTO `queues` VALUES (8, 'B001', 2, '1111111111111', 'KIOSK_01', '2025-10-08 09:21:34', 'called', 1, '2025-10-08 09:21:40', 1, 0, 0, '2025-10-08 09:21:34');
+INSERT INTO `queues` VALUES (9, 'A001', 1, '1329900000000', 'KIOSK_01', '2025-10-08 10:51:50', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 10:51:50');
+INSERT INTO `queues` VALUES (10, 'A002', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:05:09', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:05:09');
+INSERT INTO `queues` VALUES (11, 'A003', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:48:07', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:48:07');
+INSERT INTO `queues` VALUES (12, 'C001', 3, '1111111111111', 'KIOSK_01', '2025-10-08 11:54:04', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:54:04');
+INSERT INTO `queues` VALUES (13, 'A004', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:54:16', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:54:16');
+INSERT INTO `queues` VALUES (14, 'A005', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:55:37', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:55:37');
+INSERT INTO `queues` VALUES (15, 'A006', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:56:03', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:56:03');
+INSERT INTO `queues` VALUES (16, 'A007', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:57:04', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:57:04');
+INSERT INTO `queues` VALUES (17, 'A008', 1, '1111111111111', 'KIOSK_01', '2025-10-08 11:59:33', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 11:59:33');
+INSERT INTO `queues` VALUES (18, 'A009', 1, '1111111111111', 'KIOSK_01', '2025-10-08 12:00:57', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 12:00:57');
+INSERT INTO `queues` VALUES (19, 'A010', 1, '1111111111111', 'KIOSK_01', '2025-10-08 12:06:41', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 12:06:41');
+INSERT INTO `queues` VALUES (20, 'A011', 1, '1111111111111', 'KIOSK_01', '2025-10-08 12:12:27', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 12:12:27');
+INSERT INTO `queues` VALUES (21, 'A012', 1, '1222222222222', 'KIOSK_01', '2025-10-08 13:12:01', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:12:01');
+INSERT INTO `queues` VALUES (22, 'A013', 1, '1222222222222', 'KIOSK_01', '2025-10-08 13:12:17', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:12:17');
+INSERT INTO `queues` VALUES (23, 'A014', 1, '1222222222222', 'KIOSK_01', '2025-10-08 13:14:06', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:14:06');
+INSERT INTO `queues` VALUES (24, 'A015', 1, '1222222222222', 'KIOSK_01', '2025-10-08 13:15:49', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:15:49');
+INSERT INTO `queues` VALUES (25, 'A016', 1, '1222222222222', 'KIOSK_01', '2025-10-08 13:17:04', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:17:04');
+INSERT INTO `queues` VALUES (26, 'A017', 1, '1111111111111', 'KIOSK_01', '2025-10-08 13:20:05', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:20:05');
+INSERT INTO `queues` VALUES (27, 'A018', 1, '1111111111111', 'KIOSK_01', '2025-10-08 13:49:47', 'waiting', 1, NULL, 0, 0, 0, '2025-10-08 13:49:47');
 
 -- ----------------------------
 -- Table structure for real_time_metrics
@@ -1745,7 +1896,7 @@ CREATE TABLE `real_time_metrics`  (
   `recorded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`metric_id`) USING BTREE,
   INDEX `idx_metric_name_time`(`metric_name` ASC, `recorded_at` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of real_time_metrics
@@ -1766,7 +1917,7 @@ CREATE TABLE `report_cache`  (
   UNIQUE INDEX `cache_key`(`cache_key` ASC) USING BTREE,
   INDEX `idx_cache_key`(`cache_key` ASC) USING BTREE,
   INDEX `idx_expires_at`(`expires_at` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of report_cache
@@ -1797,7 +1948,7 @@ CREATE TABLE `report_execution_log`  (
   CONSTRAINT `fk_rel_executed_by` FOREIGN KEY (`executed_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_rel_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `scheduled_reports` (`schedule_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_rel_template` FOREIGN KEY (`template_id`) REFERENCES `report_templates` (`template_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of report_execution_log
@@ -1820,7 +1971,7 @@ CREATE TABLE `report_templates`  (
   PRIMARY KEY (`template_id`) USING BTREE,
   INDEX `fk_rt_created_by`(`created_by` ASC) USING BTREE,
   CONSTRAINT `fk_rt_created_by` FOREIGN KEY (`created_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of report_templates
@@ -1842,7 +1993,7 @@ CREATE TABLE `role_permissions`  (
   INDEX `fk_rp_permission`(`permission_id` ASC) USING BTREE,
   CONSTRAINT `fk_rp_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_rp_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of role_permissions
@@ -1883,7 +2034,7 @@ CREATE TABLE `roles`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`role_id`) USING BTREE,
   UNIQUE INDEX `role_name`(`role_name` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of roles
@@ -1918,7 +2069,7 @@ CREATE TABLE `scheduled_reports`  (
   INDEX `fk_sr_created_by`(`created_by` ASC) USING BTREE,
   CONSTRAINT `fk_sr_created_by` FOREIGN KEY (`created_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_sr_template` FOREIGN KEY (`template_id`) REFERENCES `report_templates` (`template_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of scheduled_reports
@@ -1949,7 +2100,7 @@ CREATE TABLE `service_flow_history`  (
   CONSTRAINT `fk_sfh_queue` FOREIGN KEY (`queue_id`) REFERENCES `queues` (`queue_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_sfh_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_sfh_to_sp` FOREIGN KEY (`to_service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 131 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 157 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of service_flow_history
@@ -2084,6 +2235,32 @@ INSERT INTO `service_flow_history` VALUES (127, 4, 1, NULL, 1, 'completed', '', 
 INSERT INTO `service_flow_history` VALUES (128, 3, 1, 2, 1, 'forwarded', '', '2025-10-01 09:33:06');
 INSERT INTO `service_flow_history` VALUES (129, 5, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-01 10:15:59');
 INSERT INTO `service_flow_history` VALUES (130, 5, 1, 1, 1, 'called', NULL, '2025-10-01 10:16:10');
+INSERT INTO `service_flow_history` VALUES (131, 6, 1, 1, 1, 'called', NULL, '2025-10-01 13:57:32');
+INSERT INTO `service_flow_history` VALUES (132, 7, 1, 1, 1, 'called', NULL, '2025-10-01 13:57:33');
+INSERT INTO `service_flow_history` VALUES (133, 7, 1, 1, 1, 'recalled', NULL, '2025-10-08 09:09:29');
+INSERT INTO `service_flow_history` VALUES (134, 7, 1, 1, 1, 'recalled', NULL, '2025-10-08 09:13:23');
+INSERT INTO `service_flow_history` VALUES (135, 8, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 09:21:34');
+INSERT INTO `service_flow_history` VALUES (136, 8, 1, 1, 1, 'called', NULL, '2025-10-08 09:21:40');
+INSERT INTO `service_flow_history` VALUES (137, 3, 2, 2, 1, 'called', NULL, '2025-10-08 09:22:27');
+INSERT INTO `service_flow_history` VALUES (138, 9, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 10:51:50');
+INSERT INTO `service_flow_history` VALUES (139, 10, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:05:09');
+INSERT INTO `service_flow_history` VALUES (140, 11, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:48:07');
+INSERT INTO `service_flow_history` VALUES (141, 12, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:54:04');
+INSERT INTO `service_flow_history` VALUES (142, 13, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:54:16');
+INSERT INTO `service_flow_history` VALUES (143, 14, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:55:37');
+INSERT INTO `service_flow_history` VALUES (144, 15, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:56:03');
+INSERT INTO `service_flow_history` VALUES (145, 16, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:57:04');
+INSERT INTO `service_flow_history` VALUES (146, 17, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 11:59:33');
+INSERT INTO `service_flow_history` VALUES (147, 18, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 12:00:57');
+INSERT INTO `service_flow_history` VALUES (148, 19, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 12:06:41');
+INSERT INTO `service_flow_history` VALUES (149, 20, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 12:12:27');
+INSERT INTO `service_flow_history` VALUES (150, 21, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:12:01');
+INSERT INTO `service_flow_history` VALUES (151, 22, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:12:17');
+INSERT INTO `service_flow_history` VALUES (152, 23, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:14:06');
+INSERT INTO `service_flow_history` VALUES (153, 24, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:15:49');
+INSERT INTO `service_flow_history` VALUES (154, 25, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:17:04');
+INSERT INTO `service_flow_history` VALUES (155, 26, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:20:05');
+INSERT INTO `service_flow_history` VALUES (156, 27, NULL, 1, NULL, 'created', 'สร้างคิวจาก Kiosk', '2025-10-08 13:49:47');
 
 -- ----------------------------
 -- Table structure for service_flows
@@ -2105,7 +2282,7 @@ CREATE TABLE `service_flows`  (
   CONSTRAINT `fk_sf_from_sp` FOREIGN KEY (`from_service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_sf_queue_type` FOREIGN KEY (`queue_type_id`) REFERENCES `queue_types` (`queue_type_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_sf_to_sp` FOREIGN KEY (`to_service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of service_flows
@@ -2137,13 +2314,13 @@ CREATE TABLE `service_points`  (
   INDEX `fk_sp_voice_template`(`voice_template_id` ASC) USING BTREE,
   CONSTRAINT `fk_sp_queue_type` FOREIGN KEY (`queue_type_id`) REFERENCES `queue_types` (`queue_type_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_sp_voice_template` FOREIGN KEY (`voice_template_id`) REFERENCES `voice_templates` (`template_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of service_points
 -- ----------------------------
 INSERT INTO `service_points` VALUES (1, 'จุด', 'คัดกรอง', 'จุดคัดกรองผู้ป่วยเบื้องต้น', 'SCREENING_01', 1, 1, NULL, NULL, '2025-06-19 16:30:13');
-INSERT INTO `service_points` VALUES (2, NULL, 'ห้องตรวจ 1', 'ห้องตรวจแพทย์ห้องที่ 1', 'DOCTOR_01', 1, 2, NULL, NULL, '2025-06-19 16:30:13');
+INSERT INTO `service_points` VALUES (2, '', 'ห้องตรวจ 1', 'ห้องตรวจแพทย์ห้องที่ 1', 'DOCTOR_01', 1, 2, NULL, NULL, '2025-06-19 16:30:13');
 INSERT INTO `service_points` VALUES (3, NULL, 'ห้องตรวจ 2', 'ห้องตรวจแพทย์ห้องที่ 2', 'DOCTOR_02', 1, 3, NULL, NULL, '2025-06-19 16:30:13');
 INSERT INTO `service_points` VALUES (4, NULL, 'ห้องเภสัช', 'จุดรับยา', 'PHARMACY_01', 1, 4, NULL, NULL, '2025-06-19 16:30:13');
 INSERT INTO `service_points` VALUES (5, NULL, 'การเงิน', 'จุดชำระเงิน', 'CASHIER_01', 1, 5, NULL, NULL, '2025-06-19 16:30:13');
@@ -2159,7 +2336,7 @@ CREATE TABLE `settings`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`setting_key`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of settings
@@ -2245,7 +2422,7 @@ CREATE TABLE `staff_service_point_access`  (
   INDEX `fk_sspa_sp`(`service_point_id` ASC) USING BTREE,
   CONSTRAINT `fk_sspa_sp` FOREIGN KEY (`service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_sspa_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff_users` (`staff_id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of staff_service_point_access
@@ -2277,12 +2454,12 @@ CREATE TABLE `staff_users`  (
   INDEX `idx_staff_users_active`(`is_active` ASC) USING BTREE,
   INDEX `fk_staff_role`(`role_id` ASC) USING BTREE,
   CONSTRAINT `fk_staff_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE SET NULL ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of staff_users
 -- ----------------------------
-INSERT INTO `staff_users` VALUES (1, 'admin', '$2y$10$YnYLz/CHULA9Cpl4Kqmnke.FMzw9AjzQHC07C955UKo58R4M5sOyO', 'ผู้ดูแลระบบ', 1, 1, '2025-10-01 08:37:04', 'pass:123456', '2025-06-19 16:30:13');
+INSERT INTO `staff_users` VALUES (1, 'admin', '$2y$10$YnYLz/CHULA9Cpl4Kqmnke.FMzw9AjzQHC07C955UKo58R4M5sOyO', 'ผู้ดูแลระบบ', 1, 1, '2025-10-08 13:45:26', 'pass:123456', '2025-06-19 16:30:13');
 
 -- ----------------------------
 -- Table structure for tts_api_services
@@ -2296,12 +2473,13 @@ CREATE TABLE `tts_api_services`  (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`service_id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of tts_api_services
 -- ----------------------------
-INSERT INTO `tts_api_services` VALUES (1, 'GIN', 'curl --location http://gin.ycap.go.th:5000/tts\' \\\r\n--header \'Content-Type: application/json\' \\\r\n--data \'{\r\n    \"text\": \"{{_TEXT_TO_SPECH_}}\",\r\n    \"lang\": \"th\"\r\n}\'', 1, '2025-09-30 15:40:59', '2025-09-30 15:46:23');
+INSERT INTO `tts_api_services` VALUES (1, 'GIN', 'curl -X POST -H \"Content-Type: application/json\" -d \'{\"text\": \"{{_TEXT_TO_SPEECH_}}\", \"lang\": \"th\"}\' http://gin.ycap.go.th:5000/tts', 1, '2025-09-30 15:40:59', '2025-10-08 09:05:03');
+INSERT INTO `tts_api_services` VALUES (2, 'Localhost', 'curl -X \'POST\' \\\r\n  \'http://localhost:5000/tts\' \\\r\n  -H \'accept: */*\' \\\r\n  -H \'Content-Type: application/json\' \\\r\n  -d \'{\r\n  \"text\": \"{{_TEXT_TO_SPECH_}}\",\r\n  \"lang\": \"th\",\r\n  \"slow\": false,\r\n  \"tld\": \"com\"\r\n}\'', 0, '2025-10-01 11:06:54', '2025-10-07 16:13:25');
 
 -- ----------------------------
 -- Table structure for voice_templates
@@ -2316,32 +2494,13 @@ CREATE TABLE `voice_templates`  (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`template_id`) USING BTREE,
   UNIQUE INDEX `template_name`(`template_name` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of voice_templates
 -- ----------------------------
-INSERT INTO `voice_templates` VALUES (1, 'เรียกคิวมาตรฐาน', 'ขอเชิญ หมายเลข {queue_number} ที่ {service_point_name} ครับ', 1, '2025-06-19 16:30:13', '2025-09-03 15:20:24');
+INSERT INTO `voice_templates` VALUES (1, 'เรียกคิวมาตรฐาน', 'ขอเชิญหมายเลข, {queue_number}, ที่ {service_point_name}, ค่ะ', 1, '2025-06-19 16:30:13', '2025-10-08 09:21:23');
 INSERT INTO `voice_templates` VALUES (2, 'เรียกคิวแบบสั้น', 'คิว {queue_number} ที่ {service_point_name}', 0, '2025-06-19 16:30:13', '2025-06-19 16:30:13');
 INSERT INTO `voice_templates` VALUES (3, 'เรียกคิวแบบมีชื่อ', 'คุณ {patient_name} หมายเลข {queue_number} เชิญที่ {service_point_name}', 0, '2025-06-19 16:30:13', '2025-06-19 16:30:13');
-INSERT INTO `voice_templates` VALUES (4, '5555', 'ขอเชิญ {คัดกรอง}', 0, '2025-08-28 10:48:55', '2025-08-29 10:23:30');
-
--- ----------------------------
--- View structure for v_current_queue_status
--- ----------------------------
-DROP VIEW IF EXISTS `v_current_queue_status`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_current_queue_status` AS select `q`.`queue_id` AS `queue_id`,`q`.`queue_number` AS `queue_number`,`q`.`queue_type_id` AS `queue_type_id`,`qt`.`type_name` AS `queue_type_name`,`q`.`current_status` AS `status`,`q`.`priority_level` AS `priority`,`q`.`current_service_point_id` AS `current_service_point_id`,`sp`.`point_name` AS `service_point_name`,`q`.`creation_time` AS `created_at`,`q`.`last_called_time` AS `called_at`,`q`.`estimated_wait_time` AS `estimated_wait_time` from ((`queues` `q` left join `queue_types` `qt` on((`q`.`queue_type_id` = `qt`.`queue_type_id`))) left join `service_points` `sp` on((`q`.`current_service_point_id` = `sp`.`service_point_id`))) where ((cast(`q`.`creation_time` as date) = curdate()) and (`q`.`current_status` in ('waiting','called','processing')));
-
--- ----------------------------
--- View structure for v_queue_statistics
--- ----------------------------
-DROP VIEW IF EXISTS `v_queue_statistics`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_queue_statistics` AS select cast(`q`.`creation_time` as date) AS `queue_date`,`q`.`queue_type_id` AS `queue_type_id`,count(0) AS `total_queues`,sum((case when (`q`.`current_status` = 'completed') then 1 else 0 end)) AS `completed_queues`,sum((case when (`q`.`current_status` = 'cancelled') then 1 else 0 end)) AS `cancelled_queues`,sum((case when (`q`.`current_status` = 'no_show') then 1 else 0 end)) AS `no_show_queues`,NULL AS `avg_wait_time`,NULL AS `avg_service_time` from `queues` `q` group by cast(`q`.`creation_time` as date),`q`.`queue_type_id`;
-
--- ----------------------------
--- View structure for v_service_point_performance
--- ----------------------------
-DROP VIEW IF EXISTS `v_service_point_performance`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `v_service_point_performance` AS select `sp`.`service_point_id` AS `service_point_id`,`sp`.`point_name` AS `point_name`,cast(`q`.`creation_time` as date) AS `performance_date`,count(`q`.`queue_id`) AS `total_served`,NULL AS `avg_service_time`,sum((case when (`q`.`current_status` = 'completed') then 1 else 0 end)) AS `completed_count`,((sum((case when (`q`.`current_status` = 'completed') then 1 else 0 end)) / count(`q`.`queue_id`)) * 100) AS `completion_rate` from (`service_points` `sp` left join `queues` `q` on((`sp`.`service_point_id` = `q`.`current_service_point_id`))) where (`q`.`creation_time` >= (curdate() - interval 30 day)) group by `sp`.`service_point_id`,cast(`q`.`creation_time` as date);
 
 SET FOREIGN_KEY_CHECKS = 1;

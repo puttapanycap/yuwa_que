@@ -209,7 +209,7 @@
                         <div class="col-md-12 mb-3">
                             <div class="service-type-card" onclick="selectServiceType(${type.queue_type_id}, '${type.type_name}')">
                                 <div class="text-center">
-                                    <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
+                                    <i class="${type.icon_class} fa-3x text-primary mb-3"></i>
                                     <h5>${type.type_name}</h5>
                                     <p class="text-muted">${type.description}</p>
                                 </div>
