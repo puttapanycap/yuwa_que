@@ -130,8 +130,19 @@
                     <div class="col-md-8">
                         <div class="mb-4">
                             <label class="form-label h5">กรุณากรอกเลขบัตรประจำตัวประชาชน 13 หลัก</label>
-                            <input type="text" class="form-control id-input" id="idCardNumber" 
+                            <input type="text" class="form-control id-input" id="idCardNumber" inputmode="numeric"
                                    placeholder="0-0000-00000-00-0" maxlength="17" pattern="[0-9-]{17}">
+                            <!-- <input 
+                                type="text" 
+                                class="form-control id-input"
+                                id="idCardNumber" 
+                                inputmode="none" 
+                                style="ime-mode:disabled;" 
+                                maxlength="17"
+                                pattern="[0-9-]{17}"
+                                placeholder="0-0000-00000-00-0"
+                                readonly 
+                                onfocus="this.blur();"> -->
                             <div class="form-text">หรือเสียบบัตรประจำตัวประชาชนที่เครื่องอ่านบัตร</div>
                         </div>
                         <div class="text-center">
