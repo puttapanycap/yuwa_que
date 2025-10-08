@@ -242,11 +242,23 @@
     <script>
         let selectedServiceType = null;
         let currentQueue = null;
+        let appSettings = {
+            queue_print_count: 1
+        };
 
         $(document).ready(function() {
+            loadAppSettings();
             loadServiceTypes();
             setupIdCardInput();
         });
+
+        function loadAppSettings() {
+            $.get('api/get_settings.php', function(data) {
+                appSettings = data;
+            }).fail(function() {
+                console.error('Could not load app settings.');
+            });
+        }
 
         function loadServiceTypes() {
             $.get('api/get_service_types.php', function(data) {
@@ -426,6 +438,25 @@
         }
 
         function printQueue() {
+            const printCount = parseInt(appSettings.queue_print_count, 10) || 1;
+            let ticketsHtml = '';
+
+            for (let i = 0; i < printCount; i++) {
+                ticketsHtml += `
+                    <div class="print-area" style="page-break-after: ${i < printCount - 1 ? 'always' : 'auto'};">
+                        <div class="hospital-name">${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</div>
+                        <h3>บัตรคิว</h3>
+                        <div class="queue-number">${currentQueue.queue_number}</div>
+                        <div class="queue-type">${selectedServiceType.name}</div>
+                        <div class="datetime">${new Date().toLocaleString('th-TH')}</div>
+                        <div class="qr-container">
+                            <canvas id="printQR_${i}" width="150" height="150"></canvas>
+                        </div>
+                        <div class="footer">สแกน QR Code เพื่อตรวจสอบสถานะคิว</div>
+                    </div>
+                `;
+            }
+
             const content = `
                 <!DOCTYPE html>
                 <html>
@@ -442,12 +473,20 @@
                             font-family: 'Sarabun', sans-serif;
                             text-align: center;
                             margin: 0;
-                            padding: 5mm;
+                            padding: 0;
                             width: 80mm;
-                            height: 140mm;
                             box-sizing: border-box;
                             color: #000;
+                        }
+                        .print-area {
+                            width: 80mm;
+                            height: 140mm;
+                            padding: 5mm;
+                            box-sizing: border-box;
                             overflow: hidden;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
                         }
                         .hospital-name {
                             font-size: 12pt;
@@ -476,16 +515,8 @@
                         }
                     </style>
                 </head>
-                <body class="print-area">
-                    <div class="hospital-name">โรงพยาบาลยุวประสาทไวทโยปถัมภ์</div>
-                    <h3>บัตรคิว</h3>
-                    <div class="queue-number">${currentQueue.queue_number}</div>
-                    <div class="queue-type">${selectedServiceType.name}</div>
-                    <div class="datetime">${new Date().toLocaleString('th-TH')}</div>
-                    <div class="qr-container">
-                        <canvas id="printQR" width="150" height="150"></canvas>
-                    </div>
-                    <div class="footer">สแกน QR Code เพื่อตรวจสอบสถานะคิว</div>
+                <body>
+                    ${ticketsHtml}
                 </body>
                 </html>
             `;
@@ -508,12 +539,14 @@
             
             script.onload = function() {
                 try {
-                    new printFrame.contentWindow.QRious({
-                        element: frameDoc.getElementById('printQR'),
-                        value: qrData,
-                        size: 150,
-                        level: 'H'
-                    });
+                    for (let i = 0; i < printCount; i++) {
+                        new printFrame.contentWindow.QRious({
+                            element: frameDoc.getElementById(`printQR_${i}`),
+                            value: qrData,
+                            size: 150,
+                            level: 'H'
+                        });
+                    }
                 } catch (e) {
                     console.error("QRious error:", e);
                 }

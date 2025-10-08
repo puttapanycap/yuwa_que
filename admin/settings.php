@@ -73,6 +73,7 @@ $currentSettings = [
     'enable_priority_queue' => getSetting('enable_priority_queue', 'true'),
     'auto_forward_enabled' => getSetting('auto_forward_enabled', 'false'),
     'service_point_label' => getSetting('service_point_label', 'จุดบริการ'),
+    'queue_print_count' => getSetting('queue_print_count', '1'),
 
     // Working Hours
     'working_hours_start' => getSetting('working_hours_start', '08:00'),
@@ -305,14 +306,14 @@ $currentSettings = [
                                 </div>
                                 
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">เวลาหมดอายุคิว (นาที)</label>
                                             <input type="number" class="form-control" name="settings[queue_timeout_minutes]" 
                                                    value="<?php echo $currentSettings['queue_timeout_minutes']; ?>" min="5" max="120">
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">ความถี่ในการรีเฟรชหน้าจอ (วินาที)</label>
                                             <select class="form-select" name="settings[display_refresh_interval]">
@@ -321,6 +322,13 @@ $currentSettings = [
                                                 <option value="5" <?php echo $currentSettings['display_refresh_interval'] == '5' ? 'selected' : ''; ?>>5 วินาที</option>
                                                 <option value="10" <?php echo $currentSettings['display_refresh_interval'] == '10' ? 'selected' : ''; ?>>10 วินาที</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">จำนวนสั่งปริ้นท์บัตรคิว</label>
+                                            <input type="number" class="form-control" name="settings[queue_print_count]"
+                                                   value="<?php echo $currentSettings['queue_print_count']; ?>" min="1" max="5">
                                         </div>
                                     </div>
                                 </div>

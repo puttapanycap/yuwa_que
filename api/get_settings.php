@@ -18,6 +18,7 @@ try {
         'enable_priority_queue' => getSetting('enable_priority_queue', '1'),
         'working_hours_start' => getSetting('working_hours_start', '08:00'),
         'working_hours_end' => getSetting('working_hours_end', '16:00'),
+        'queue_print_count' => getSetting('queue_print_count', '1'),
         'last_updated' => date('Y-m-d H:i:s')
     ];
     
