@@ -97,6 +97,55 @@
         .qr-code {
             margin: 1rem 0;
         }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: none;
+                font-family: 'Sarabun', sans-serif;
+            }
+            .kiosk-container, .hospital-header, .step-content, .btn, .form-text, .qr-code p {
+                display: none !important;
+            }
+            .queue-display {
+                display: block !important;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                text-align: center;
+            }
+            #step3 {
+                display: block !important;
+            }
+            .print-area {
+                width: 80mm;
+                padding: 5mm;
+                box-sizing: border-box;
+            }
+            .print-area .hospital-name {
+                font-size: 14pt;
+                font-weight: bold;
+            }
+            .print-area h3 {
+                font-size: 16pt;
+                margin: 10px 0;
+            }
+            .print-area .queue-number {
+                font-size: 36pt;
+                font-weight: bold;
+                margin: 10px 0;
+            }
+            .print-area .queue-type, .print-area .datetime {
+                font-size: 12pt;
+            }
+            .print-area .qr-container {
+                margin: 15px 0;
+            }
+            .print-area .footer {
+                font-size: 10pt;
+            }
+        }
     </style>
 </head>
 <body>
@@ -377,54 +426,57 @@
         }
 
         function printQueue() {
-            // สร้าง print window
-            const printWindow = window.open('', '_blank', 'width=400,height=600');
-            
-            // เขียน HTML structure
-            printWindow.document.write(`
+            const content = `
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="UTF-8">
                     <title>บัตรคิว</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
                     <style>
+                        @page {
+                            size: 80mm 140mm;
+                            margin: 0;
+                        }
                         body {
                             font-family: 'Sarabun', sans-serif;
                             text-align: center;
-                            padding: 20px;
                             margin: 0;
-                        }
-                        .queue-number {
-                            font-size: 48px;
-                            font-weight: bold;
-                            margin: 20px 0;
+                            padding: 5mm;
+                            width: 80mm;
+                            height: 140mm;
+                            box-sizing: border-box;
+                            color: #000;
+                            overflow: hidden;
                         }
                         .hospital-name {
-                            font-size: 18px;
+                            font-size: 12pt;
                             font-weight: bold;
-                            margin-bottom: 10px;
+                            margin-bottom: 5px;
                         }
-                        .queue-type {
-                            font-size: 16px;
+                        h3 {
+                            font-size: 14pt;
+                            margin: 5px 0;
+                        }
+                        .queue-number {
+                            font-size: 32pt;
+                            font-weight: bold;
                             margin: 10px 0;
                         }
-                        .datetime {
-                            font-size: 14px;
-                            margin: 10px 0;
+                        .queue-type, .datetime {
+                            font-size: 10pt;
+                            margin: 5px 0;
                         }
                         .qr-container {
-                            margin: 20px 0;
+                            margin: 10px 0;
                         }
                         .footer {
-                            font-size: 12px;
-                            margin-top: 20px;
-                        }
-                        @media print {
-                            body { margin: 0; }
+                            font-size: 8pt;
+                            margin-top: 10px;
                         }
                     </style>
                 </head>
-                <body>
+                <body class="print-area">
                     <div class="hospital-name">โรงพยาบาลยุวประสาทไวทโยปถัมภ์</div>
                     <h3>บัตรคิว</h3>
                     <div class="queue-number">${currentQueue.queue_number}</div>
@@ -436,69 +488,53 @@
                     <div class="footer">สแกน QR Code เพื่อตรวจสอบสถานะคิว</div>
                 </body>
                 </html>
-            `);
+            `;
+
+            const printFrame = document.createElement('iframe');
+            printFrame.style.position = 'absolute';
+            printFrame.style.width = '0';
+            printFrame.style.height = '0';
+            printFrame.style.border = '0';
+            document.body.appendChild(printFrame);
+
+            const frameDoc = printFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(content);
+            frameDoc.close();
+
+            const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
+            const script = frameDoc.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
             
-            printWindow.document.close();
-            
-            // รอให้ window โหลดเสร็จแล้วสร้าง QR Code
-            printWindow.onload = function() {
-                // โหลด QRCode library ใน print window
-                const script = printWindow.document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-                script.onload = function() {
-                    try {
-                        // สร้าง QR Code
-                        const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-                        new printWindow.QRious({
-                            element: printWindow.document.getElementById('printQR'),
-                            value: qrData,
-                            size: 150,
-                            backgroundAlpha: 1,
-                            foreground: '#000000',
-                            background: '#FFFFFF',
-                            level: 'H'
-                        });
-                        
-                        // รอสักครู่แล้ว print
-                        setTimeout(() => {
-                            printWindow.print();
-                            printWindow.close();
-                        }, 500);
-                    } catch (error) {
-                        console.error('QR Code generation error:', error);
-                        const canvas = printWindow.document.getElementById('printQR');
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#f8f9fa';
-                        ctx.fillRect(0, 0, 150, 150);
-                        ctx.fillStyle = '#6c757d';
-                        ctx.font = '12px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('QR Code', 75, 70);
-                        ctx.fillText('ไม่สามารถสร้างได้', 75, 85);
-                        
-                        printWindow.print();
-                        printWindow.close();
-                    }
-                };
+            script.onload = function() {
+                try {
+                    new printFrame.contentWindow.QRious({
+                        element: frameDoc.getElementById('printQR'),
+                        value: qrData,
+                        size: 150,
+                        level: 'H'
+                    });
+                } catch (e) {
+                    console.error("QRious error:", e);
+                }
                 
-                script.onerror = function() {
-                    // ถ้าโหลด library ไม่ได้ ให้แสดงข้อความแทน
-                    const canvas = printWindow.document.getElementById('printQR');
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#f8f9fa';
-                    ctx.fillRect(0, 0, 150, 150);
-                    ctx.fillStyle = '#6c757d';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('QR Code', 75, 70);
-                    ctx.fillText('ไม่สามารถสร้างได้', 75, 85);
-                    
-                    printWindow.print();
-                    printWindow.close();
-                };
-                
-                printWindow.document.head.appendChild(script);
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                    document.body.removeChild(printFrame);
+                }, 500);
             };
+
+            script.onerror = function() {
+                console.error("Could not load QRious library.");
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                    document.body.removeChild(printFrame);
+                }, 250);
+            };
+
+            frameDoc.head.appendChild(script);
         }
 
         function resetKiosk() {
