@@ -206,7 +206,7 @@
                 
                 data.forEach(function(type) {
                     const card = `
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-12 mb-3">
                             <div class="service-type-card" onclick="selectServiceType(${type.queue_type_id}, '${type.type_name}')">
                                 <div class="text-center">
                                     <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
