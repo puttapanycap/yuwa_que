@@ -528,147 +528,183 @@
                     return;
                 }
 
-                let ticketsHtml = '';
-
-                for (let i = 0; i < printCount; i++) {
-                    ticketsHtml += `
-                        <div class="print-area" style="page-break-after: ${i < printCount - 1 ? 'always' : 'auto'};">
-                            <div class="hospital-name">${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</div>
-                            <h3>บัตรคิว</h3>
-                            <div class="queue-number">${currentQueue.queue_number}</div>
-                            <div class="queue-type">${selectedServiceType.name}</div>
-                            <div class="datetime">${getTicketDateTime()}</div>
-                            <div class="qr-container">
-                                <canvas id="printQR_${i}" width="150" height="150"></canvas>
-                            </div>
-                            <div class="footer">${(appSettings.bixolon_ticket_footer || 'สแกน QR Code เพื่อตรวจสอบสถานะคิว')}</div>
-                        </div>
-                    `;
-                }
-
-                const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
+                const pdfUrl = new URL('print_ticket.php?queue_id=' + currentQueue.queue_id + '&format=pdf', window.location.href).toString();
 
                 const content = `
                     <!DOCTYPE html>
-                    <html>
+                    <html lang="th">
                     <head>
                         <meta charset="UTF-8">
-                        <title>บัตรคิว</title>
-                        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+                        <title>บัตรคิว ${currentQueue.queue_number}</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <style>
-                            @page {
-                                size: 80mm 140mm;
-                                margin: 0;
+                            :root {
+                                color-scheme: light;
                             }
                             body {
-                                font-family: 'Sarabun', sans-serif;
-                                text-align: center;
+                                font-family: 'Sarabun', 'TH Sarabun New', 'Tahoma', sans-serif;
                                 margin: 0;
-                                padding: 0;
-                                width: 80mm;
-                                box-sizing: border-box;
-                                color: #000;
-                            }
-                            .print-area {
-                                width: 80mm;
-                                height: 140mm;
-                                padding: 5mm;
-                                box-sizing: border-box;
-                                overflow: hidden;
+                                padding: 20px;
+                                background: #f5f6fa;
+                                color: #2c3e50;
+                                min-height: 100vh;
                                 display: flex;
                                 flex-direction: column;
-                                justify-content: center;
-                                align-items: center;
+                                gap: 16px;
+                                box-sizing: border-box;
                             }
-                            .hospital-name {
-                                font-size: 12pt;
-                                font-weight: bold;
-                                margin-bottom: 5px;
+                            header {
+                                text-align: center;
                             }
-                            h3 {
-                                font-size: 14pt;
-                                margin: 5px 0;
+                            header h1 {
+                                margin: 0 0 8px 0;
+                                font-size: 1.4rem;
                             }
-                            .queue-number {
-                                font-size: 32pt;
-                                font-weight: bold;
-                                margin: 10px 0;
+                            header p {
+                                margin: 4px 0;
+                                font-size: 1rem;
                             }
-                            .queue-type, .datetime {
-                                font-size: 10pt;
-                                margin: 5px 0;
+                            #pdfPreview {
+                                flex: 1;
+                                min-height: 60vh;
+                                width: 100%;
+                                border: 1px solid #dcdfe6;
+                                border-radius: 12px;
+                                background: #ffffff;
+                                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.03);
                             }
-                            .qr-container {
-                                margin: 10px 0;
-                            }
-                            .footer {
-                                font-size: 8pt;
-                                margin-top: 10px;
+                            #printStatus {
+                                text-align: center;
+                                font-size: 1rem;
                             }
                         </style>
                     </head>
                     <body>
-                        ${ticketsHtml}
-                        <script>
-                            window.__PRINT_SETTINGS__ = {
-                                printCount: ${printCount},
-                                qrData: ${JSON.stringify(qrData)}
-                            };
-                        <\/script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
+                        <header>
+                            <h1>${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</h1>
+                            <p>หมายเลขคิว <strong>${currentQueue.queue_number}</strong></p>
+                            <p>บริการ: ${selectedServiceType.name}</p>
+                            <p>ออกบัตรเมื่อ ${getTicketDateTime()}</p>
+                        </header>
+                        <iframe id="pdfPreview" title="ตัวอย่างบัตรคิว"></iframe>
+                        <div id="printStatus">กำลังเตรียมบัตรคิวสำหรับพิมพ์...</div>
                         <script>
                             (function() {
-                                function generateQrCodes() {
-                                    var settings = window.__PRINT_SETTINGS__ || {};
-                                    for (var i = 0; i < (settings.printCount || 0); i++) {
-                                        var canvas = document.getElementById('printQR_' + i);
-                                        if (!canvas) { continue; }
+                                const settings = {
+                                    copies: ${printCount},
+                                    pdfPath: ${JSON.stringify(pdfUrl)},
+                                    queueNumber: ${JSON.stringify(currentQueue.queue_number)}
+                                };
+                                const status = document.getElementById('printStatus');
+                                const preview = document.getElementById('pdfPreview');
+
+                                function buildPdfUrl(copyIndex) {
+                                    const url = new URL(settings.pdfPath);
+                                    url.searchParams.set('ts', Date.now().toString());
+                                    if (typeof copyIndex === 'number') {
+                                        url.searchParams.set('copy', (copyIndex + 1).toString());
+                                    }
+                                    return url.toString();
+                                }
+
+                                function openFallback(pdfUrl) {
+                                    const popup = window.open(pdfUrl, '_blank');
+                                    if (!popup) {
+                                        alert('ไม่สามารถเปิดไฟล์ PDF ในแท็บใหม่ได้ กรุณาปิดการบล็อกป๊อปอัป');
+                                    }
+                                }
+
+                                function scheduleClose() {
+                                    setTimeout(() => {
                                         try {
-                                            new QRious({
-                                                element: canvas,
-                                                value: settings.qrData,
-                                                size: 150,
-                                                level: 'H'
-                                            });
+                                            window.close();
                                         } catch (error) {
-                                            console.error('QRious error:', error);
+                                            console.warn('Unable to close fallback window automatically.', error);
                                         }
-                                    }
+                                    }, 1200);
                                 }
 
-                                function triggerPrint() {
-                                    window.focus();
-                                    window.print();
-                                }
+                                function printCopy(index) {
+                                    status.textContent = `กำลังพิมพ์บัตรคิว (${index + 1}/${settings.copies})...`;
+                                    const frame = document.createElement('iframe');
+                                    frame.style.position = 'fixed';
+                                    frame.style.right = '0';
+                                    frame.style.bottom = '0';
+                                    frame.style.width = '1px';
+                                    frame.style.height = '1px';
+                                    frame.style.opacity = '0';
+                                    frame.setAttribute('title', 'พิมพ์บัตรคิวอัตโนมัติ');
 
-                                function setupCloseHandler() {
-                                    if ('onafterprint' in window) {
-                                        window.addEventListener('afterprint', function() {
-                                            setTimeout(function() { window.close(); }, 500);
-                                        });
-                                    } else if (window.matchMedia) {
-                                        var mediaQuery = window.matchMedia('print');
-                                        if (mediaQuery && mediaQuery.addListener) {
-                                            mediaQuery.addListener(function(mql) {
-                                                if (!mql.matches) {
-                                                    setTimeout(function() { window.close(); }, 500);
+                                    let cleaned = false;
+                                    const cleanup = () => {
+                                        if (cleaned) {
+                                            return;
+                                        }
+                                        cleaned = true;
+                                        frame.remove();
+                                    };
+
+                                    frame.onload = () => {
+                                        try {
+                                            const printWindow = frame.contentWindow || frame;
+                                            if (!printWindow) {
+                                                throw new Error('ไม่พบหน้าต่างสำหรับพิมพ์');
+                                            }
+
+                                            const afterPrint = () => {
+                                                cleanup();
+                                                const nextIndex = index + 1;
+                                                if (nextIndex < settings.copies) {
+                                                    setTimeout(() => printCopy(nextIndex), 500);
+                                                } else {
+                                                    status.textContent = 'พิมพ์บัตรคิวเสร็จเรียบร้อย';
+                                                    scheduleClose();
                                                 }
-                                            });
+                                            };
+
+                                            if ('onafterprint' in printWindow) {
+                                                printWindow.onafterprint = afterPrint;
+                                            } else {
+                                                setTimeout(afterPrint, 1500);
+                                            }
+
+                                            const result = printWindow.print();
+                                            if (result === false) {
+                                                throw new Error('เบราว์เซอร์ไม่อนุญาตให้พิมพ์อัตโนมัติ');
+                                            }
+                                        } catch (error) {
+                                            console.error('Automatic PDF print failed.', error);
+                                            cleanup();
+                                            openFallback(buildPdfUrl(index));
+                                            status.textContent = 'เปิดไฟล์ PDF ในแท็บใหม่เพื่อพิมพ์ด้วยตนเอง';
                                         }
-                                    }
+                                    };
+
+                                    frame.onerror = () => {
+                                        cleanup();
+                                        openFallback(buildPdfUrl(index));
+                                        status.textContent = 'ไม่สามารถโหลดไฟล์ PDF ได้ เปิดในแท็บใหม่เพื่อพิมพ์ด้วยตนเอง';
+                                    };
+
+                                    document.body.appendChild(frame);
+                                    frame.src = buildPdfUrl(index);
                                 }
 
-                                window.addEventListener('load', function() {
+                                function start() {
                                     try {
-                                        generateQrCodes();
+                                        preview.src = buildPdfUrl();
                                     } catch (error) {
-                                        console.error('Failed to generate QR codes:', error);
+                                        console.warn('Unable to show PDF preview.', error);
                                     }
 
-                                    setupCloseHandler();
+                                    setTimeout(() => printCopy(0), 600);
+                                }
 
-                                    setTimeout(triggerPrint, 800);
-                                });
+                                if (document.readyState === 'complete') {
+                                    start();
+                                } else {
+                                    window.addEventListener('load', start);
+                                }
                             })();
                         <\/script>
                     </body>
