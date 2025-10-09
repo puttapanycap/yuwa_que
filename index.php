@@ -3,9 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0d6efd" />
-    <link rel="manifest" href="./manifest.json" />
-    <meta name="mobile-web-app-capable" content="yes">
     <title>ระบบเรียกคิว - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
     
     <!-- Bootstrap 5 -->
@@ -551,49 +548,6 @@
 
                 const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
 
-                const encodeToBase64 = (text) => {
-                    if (typeof TextEncoder !== 'undefined') {
-                        try {
-                            const bytes = new TextEncoder().encode(text);
-                            let binary = '';
-                            bytes.forEach((byte) => {
-                                binary += String.fromCharCode(byte);
-                            });
-                            return btoa(binary);
-                        } catch (error) {
-                            console.error('TextEncoder failed while preparing Android print payload:', error);
-                        }
-                    }
-
-                    try {
-                        return btoa(unescape(encodeURIComponent(text)));
-                    } catch (error) {
-                        console.error('Fallback base64 encoding failed:', error);
-                    }
-
-                    return null;
-                };
-
-                const tryAndroidPrint = (html) => {
-                    const androidPrinter = window.AndroidPrinter;
-                    if (!androidPrinter || typeof androidPrinter.printHtml !== 'function') {
-                        return false;
-                    }
-
-                    const encoded = encodeToBase64(html);
-                    if (!encoded) {
-                        return false;
-                    }
-
-                    try {
-                        androidPrinter.printHtml('Yuwa Queue Ticket', encoded);
-                        return true;
-                    } catch (error) {
-                        console.error('Android printer bridge failed:', error);
-                        return false;
-                    }
-                };
-
                 const content = `
                     <!DOCTYPE html>
                     <html>
@@ -654,14 +608,17 @@
                         </style>
                     </head>
                     <body>
-                        ${ticketsHtml}
+                        <div class="ticket-sheet">
+                            ${ticketsHtml}
+                        </div>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIPo0PvyX+IWDVjYDL0J3QGa5VVP8YQRT9PxqXfsTZLXg1MYqMy3Itbwk5G6JX0R3t4FRTbwdUuHjQH5DsmA==" crossorigin="anonymous" referrerpolicy="no-referrer"><\/script>
                         <script>
                             window.__PRINT_SETTINGS__ = {
                                 printCount: ${printCount},
                                 qrData: ${JSON.stringify(qrData)}
                             };
                         <\/script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
                         <script>
                             (function() {
                                 function generateQrCodes() {
@@ -682,31 +639,7 @@
                                     }
                                 }
 
-                                function triggerPrint() {
-                                    var androidPrinter = window.AndroidPrinter;
-                                    var androidPrinterAvailable = !!(androidPrinter && typeof androidPrinter.printCurrentPage === 'function');
-
-                                    if (androidPrinterAvailable) {
-                                        try {
-                                            androidPrinter.printCurrentPage('Yuwa Queue Ticket');
-                                            return;
-                                        } catch (error) {
-                                            console.error('Android printing failed, falling back to window.print():', error);
-                                        }
-                                    }
-
-                                    window.focus();
-                                    window.print();
-                                }
-
                                 function setupCloseHandler() {
-                                    var androidPrinter = window.AndroidPrinter;
-                                    var androidPrinterAvailable = !!(androidPrinter && typeof androidPrinter.printCurrentPage === 'function');
-
-                                    if (androidPrinterAvailable) {
-                                        return;
-                                    }
-
                                     if ('onafterprint' in window) {
                                         window.addEventListener('afterprint', function() {
                                             setTimeout(function() { window.close(); }, 500);
@@ -723,6 +656,78 @@
                                     }
                                 }
 
+                                function createPdfAndPrint() {
+                                    var ticketSheet = document.querySelector('.ticket-sheet');
+                                    if (!ticketSheet || typeof html2pdf === 'undefined') {
+                                        window.focus();
+                                        window.print();
+                                        return;
+                                    }
+
+                                    var options = {
+                                        margin: [0, 0, 0, 0],
+                                        filename: 'queue-ticket.pdf',
+                                        image: { type: 'jpeg', quality: 0.98 },
+                                        html2canvas: { scale: 2, useCORS: true },
+                                        jsPDF: { unit: 'mm', format: [80, 140], orientation: 'portrait' },
+                                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                                    };
+
+                                    html2pdf().set(options).from(ticketSheet).outputPdf('blob')
+                                        .then(function(blob) {
+                                            var blobUrl = URL.createObjectURL(blob);
+                                            var iframe = document.createElement('iframe');
+                                            iframe.style.position = 'fixed';
+                                            iframe.style.right = '0';
+                                            iframe.style.bottom = '0';
+                                            iframe.style.width = '1px';
+                                            iframe.style.height = '1px';
+                                            iframe.style.opacity = '0';
+                                            iframe.setAttribute('sandbox', 'allow-modals allow-scripts allow-same-origin');
+
+                                            var cleanedUp = false;
+                                            var cleanup = function() {
+                                                if (cleanedUp) { return; }
+                                                cleanedUp = true;
+                                                URL.revokeObjectURL(blobUrl);
+                                                iframe.remove();
+                                            };
+
+                                            iframe.onload = function() {
+                                                try {
+                                                    var frameWindow = iframe.contentWindow || iframe;
+                                                    frameWindow.focus();
+                                                    if (frameWindow) {
+                                                        frameWindow.onafterprint = cleanup;
+                                                    }
+                                                    frameWindow.print();
+                                                    setTimeout(cleanup, 30000);
+                                                } catch (error) {
+                                                    console.error('Automatic PDF print failed, opening preview window instead.', error);
+                                                    var pdfWindow = window.open(blobUrl, '_blank');
+                                                    if (!pdfWindow) {
+                                                        alert('ไม่สามารถเปิดหน้าต่างพิมพ์ PDF ได้ กรุณาปิดการบล็อกป๊อปอัป');
+                                                    }
+                                                    setTimeout(cleanup, 120000);
+                                                }
+                                            };
+
+                                            iframe.onabort = cleanup;
+                                            iframe.onerror = function() {
+                                                cleanup();
+                                                alert('ไม่สามารถโหลดไฟล์ PDF สำหรับพิมพ์ได้');
+                                            };
+
+                                            document.body.appendChild(iframe);
+                                            iframe.src = blobUrl;
+                                        })
+                                        .catch(function(error) {
+                                            console.error('Failed to render ticket PDF, falling back to window.print()', error);
+                                            window.focus();
+                                            window.print();
+                                        });
+                                }
+
                                 window.addEventListener('load', function() {
                                     try {
                                         generateQrCodes();
@@ -732,20 +737,13 @@
 
                                     setupCloseHandler();
 
-                                    setTimeout(triggerPrint, 800);
+                                    setTimeout(createPdfAndPrint, 800);
                                 });
                             })();
                         <\/script>
                     </body>
                     </html>
                 `;
-
-                if (tryAndroidPrint(content)) {
-                    if (fallbackWindow && !fallbackWindow.closed) {
-                        fallbackWindow.close();
-                    }
-                    return;
-                }
 
                 const printWindow = (fallbackWindow && !fallbackWindow.closed)
                     ? fallbackWindow
@@ -778,14 +776,6 @@
         // Auto-refresh service types every 30 seconds
         setInterval(loadServiceTypes, 30000);
         
-    </script>
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(console.error);
-            });
-        }
     </script>
 
     <script>
