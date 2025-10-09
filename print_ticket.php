@@ -175,7 +175,19 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
 
     <script>
         (function() {
+            const androidPrinter = window.AndroidPrinter;
+            const androidPrinterAvailable = !!(androidPrinter && typeof androidPrinter.printCurrentPage === 'function');
+
             const triggerPrint = () => {
+                if (androidPrinterAvailable) {
+                    try {
+                        androidPrinter.printCurrentPage('Yuwa Queue Ticket');
+                        return;
+                    } catch (error) {
+                        console.error('Android printing failed, falling back to window.print():', error);
+                    }
+                }
+
                 window.focus();
                 window.print();
             };
@@ -186,18 +198,20 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
                 window.addEventListener('load', () => setTimeout(triggerPrint, 300));
             }
 
-            const closeWindow = () => setTimeout(() => window.close(), 600);
+            if (!androidPrinterAvailable) {
+                const closeWindow = () => setTimeout(() => window.close(), 600);
 
-            if ('onafterprint' in window) {
-                window.addEventListener('afterprint', closeWindow);
-            } else {
-                const mediaQueryList = window.matchMedia('print');
-                if (mediaQueryList && mediaQueryList.addListener) {
-                    mediaQueryList.addListener((mql) => {
-                        if (!mql.matches) {
-                            closeWindow();
-                        }
-                    });
+                if ('onafterprint' in window) {
+                    window.addEventListener('afterprint', closeWindow);
+                } else {
+                    const mediaQueryList = window.matchMedia('print');
+                    if (mediaQueryList && mediaQueryList.addListener) {
+                        mediaQueryList.addListener((mql) => {
+                            if (!mql.matches) {
+                                closeWindow();
+                            }
+                        });
+                    }
                 }
             }
         })();

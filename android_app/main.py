@@ -44,6 +44,7 @@ class _AndroidBrowserController:
         self._root_layout = None
         self._toolbar_layout = None
         self._webview = None
+        self._printer_bridge = None
 
     def initialise(self):
         self._initialise_ui()
@@ -102,6 +103,10 @@ class _AndroidBrowserController:
         settings.setBuiltInZoomControls(True)
         settings.setDisplayZoomControls(False)
 
+        AndroidPrinterBridge = autoclass("com.yuwa.browser.AndroidPrinterBridge")
+        self._printer_bridge = AndroidPrinterBridge(self._activity, self._webview)
+        self._webview.addJavascriptInterface(self._printer_bridge, "AndroidPrinter")
+
         self._webview.loadUrl(self.WEB_URL)
 
     @run_on_ui_thread
@@ -136,6 +141,10 @@ class _AndroidBrowserController:
 
     @run_on_ui_thread
     def cleanup(self):
+        if self._printer_bridge:
+            self._printer_bridge.cleanup()
+            self._printer_bridge = None
+
         if self._webview:
             self._webview.destroy()
             self._webview = None

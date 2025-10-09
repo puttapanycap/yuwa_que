@@ -548,6 +548,49 @@
 
                 const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
 
+                const encodeToBase64 = (text) => {
+                    if (typeof TextEncoder !== 'undefined') {
+                        try {
+                            const bytes = new TextEncoder().encode(text);
+                            let binary = '';
+                            bytes.forEach((byte) => {
+                                binary += String.fromCharCode(byte);
+                            });
+                            return btoa(binary);
+                        } catch (error) {
+                            console.error('TextEncoder failed while preparing Android print payload:', error);
+                        }
+                    }
+
+                    try {
+                        return btoa(unescape(encodeURIComponent(text)));
+                    } catch (error) {
+                        console.error('Fallback base64 encoding failed:', error);
+                    }
+
+                    return null;
+                };
+
+                const tryAndroidPrint = (html) => {
+                    const androidPrinter = window.AndroidPrinter;
+                    if (!androidPrinter || typeof androidPrinter.printHtml !== 'function') {
+                        return false;
+                    }
+
+                    const encoded = encodeToBase64(html);
+                    if (!encoded) {
+                        return false;
+                    }
+
+                    try {
+                        androidPrinter.printHtml('Yuwa Queue Ticket', encoded);
+                        return true;
+                    } catch (error) {
+                        console.error('Android printer bridge failed:', error);
+                        return false;
+                    }
+                };
+
                 const content = `
                     <!DOCTYPE html>
                     <html>
@@ -637,11 +680,30 @@
                                 }
 
                                 function triggerPrint() {
+                                    var androidPrinter = window.AndroidPrinter;
+                                    var androidPrinterAvailable = !!(androidPrinter && typeof androidPrinter.printCurrentPage === 'function');
+
+                                    if (androidPrinterAvailable) {
+                                        try {
+                                            androidPrinter.printCurrentPage('Yuwa Queue Ticket');
+                                            return;
+                                        } catch (error) {
+                                            console.error('Android printing failed, falling back to window.print():', error);
+                                        }
+                                    }
+
                                     window.focus();
                                     window.print();
                                 }
 
                                 function setupCloseHandler() {
+                                    var androidPrinter = window.AndroidPrinter;
+                                    var androidPrinterAvailable = !!(androidPrinter && typeof androidPrinter.printCurrentPage === 'function');
+
+                                    if (androidPrinterAvailable) {
+                                        return;
+                                    }
+
                                     if ('onafterprint' in window) {
                                         window.addEventListener('afterprint', function() {
                                             setTimeout(function() { window.close(); }, 500);
@@ -674,6 +736,13 @@
                     </body>
                     </html>
                 `;
+
+                if (tryAndroidPrint(content)) {
+                    if (fallbackWindow && !fallbackWindow.closed) {
+                        fallbackWindow.close();
+                    }
+                    return;
+                }
 
                 const printWindow = (fallbackWindow && !fallbackWindow.closed)
                     ? fallbackWindow
