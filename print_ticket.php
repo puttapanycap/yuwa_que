@@ -173,32 +173,109 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
 </head>
 <body>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIPo0PvyX+IWDVjYDL0J3QGa5VVP8YQRT9PxqXfsTZLXg1MYqMy3Itbwk5G6JX0R3t4FRTbwdUuHjQH5DsmA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
         (function() {
-            const triggerPrint = () => {
-                window.focus();
-                window.print();
+            function createPdfAndPrint() {
+                const ticket = document.querySelector('.ticket-container');
+                if (!ticket || typeof html2pdf === 'undefined') {
+                    window.focus();
+                    window.print();
+                    return;
+                }
+
+                const options = {
+                    margin: [0, 0, 0, 0],
+                    filename: 'queue-ticket-<?php echo htmlspecialchars($ticket['queue_number']); ?>.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: [80, 140], orientation: 'portrait' },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                html2pdf().set(options).from(ticket).outputPdf('blob')
+                    .then((blob) => {
+                        const blobUrl = URL.createObjectURL(blob);
+                        const iframe = document.createElement('iframe');
+                        iframe.style.position = 'fixed';
+                        iframe.style.right = '0';
+                        iframe.style.bottom = '0';
+                        iframe.style.width = '1px';
+                        iframe.style.height = '1px';
+                        iframe.style.opacity = '0';
+                        iframe.setAttribute('sandbox', 'allow-modals allow-scripts allow-same-origin');
+
+                        let cleanedUp = false;
+                        const cleanup = () => {
+                            if (cleanedUp) {
+                                return;
+                            }
+                            cleanedUp = true;
+                            URL.revokeObjectURL(blobUrl);
+                            iframe.remove();
+                        };
+
+                        iframe.onload = () => {
+                            try {
+                                const frameWindow = iframe.contentWindow || iframe;
+                                frameWindow.focus();
+                                if (frameWindow) {
+                                    frameWindow.onafterprint = cleanup;
+                                }
+                                frameWindow.print();
+                                setTimeout(cleanup, 30000);
+                            } catch (error) {
+                                console.error('Automatic PDF print failed, opening preview window instead.', error);
+                                const pdfWindow = window.open(blobUrl, '_blank');
+                                if (!pdfWindow) {
+                                    alert('ไม่สามารถเปิดหน้าต่างพิมพ์ PDF ได้ กรุณาปิดการบล็อกป๊อปอัป');
+                                }
+                                setTimeout(cleanup, 120000);
+                            }
+                        };
+
+                        iframe.onabort = cleanup;
+                        iframe.onerror = () => {
+                            cleanup();
+                            alert('ไม่สามารถโหลดไฟล์ PDF สำหรับพิมพ์ได้');
+                        };
+
+                        document.body.appendChild(iframe);
+                        iframe.src = blobUrl;
+                    })
+                    .catch((error) => {
+                        console.error('Failed to render ticket PDF, falling back to window.print()', error);
+                        window.focus();
+                        window.print();
+                    });
+            }
+
+            function setupCloseHandler() {
+                const closeWindow = () => setTimeout(() => window.close(), 600);
+
+                if ('onafterprint' in window) {
+                    window.addEventListener('afterprint', closeWindow);
+                } else {
+                    const mediaQueryList = window.matchMedia('print');
+                    if (mediaQueryList && mediaQueryList.addListener) {
+                        mediaQueryList.addListener((mql) => {
+                            if (!mql.matches) {
+                                closeWindow();
+                            }
+                        });
+                    }
+                }
+            }
+
+            const trigger = () => {
+                setupCloseHandler();
+                setTimeout(createPdfAndPrint, 300);
             };
 
             if (document.readyState === 'complete') {
-                setTimeout(triggerPrint, 300);
+                trigger();
             } else {
-                window.addEventListener('load', () => setTimeout(triggerPrint, 300));
-            }
-
-            const closeWindow = () => setTimeout(() => window.close(), 600);
-
-            if ('onafterprint' in window) {
-                window.addEventListener('afterprint', closeWindow);
-            } else {
-                const mediaQueryList = window.matchMedia('print');
-                if (mediaQueryList && mediaQueryList.addListener) {
-                    mediaQueryList.addListener((mql) => {
-                        if (!mql.matches) {
-                            closeWindow();
-                        }
-                    });
-                }
+                window.addEventListener('load', trigger);
             }
         })();
     </script>
