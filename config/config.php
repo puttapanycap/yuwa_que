@@ -198,40 +198,40 @@ class Cache {
 }
 
 // Functions
-function generateCSRFToken() {
-    if (!isset($_SESSION[CSRF_TOKEN_NAME])) {
-        $_SESSION[CSRF_TOKEN_NAME] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION[CSRF_TOKEN_NAME];
-}
+// function generateCSRFToken() {
+//     if (!isset($_SESSION[CSRF_TOKEN_NAME])) {
+//         $_SESSION[CSRF_TOKEN_NAME] = bin2hex(random_bytes(32));
+//     }
+//     return $_SESSION[CSRF_TOKEN_NAME];
+// }
 
-function verifyCSRFToken($token) {
-    return isset($_SESSION[CSRF_TOKEN_NAME]) && hash_equals($_SESSION[CSRF_TOKEN_NAME], $token);
-}
+// function verifyCSRFToken($token) {
+//     return isset($_SESSION[CSRF_TOKEN_NAME]) && hash_equals($_SESSION[CSRF_TOKEN_NAME], $token);
+// }
 
-function sanitizeInput($data) {
-    return htmlspecialchars(strip_tags(trim($data)));
-}
+// function sanitizeInput($data) {
+//     return htmlspecialchars(strip_tags(trim($data)));
+// }
 
-function redirectTo($url) {
-    header("Location: " . $url);
-    exit();
-}
+// function redirectTo($url) {
+//     header("Location: " . $url);
+//     exit();
+// }
 
-function isLoggedIn() {
-    return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
-}
+// function isLoggedIn() {
+//     return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
+// }
 
-function requireLogin() {
-    if (!isLoggedIn()) {
-        redirectTo(BASE_URL . '/staff/login.php');
-    }
-}
+// function requireLogin() {
+//     if (!isLoggedIn()) {
+//         redirectTo(BASE_URL . '/staff/login.php');
+//     }
+// }
 
-function hasPermission($permission) {
-    if (!isLoggedIn()) return false;
-    return in_array($permission, $_SESSION['permissions'] ?? []);
-}
+// function hasPermission($permission) {
+//     if (!isLoggedIn()) return false;
+//     return in_array($permission, $_SESSION['permissions'] ?? []);
+// }
 
 function logActivity($description, $staff_id = null) {
     try {

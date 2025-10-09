@@ -639,6 +639,7 @@
                                     }
                                 }
 
+<<<<<<< Updated upstream
                                 function setupCloseHandler() {
                                     if ('onafterprint' in window) {
                                         window.addEventListener('afterprint', function() {
@@ -652,6 +653,23 @@
                                                     setTimeout(function() { window.close(); }, 500);
                                                 }
                                             });
+=======
+                                function printCopy(index) {
+                                    status.textContent = \`กำลังพิมพ์บัตรคิว (\${index + 1}/\${settings.copies})...\`;
+                                    const frame = document.createElement('iframe');
+                                    frame.style.position = 'fixed';
+                                    frame.style.right = '0';
+                                    frame.style.bottom = '0';
+                                    frame.style.width = '1px';
+                                    frame.style.height = '1px';
+                                    frame.style.opacity = '0';
+                                    frame.setAttribute('title', 'พิมพ์บัตรคิวอัตโนมัติ');
+
+                                    let cleaned = false;
+                                    const cleanup = () => {
+                                        if (cleaned) {
+                                            return;
+>>>>>>> Stashed changes
                                         }
                                     }
                                 }
