@@ -238,6 +238,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- QR Code library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
+    <!-- BIXOLON Web Print helper -->
+    <script src="assets/js/bixolon-webprint.js"></script>
     
     <script>
         let selectedServiceType = null;
@@ -245,6 +247,7 @@
         let appSettings = {
             queue_print_count: 1
         };
+        let bixolonClient = null;
 
         $(document).ready(function() {
             loadAppSettings();
@@ -255,9 +258,84 @@
         function loadAppSettings() {
             $.get('api/get_settings.php', function(data) {
                 appSettings = data;
+                initializeBixolonPrinter();
             }).fail(function() {
                 console.error('Could not load app settings.');
             });
+        }
+
+        function initializeBixolonPrinter() {
+            if (!window.BixolonWebPrint) {
+                console.warn('BIXOLON Web Print helper is not available.');
+                bixolonClient = null;
+                return;
+            }
+
+            if (!appSettings || appSettings.bixolon_enabled !== '1') {
+                bixolonClient = null;
+                return;
+            }
+
+            try {
+                bixolonClient = new window.BixolonWebPrint.BixolonWebPrintClient({
+                    enabled: true,
+                    serviceUrl: (appSettings.bixolon_service_url || '').trim() || 'http://127.0.0.1:18080',
+                    servicePath: (appSettings.bixolon_service_path || '').trim() || '/commands/print',
+                    interfaceType: (appSettings.bixolon_printer_interface || '').trim() || 'network',
+                    printerTarget: (appSettings.bixolon_printer_target || '').trim(),
+                    printerPort: appSettings.bixolon_printer_port || '9100',
+                    printerModel: (appSettings.bixolon_printer_model || '').trim(),
+                    qrModuleSize: appSettings.bixolon_qr_module_size || '6',
+                    cutType: (appSettings.bixolon_cut_type || '').trim() || 'partial',
+                    timeout: appSettings.bixolon_timeout || '5000'
+                });
+
+                if (!bixolonClient.isReady()) {
+                    console.warn('BIXOLON Web Print client is not fully configured.');
+                }
+            } catch (error) {
+                console.error('Failed to initialise BIXOLON Web Print client', error);
+                bixolonClient = null;
+            }
+        }
+
+        function getTicketDateTime() {
+            if (currentQueue && currentQueue.creation_time) {
+                try {
+                    return new Date(currentQueue.creation_time.replace(' ', 'T')).toLocaleString('th-TH');
+                } catch (error) {
+                    console.warn('Cannot parse queue creation time, using current time.', error);
+                }
+            }
+            return new Date().toLocaleString('th-TH');
+        }
+
+        function attemptBixolonPrint(printCount) {
+            if (!bixolonClient || !bixolonClient.isReady()) {
+                return Promise.resolve(false);
+            }
+
+            const hospitalName = appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์';
+            const queueNumber = currentQueue?.queue_number || '';
+            const servicePoint = currentQueue?.service_point_name || '';
+            const ticket = {
+                hospitalName,
+                serviceType: selectedServiceType?.name || '',
+                queueNumber,
+                servicePoint,
+                datetime: getTicketDateTime(),
+                additionalNote: (appSettings.bixolon_additional_note || '').trim() || '',
+                footer: (appSettings.bixolon_ticket_footer || '').trim() || '',
+                qrData: `${window.location.origin}/check_status.php?queue_id=${currentQueue?.queue_id || ''}`
+            };
+
+            return bixolonClient.printTicket(ticket, printCount)
+                .then(() => true)
+                .catch(error => {
+                    console.error('BIXOLON print failed', error);
+                    alert('ไม่สามารถพิมพ์ผ่านเครื่องพิมพ์ BIXOLON ได้\nกรุณาตรวจสอบการเชื่อมต่อเครื่องพิมพ์');
+                    return false;
+                });
         }
 
         function loadServiceTypes() {
@@ -439,135 +517,142 @@
 
         function printQueue() {
             const printCount = parseInt(appSettings.queue_print_count, 10) || 1;
-            let ticketsHtml = '';
 
-            for (let i = 0; i < printCount; i++) {
-                ticketsHtml += `
-                    <div class="print-area" style="page-break-after: ${i < printCount - 1 ? 'always' : 'auto'};">
-                        <div class="hospital-name">${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</div>
-                        <h3>บัตรคิว</h3>
-                        <div class="queue-number">${currentQueue.queue_number}</div>
-                        <div class="queue-type">${selectedServiceType.name}</div>
-                        <div class="datetime">${new Date().toLocaleString('th-TH')}</div>
-                        <div class="qr-container">
-                            <canvas id="printQR_${i}" width="150" height="150"></canvas>
-                        </div>
-                        <div class="footer">สแกน QR Code เพื่อตรวจสอบสถานะคิว</div>
-                    </div>
-                `;
-            }
-
-            const content = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>บัตรคิว</title>
-                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-                    <style>
-                        @page {
-                            size: 80mm 140mm;
-                            margin: 0;
-                        }
-                        body {
-                            font-family: 'Sarabun', sans-serif;
-                            text-align: center;
-                            margin: 0;
-                            padding: 0;
-                            width: 80mm;
-                            box-sizing: border-box;
-                            color: #000;
-                        }
-                        .print-area {
-                            width: 80mm;
-                            height: 140mm;
-                            padding: 5mm;
-                            box-sizing: border-box;
-                            overflow: hidden;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                        }
-                        .hospital-name {
-                            font-size: 12pt;
-                            font-weight: bold;
-                            margin-bottom: 5px;
-                        }
-                        h3 {
-                            font-size: 14pt;
-                            margin: 5px 0;
-                        }
-                        .queue-number {
-                            font-size: 32pt;
-                            font-weight: bold;
-                            margin: 10px 0;
-                        }
-                        .queue-type, .datetime {
-                            font-size: 10pt;
-                            margin: 5px 0;
-                        }
-                        .qr-container {
-                            margin: 10px 0;
-                        }
-                        .footer {
-                            font-size: 8pt;
-                            margin-top: 10px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${ticketsHtml}
-                </body>
-                </html>
-            `;
-
-            const printFrame = document.createElement('iframe');
-            printFrame.style.position = 'absolute';
-            printFrame.style.width = '0';
-            printFrame.style.height = '0';
-            printFrame.style.border = '0';
-            document.body.appendChild(printFrame);
-
-            const frameDoc = printFrame.contentWindow.document;
-            frameDoc.open();
-            frameDoc.write(content);
-            frameDoc.close();
-
-            const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-            const script = frameDoc.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-            
-            script.onload = function() {
-                try {
-                    for (let i = 0; i < printCount; i++) {
-                        new printFrame.contentWindow.QRious({
-                            element: frameDoc.getElementById(`printQR_${i}`),
-                            value: qrData,
-                            size: 150,
-                            level: 'H'
-                        });
-                    }
-                } catch (e) {
-                    console.error("QRious error:", e);
+            attemptBixolonPrint(printCount).then(success => {
+                if (success) {
+                    return;
                 }
-                
-                setTimeout(() => {
-                    printFrame.contentWindow.focus();
-                    printFrame.contentWindow.print();
-                    document.body.removeChild(printFrame);
-                }, 500);
-            };
 
-            script.onerror = function() {
-                console.error("Could not load QRious library.");
-                setTimeout(() => {
-                    printFrame.contentWindow.focus();
-                    printFrame.contentWindow.print();
-                    document.body.removeChild(printFrame);
-                }, 250);
-            };
+                let ticketsHtml = '';
 
-            frameDoc.head.appendChild(script);
+                for (let i = 0; i < printCount; i++) {
+                    ticketsHtml += `
+                        <div class="print-area" style="page-break-after: ${i < printCount - 1 ? 'always' : 'auto'};">
+                            <div class="hospital-name">${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</div>
+                            <h3>บัตรคิว</h3>
+                            <div class="queue-number">${currentQueue.queue_number}</div>
+                            <div class="queue-type">${selectedServiceType.name}</div>
+                            <div class="datetime">${getTicketDateTime()}</div>
+                            <div class="qr-container">
+                                <canvas id="printQR_${i}" width="150" height="150"></canvas>
+                            </div>
+                            <div class="footer">${(appSettings.bixolon_ticket_footer || 'สแกน QR Code เพื่อตรวจสอบสถานะคิว')}</div>
+                        </div>
+                    `;
+                }
+
+                const content = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>บัตรคิว</title>
+                        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+                        <style>
+                            @page {
+                                size: 80mm 140mm;
+                                margin: 0;
+                            }
+                            body {
+                                font-family: 'Sarabun', sans-serif;
+                                text-align: center;
+                                margin: 0;
+                                padding: 0;
+                                width: 80mm;
+                                box-sizing: border-box;
+                                color: #000;
+                            }
+                            .print-area {
+                                width: 80mm;
+                                height: 140mm;
+                                padding: 5mm;
+                                box-sizing: border-box;
+                                overflow: hidden;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: center;
+                            }
+                            .hospital-name {
+                                font-size: 12pt;
+                                font-weight: bold;
+                                margin-bottom: 5px;
+                            }
+                            h3 {
+                                font-size: 14pt;
+                                margin: 5px 0;
+                            }
+                            .queue-number {
+                                font-size: 32pt;
+                                font-weight: bold;
+                                margin: 10px 0;
+                            }
+                            .queue-type, .datetime {
+                                font-size: 10pt;
+                                margin: 5px 0;
+                            }
+                            .qr-container {
+                                margin: 10px 0;
+                            }
+                            .footer {
+                                font-size: 8pt;
+                                margin-top: 10px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${ticketsHtml}
+                    </body>
+                    </html>
+                `;
+
+                const printFrame = document.createElement('iframe');
+                printFrame.style.position = 'absolute';
+                printFrame.style.width = '0';
+                printFrame.style.height = '0';
+                printFrame.style.border = '0';
+                document.body.appendChild(printFrame);
+
+                const frameDoc = printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(content);
+                frameDoc.close();
+
+                const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
+                const script = frameDoc.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+
+                script.onload = function() {
+                    try {
+                        for (let i = 0; i < printCount; i++) {
+                            new printFrame.contentWindow.QRious({
+                                element: frameDoc.getElementById(`printQR_${i}`),
+                                value: qrData,
+                                size: 150,
+                                level: 'H'
+                            });
+                        }
+                    } catch (e) {
+                        console.error("QRious error:", e);
+                    }
+
+                    setTimeout(() => {
+                        printFrame.contentWindow.focus();
+                        printFrame.contentWindow.print();
+                        document.body.removeChild(printFrame);
+                    }, 500);
+                };
+
+                script.onerror = function() {
+                    console.error("Could not load QRious library.");
+                    setTimeout(() => {
+                        printFrame.contentWindow.focus();
+                        printFrame.contentWindow.print();
+                        document.body.removeChild(printFrame);
+                    }, 250);
+                };
+
+                frameDoc.head.appendChild(script);
+            });
         }
 
         function resetKiosk() {
