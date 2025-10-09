@@ -43,57 +43,85 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>บัตรคิว <?php echo htmlspecialchars($ticket['queue_number']); ?></title>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ticket-width: 80mm;
+            --ticket-padding: 12px;
+        }
+
         /* --- General Styles --- */
         body {
-            font-family: 'Sarabun', sans-serif;
+            font-family: 'Sarabun', 'TH Sarabun New', 'Tahoma', 'Arial', sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px var(--ticket-padding);
             background-color: #f0f0f0;
             display: flex;
             justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+        }
+
+        html, body {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        * {
+            box-sizing: inherit;
         }
 
         /* --- Ticket Styles for Screen Preview --- */
         .ticket-container {
-            background-color: white;
+            width: min(100%, var(--ticket-width));
+            background-color: #ffffff;
             border: 1px dashed #ccc;
             text-align: center;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 18px 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.08);
+            margin: 0 auto;
         }
 
         /* --- Print Styles --- */
         @media print {
-            /* ซ่อน element ที่ไม่ต้องการพิมพ์ */
-            body > *:not(.ticket-container) {
-                display: none;
-            }
-
-            /* ตั้งค่าหน้ากระดาษ */
-            @page {
-                size: 80mm 140mm; /* กว้าง 8cm, สูง 14cm */
-                margin: 5mm; /* ตั้งค่าขอบกระดาษ */
+            html, body {
+                width: var(--ticket-width);
+                margin: 0;
+                padding: 0;
+                background: #ffffff !important;
             }
 
             body {
-                background-color: white;
-                margin: 0;
-                padding: 0;
                 display: block; /* Override flex for printing */
+                -webkit-print-color-adjust: exact;
+            }
+
+            body > *:not(.ticket-container) {
+                display: none !important;
+            }
+
+            @page {
+                size: var(--ticket-width) auto; /* Thermal roll width 80mm */
+                margin: 0; /* Let printer handle its own margins */
             }
 
             .ticket-container {
-                width: 100%;
-                height: 100%;
+                width: var(--ticket-width);
+                min-height: 120mm;
                 border: none;
                 box-shadow: none;
-                padding: 0;
-                margin: 0;
-                page-break-after: always; /* ขึ้นหน้าใหม่สำหรับแต่ละบัตรคิว */
+                padding: 12px;
+                margin: 0 auto;
+                page-break-after: always; /* Force paper cut per ticket */
+            }
+
+            .ticket-footer .qr-code img {
+                width: 100px;
+                height: 100px;
+            }
+
+            /* Extra feed at the end to ensure auto-cutter engages */
+            body::after {
+                content: "";
+                display: block;
+                height: 6mm;
             }
         }
 
@@ -129,9 +157,51 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
         .ticket-footer .qr-code {
             margin-top: 10px;
         }
+
+        .ticket-footer .qr-code img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px dashed #bfbfbf;
+            margin: 12px auto;
+            width: 90%;
+        }
     </style>
 </head>
-<body onload="window.print()">
+<body>
+
+    <script>
+        (function() {
+            const triggerPrint = () => {
+                window.focus();
+                window.print();
+            };
+
+            if (document.readyState === 'complete') {
+                setTimeout(triggerPrint, 300);
+            } else {
+                window.addEventListener('load', () => setTimeout(triggerPrint, 300));
+            }
+
+            const closeWindow = () => setTimeout(() => window.close(), 600);
+
+            if ('onafterprint' in window) {
+                window.addEventListener('afterprint', closeWindow);
+            } else {
+                const mediaQueryList = window.matchMedia('print');
+                if (mediaQueryList && mediaQueryList.addListener) {
+                    mediaQueryList.addListener((mql) => {
+                        if (!mql.matches) {
+                            closeWindow();
+                        }
+                    });
+                }
+            }
+        })();
+    </script>
 
     <div class="ticket-container">
         <div class="ticket-header">
