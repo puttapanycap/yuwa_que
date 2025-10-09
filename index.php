@@ -120,8 +120,12 @@
             }
             .print-area {
                 width: 80mm;
+                height: 140mm;
                 padding: 5mm;
                 box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
             .print-area .hospital-name {
                 font-size: 14pt;
@@ -578,6 +582,7 @@
                                 display: flex;
                                 flex-direction: column;
                                 justify-content: center;
+                                align-items: center;
                             }
                             .hospital-name {
                                 font-size: 12pt;
