@@ -120,8 +120,12 @@
             }
             .print-area {
                 width: 80mm;
+                height: 140mm;
                 padding: 5mm;
                 box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
             .print-area .hospital-name {
                 font-size: 14pt;
@@ -517,9 +521,14 @@
 
         function printQueue() {
             const printCount = parseInt(appSettings.queue_print_count, 10) || 1;
+            const shouldPreOpenFallback = !bixolonClient || !bixolonClient.isReady();
+            const fallbackWindow = shouldPreOpenFallback ? window.open('', '_blank') : null;
 
             attemptBixolonPrint(printCount).then(success => {
                 if (success) {
+                    if (fallbackWindow && !fallbackWindow.closed) {
+                        fallbackWindow.close();
+                    }
                     return;
                 }
 
@@ -540,6 +549,8 @@
                         </div>
                     `;
                 }
+
+                const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
 
                 const content = `
                     <!DOCTYPE html>
@@ -571,6 +582,7 @@
                                 display: flex;
                                 flex-direction: column;
                                 justify-content: center;
+                                align-items: center;
                             }
                             .hospital-name {
                                 font-size: 12pt;
@@ -601,57 +613,84 @@
                     </head>
                     <body>
                         ${ticketsHtml}
+                        <script>
+                            window.__PRINT_SETTINGS__ = {
+                                printCount: ${printCount},
+                                qrData: ${JSON.stringify(qrData)}
+                            };
+                        <\/script>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
+                        <script>
+                            (function() {
+                                function generateQrCodes() {
+                                    var settings = window.__PRINT_SETTINGS__ || {};
+                                    for (var i = 0; i < (settings.printCount || 0); i++) {
+                                        var canvas = document.getElementById('printQR_' + i);
+                                        if (!canvas) { continue; }
+                                        try {
+                                            new QRious({
+                                                element: canvas,
+                                                value: settings.qrData,
+                                                size: 150,
+                                                level: 'H'
+                                            });
+                                        } catch (error) {
+                                            console.error('QRious error:', error);
+                                        }
+                                    }
+                                }
+
+                                function triggerPrint() {
+                                    window.focus();
+                                    window.print();
+                                }
+
+                                function setupCloseHandler() {
+                                    if ('onafterprint' in window) {
+                                        window.addEventListener('afterprint', function() {
+                                            setTimeout(function() { window.close(); }, 500);
+                                        });
+                                    } else if (window.matchMedia) {
+                                        var mediaQuery = window.matchMedia('print');
+                                        if (mediaQuery && mediaQuery.addListener) {
+                                            mediaQuery.addListener(function(mql) {
+                                                if (!mql.matches) {
+                                                    setTimeout(function() { window.close(); }, 500);
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+
+                                window.addEventListener('load', function() {
+                                    try {
+                                        generateQrCodes();
+                                    } catch (error) {
+                                        console.error('Failed to generate QR codes:', error);
+                                    }
+
+                                    setupCloseHandler();
+
+                                    setTimeout(triggerPrint, 800);
+                                });
+                            })();
+                        <\/script>
                     </body>
                     </html>
                 `;
 
-                const printFrame = document.createElement('iframe');
-                printFrame.style.position = 'absolute';
-                printFrame.style.width = '0';
-                printFrame.style.height = '0';
-                printFrame.style.border = '0';
-                document.body.appendChild(printFrame);
+                const printWindow = (fallbackWindow && !fallbackWindow.closed)
+                    ? fallbackWindow
+                    : window.open('', '_blank');
 
-                const frameDoc = printFrame.contentWindow.document;
-                frameDoc.open();
-                frameDoc.write(content);
-                frameDoc.close();
+                if (!printWindow || !printWindow.document) {
+                    alert('ไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาปิดการบล็อกป๊อปอัปหรือใช้โหมดปกติ');
+                    return;
+                }
 
-                const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-                const script = frameDoc.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-
-                script.onload = function() {
-                    try {
-                        for (let i = 0; i < printCount; i++) {
-                            new printFrame.contentWindow.QRious({
-                                element: frameDoc.getElementById(`printQR_${i}`),
-                                value: qrData,
-                                size: 150,
-                                level: 'H'
-                            });
-                        }
-                    } catch (e) {
-                        console.error("QRious error:", e);
-                    }
-
-                    setTimeout(() => {
-                        printFrame.contentWindow.focus();
-                        printFrame.contentWindow.print();
-                        document.body.removeChild(printFrame);
-                    }, 500);
-                };
-
-                script.onerror = function() {
-                    console.error("Could not load QRious library.");
-                    setTimeout(() => {
-                        printFrame.contentWindow.focus();
-                        printFrame.contentWindow.print();
-                        document.body.removeChild(printFrame);
-                    }, 250);
-                };
-
-                frameDoc.head.appendChild(script);
+                printWindow.document.open();
+                printWindow.document.write(content);
+                printWindow.document.close();
             });
         }
 
