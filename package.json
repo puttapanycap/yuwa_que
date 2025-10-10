@@ -7,7 +7,6 @@
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
     "start": "webpack-dev-server --mode development",
-    "start:queue-printer": "node scripts/queue-printer-service.js",
     "lint": "eslint assets/js/**/*.js",
     "lint:fix": "eslint assets/js/**/*.js --fix",
     "sass": "sass assets/scss:assets/css --watch",
@@ -39,7 +38,7 @@
     "style-loader": "^3.3.0",
     "webpack": "^5.88.0",
     "webpack-cli": "^5.1.0",
-    "webpack-dev-server": "^5.2.2"
+    "webpack-dev-server": "^4.15.0"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.4.0",
@@ -53,16 +52,13 @@
     "datatables.net": "^1.13.0",
     "datatables.net-bs5": "^1.13.0",
     "dropzone": "^6.0.0-beta.1",
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-network": "^3.0.0-alpha.5",
     "fullcalendar": "^6.1.0",
     "html2canvas": "^1.4.0",
     "jquery": "^3.7.0",
     "jsbarcode": "^3.11.0",
-    "jspdf": "^3.0.3",
+    "jspdf": "^2.5.0",
     "lodash": "^4.17.0",
     "moment": "^2.29.0",
-    "node-thermal-printer": "^4.5.0",
     "pace-js": "^1.2.0",
     "perfect-scrollbar": "^1.5.0",
     "qrcode": "^1.5.0",
@@ -71,7 +67,8 @@
     "sortablejs": "^1.15.0",
     "sweetalert2": "^11.7.0",
     "swiper": "^10.0.0",
-    "toastr": "^2.1.0"
+    "toastr": "^2.1.0",
+    "xlsx": "^0.18.0"
   },
   "browserslist": [
     "> 1%",

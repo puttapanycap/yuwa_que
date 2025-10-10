@@ -357,15 +357,12 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- ESC/POS encoder & BIXOLON Web Print helper -->
     <script src="assets/vendor/esc-pos-encoder.umd.js"></script>
-    <script src="assets/js/bixolon-webprint.js"></script>
-    
     <script>
         let selectedServiceType = null;
         let currentQueue = null;
         let appSettings = {
             queue_print_count: 1
         };
-        let bixolonClient = null;
 
         function escapeHtml(text) {
             if (text === null || text === undefined) {
@@ -469,48 +466,9 @@
         function loadAppSettings() {
             $.get('api/get_settings.php', function(data) {
                 appSettings = data;
-                initializeBixolonPrinter();
             }).fail(function() {
                 console.error('Could not load app settings.');
             });
-        }
-
-        function initializeBixolonPrinter() {
-            if (!window.BixolonWebPrint) {
-                console.warn('BIXOLON Web Print helper is not available.');
-                bixolonClient = null;
-                return;
-            }
-
-            if (!appSettings || appSettings.bixolon_enabled !== '1') {
-                bixolonClient = null;
-                return;
-            }
-
-            try {
-                bixolonClient = new window.BixolonWebPrint.BixolonWebPrintClient({
-                    enabled: true,
-                    serviceUrl: (appSettings.bixolon_service_url || '').trim() || 'http://127.0.0.1:18080',
-                    servicePath: (appSettings.bixolon_service_path || '').trim() || '/commands/print',
-                    interfaceType: (appSettings.bixolon_printer_interface || '').trim() || 'network',
-                    printerTarget: (appSettings.bixolon_printer_target || '').trim(),
-                    printerPort: appSettings.bixolon_printer_port || '9100',
-                    printerModel: (appSettings.bixolon_printer_model || '').trim(),
-                    qrModuleSize: appSettings.bixolon_qr_module_size || '6',
-                    qrModel: appSettings.bixolon_qr_model || '2',
-                    qrErrorLevel: appSettings.bixolon_qr_error_level || 'm',
-                    cutType: (appSettings.bixolon_cut_type || '').trim() || 'partial',
-                    timeout: appSettings.bixolon_timeout || '5000',
-                    trailingFeed: appSettings.bixolon_trailing_feed || '6'
-                });
-
-                if (!bixolonClient.isReady()) {
-                    console.warn('BIXOLON Web Print client is not fully configured.');
-                }
-            } catch (error) {
-                console.error('Failed to initialise BIXOLON Web Print client', error);
-                bixolonClient = null;
-            }
         }
 
         function getTicketDateTime() {
@@ -545,40 +503,66 @@
             return ticket;
         }
 
-        async function attemptBixolonPrint(printCount) {
-            if (!bixolonClient || !bixolonClient.isReady()) {
-                return false;
+        function resolveQueuePrinterEndpoint() {
+            const origin = window.location.origin;
+            const defaultEndpoint = `${origin}/api/queue_printer.php`;
+            const configured = ((appSettings.queue_printer_endpoint || '').trim() || (appSettings.bixolon_service_url || '').trim());
+            const path = (appSettings.bixolon_service_path || '').trim();
+
+            if (!configured) {
+                return defaultEndpoint;
             }
 
-            const ticket = buildTicketForPrinting();
-
-            try {
-                await bixolonClient.printTicket(ticket, printCount);
-                return true;
-            } catch (error) {
-                console.error('BIXOLON print failed', error);
-                throw new Error('ไม่สามารถพิมพ์ผ่านบริการพิมพ์ที่ตั้งค่าไว้ได้');
+            const legacyLocalPattern = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i;
+            if (legacyLocalPattern.test(configured) && (!path || path === '/commands/print')) {
+                return defaultEndpoint;
             }
+
+            const appendPath = (baseUrl) => {
+                if (!path) {
+                    return baseUrl;
+                }
+                if (/\.php(\?|$)/i.test(baseUrl)) {
+                    return baseUrl;
+                }
+                return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+            };
+
+            if (/^https?:\/\//i.test(configured)) {
+                return appendPath(configured);
+            }
+
+            if (configured.startsWith('/')) {
+                return appendPath(`${origin}${configured}`);
+            }
+
+            return appendPath(`${origin}/${configured.replace(/^\//, '')}`);
         }
 
         async function sendTicketToPrinterService(printCount) {
-            const rawServiceUrl = (appSettings.bixolon_service_url || '').trim() || 'http://127.0.0.1:18080';
-            const serviceUrl = rawServiceUrl.replace(/\/$/, '');
-            if (!serviceUrl) {
-                throw new Error('ไม่ได้ตั้งค่า URL ของบริการพิมพ์');
-            }
-
-            const configuredPath = (appSettings.bixolon_service_path || '').trim();
-            const path = configuredPath && configuredPath !== '/commands/print' ? configuredPath : '/print-ticket';
-            const endpoint = path.startsWith('/') ? `${serviceUrl}${path}` : `${serviceUrl}/${path}`;
+            const endpoint = resolveQueuePrinterEndpoint();
             const timeoutMs = Math.max(1000, parseInt(appSettings.bixolon_timeout, 10) || 5000);
+
+            const options = {
+                qrModel: parseInt(appSettings.bixolon_qr_model, 10),
+                qrSize: parseInt(appSettings.bixolon_qr_module_size, 10),
+                qrErrorLevel: (appSettings.bixolon_qr_error_level || 'm').toString().toUpperCase(),
+                cutType: (appSettings.bixolon_cut_type || 'partial').toString().toLowerCase(),
+                trailingFeed: parseInt(appSettings.bixolon_trailing_feed, 10),
+                profile: (appSettings.queue_printer_profile || '').trim() || undefined,
+                codeTable: parseInt((appSettings.queue_printer_code_table || appSettings.bixolon_code_table), 10)
+            };
+
+            const sanitizedOptions = Object.fromEntries(Object.entries(options).filter(([_, value]) => Number.isFinite(value) || typeof value === 'string'));
 
             const payload = {
                 copies: Math.max(1, parseInt(printCount, 10) || 1),
                 interface: (appSettings.bixolon_printer_interface || '').trim() || undefined,
                 target: (appSettings.bixolon_printer_target || '').trim() || undefined,
                 port: appSettings.bixolon_printer_port ? parseInt(appSettings.bixolon_printer_port, 10) : undefined,
-                ticket: buildTicketForPrinting()
+                timeout: timeoutMs,
+                ticket: buildTicketForPrinting(),
+                options: sanitizedOptions
             };
 
             const controller = new AbortController();
@@ -851,43 +835,25 @@
                 }
             });
 
-            let printed = false;
-            let lastError = null;
-
             try {
-                printed = await attemptBixolonPrint(printCount);
-            } catch (error) {
-                lastError = error;
-                console.warn('Primary print channel failed', error);
-            }
-
-            if (!printed) {
-                try {
-                    await sendTicketToPrinterService(printCount);
-                    printed = true;
-                } catch (error) {
-                    lastError = error;
-                }
-            }
-
-            if (printed) {
+                await sendTicketToPrinterService(printCount);
                 Swal.fire({
                     icon: 'success',
                     title: 'พิมพ์บัตรคิวสำเร็จ',
                     timer: 1500,
                     showConfirmButton: false
                 });
-            } else {
-                const message = lastError?.message || 'ไม่สามารถสั่งพิมพ์บัตรคิวได้ กรุณาตรวจสอบเครื่องพิมพ์';
+                return true;
+            } catch (error) {
+                const message = error?.message || 'ไม่สามารถสั่งพิมพ์บัตรคิวได้ กรุณาตรวจสอบเครื่องพิมพ์';
                 Swal.fire({
                     icon: 'error',
                     title: 'พิมพ์บัตรคิวไม่สำเร็จ',
                     text: message,
                     confirmButtonText: 'ตกลง'
                 });
+                return false;
             }
-
-            return printed;
         }
 
         function resetKiosk() {
