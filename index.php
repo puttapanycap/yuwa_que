@@ -204,6 +204,63 @@
             color: #6c757d;
         }
 
+        .install-banner {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(102, 75, 162, 0.08));
+            border: 1px solid rgba(13, 110, 253, 0.2);
+            border-radius: 15px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .install-banner-icon {
+            flex: 0 0 auto;
+            font-size: 2.5rem;
+            color: #0d6efd;
+        }
+
+        .install-banner-content {
+            flex: 1 1 240px;
+            min-width: 200px;
+        }
+
+        .install-banner-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: #0d6efd;
+        }
+
+        .install-banner-text {
+            margin: 0;
+            color: #495057;
+        }
+
+        .install-banner-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex: 0 0 auto;
+        }
+
+        .install-banner-actions .btn {
+            min-width: 120px;
+        }
+
+        @media (max-width: 576px) {
+            .install-banner {
+                text-align: left;
+            }
+
+            .install-banner-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
         .swal2-popup.swal-ticket-preview-popup {
             border-radius: 18px;
         }
@@ -276,6 +333,20 @@
                 </div>
                 <h1 class="h2 text-primary mb-2">โรงพยาบาลยุวประสาทไวทโยปถัมภ์</h1>
                 <h2 class="h4 text-muted">ระบบรับบัตรคิวอัตโนมัติ</h2>
+            </div>
+
+            <div id="installBanner" class="install-banner d-none" role="alert" aria-hidden="true">
+                <div class="install-banner-icon">
+                    <i class="fas fa-mobile-alt"></i>
+                </div>
+                <div class="install-banner-content">
+                    <div class="install-banner-title">ติดตั้งแอปลงในอุปกรณ์ของคุณ</div>
+                    <p class="install-banner-text mb-0">เพิ่มระบบเรียกคิวลงในหน้าจอหลักเพื่อใช้งานสะดวกบน Android</p>
+                </div>
+                <div class="install-banner-actions">
+                    <button id="installDismissBtn" type="button" class="btn btn-outline-secondary">ภายหลัง</button>
+                    <button id="installConfirmBtn" type="button" class="btn btn-primary">ติดตั้ง</button>
+                </div>
             </div>
 
             <!-- Main Content -->
@@ -361,11 +432,168 @@
     <!-- ESC/POS encoder & BIXOLON Web Print helper -->
     <script src="assets/vendor/esc-pos-encoder.umd.js"></script>
     <script>
+        let deferredInstallPrompt = null;
+        const installPromptState = {
+            banner: null,
+            confirmButton: null,
+            dismissButton: null,
+            storageKey: 'pwa-install-dismissed'
+        };
+
         let selectedServiceType = null;
         let currentQueue = null;
         let appSettings = {
             queue_print_count: 1
         };
+
+        function matchesDisplayMode(mode) {
+            if (!window.matchMedia) {
+                return false;
+            }
+
+            try {
+                return window.matchMedia(`(display-mode: ${mode})`).matches;
+            } catch (error) {
+                console.warn('matchMedia is not available for display-mode queries.', error);
+                return false;
+            }
+        }
+
+        function isStandaloneDisplay() {
+            return matchesDisplayMode('standalone') ||
+                matchesDisplayMode('minimal-ui') ||
+                window.navigator.standalone === true;
+        }
+
+        function getLocalStorageItem(key) {
+            try {
+                return window.localStorage.getItem(key);
+            } catch (error) {
+                console.warn('Unable to access localStorage.', error);
+                return null;
+            }
+        }
+
+        function setLocalStorageItem(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+            } catch (error) {
+                console.warn('Unable to persist localStorage value.', error);
+            }
+        }
+
+        function shouldShowInstallBanner() {
+            if (!installPromptState.banner) {
+                return false;
+            }
+
+            if (isStandaloneDisplay()) {
+                return false;
+            }
+
+            if (!deferredInstallPrompt) {
+                return false;
+            }
+
+            return getLocalStorageItem(installPromptState.storageKey) !== 'true';
+        }
+
+        function showInstallBanner() {
+            if (!installPromptState.banner) {
+                return;
+            }
+
+            installPromptState.banner.classList.remove('d-none');
+            installPromptState.banner.setAttribute('aria-hidden', 'false');
+        }
+
+        function hideInstallBanner(permanent = false) {
+            if (!installPromptState.banner) {
+                return;
+            }
+
+            installPromptState.banner.classList.add('d-none');
+            installPromptState.banner.setAttribute('aria-hidden', 'true');
+
+            if (permanent) {
+                setLocalStorageItem(installPromptState.storageKey, 'true');
+            }
+        }
+
+        function maybeShowInstallBanner() {
+            if (shouldShowInstallBanner()) {
+                showInstallBanner();
+            }
+        }
+
+        function initializeInstallPromptElements() {
+            installPromptState.banner = document.getElementById('installBanner');
+            installPromptState.confirmButton = document.getElementById('installConfirmBtn');
+            installPromptState.dismissButton = document.getElementById('installDismissBtn');
+
+            if (installPromptState.confirmButton) {
+                installPromptState.confirmButton.addEventListener('click', async () => {
+                    if (!deferredInstallPrompt) {
+                        hideInstallBanner();
+                        return;
+                    }
+
+                    installPromptState.confirmButton.disabled = true;
+
+                    try {
+                        deferredInstallPrompt.prompt();
+                        const choiceResult = await deferredInstallPrompt.userChoice;
+                        if (choiceResult?.outcome === 'accepted') {
+                            hideInstallBanner(true);
+                        } else {
+                            hideInstallBanner();
+                        }
+                    } catch (error) {
+                        console.error('Unable to display the install prompt.', error);
+                        hideInstallBanner();
+                    } finally {
+                        deferredInstallPrompt = null;
+                        installPromptState.confirmButton.disabled = false;
+                    }
+                });
+            }
+
+            if (installPromptState.dismissButton) {
+                installPromptState.dismissButton.addEventListener('click', () => {
+                    hideInstallBanner(true);
+                    deferredInstallPrompt = null;
+                });
+            }
+
+            if (!isStandaloneDisplay()) {
+                maybeShowInstallBanner();
+            } else {
+                hideInstallBanner(true);
+            }
+        }
+
+        function registerServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                return;
+            }
+
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((error) => {
+                    console.error('Service worker registration failed.', error);
+                });
+            });
+        }
+
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            maybeShowInstallBanner();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            hideInstallBanner(true);
+            deferredInstallPrompt = null;
+        });
 
         function escapeHtml(text) {
             if (text === null || text === undefined) {
@@ -461,6 +689,8 @@
         }
 
         $(document).ready(function() {
+            initializeInstallPromptElements();
+            registerServiceWorker();
             loadAppSettings();
             loadServiceTypes();
             setupIdCardInput();
@@ -891,12 +1121,5 @@
         });
     </script>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(console.error);
-            });
-        }
-    </script>
 </body>
 </html>
