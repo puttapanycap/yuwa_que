@@ -98,18 +98,18 @@
             background: #ffffff;
             border: 1px dashed #ced4da;
             border-radius: 15px;
-            padding: 1.5rem;
-            text-align: left;
+            padding: 1.75rem 1.5rem;
+            text-align: center;
             color: #212529;
             box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.05);
+            max-width: 280px;
+            margin: 0 auto;
         }
 
-        .ticket-preview-label,
-        .ticket-preview-hospital,
-        .ticket-preview-queue,
-        .ticket-preview-service {
-            display: block;
-            text-align: center;
+        .ticket-preview-hospital {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .ticket-preview-label {
@@ -118,41 +118,37 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             color: #0d6efd;
+            margin-top: 0.35rem;
         }
 
-        .ticket-preview-hospital {
+        .ticket-preview-service {
             font-size: 1.1rem;
-            font-weight: 700;
-            margin-top: 0.5rem;
+            font-weight: 600;
+            margin-top: 0.75rem;
         }
 
         .ticket-preview-queue {
             font-size: 3rem;
             font-weight: 800;
             color: #0d6efd;
-            margin: 1rem 0 0.5rem;
+            margin: 0.75rem 0 0.5rem;
         }
 
-        .ticket-preview-service {
-            font-size: 1.15rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-
-        .ticket-preview-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .ticket-preview-service-point,
+        .ticket-preview-issued-at,
+        .ticket-preview-waiting {
+            display: block;
             font-size: 1rem;
-            margin: 0.35rem 0;
+            color: #495057;
         }
 
-        .ticket-preview-row span {
-            color: #6c757d;
+        .ticket-preview-service-point {
+            margin-top: 0.35rem;
         }
 
-        .ticket-preview-row strong {
-            color: #212529;
+        .ticket-preview-issued-at,
+        .ticket-preview-waiting {
+            margin-top: 0.25rem;
         }
 
         .ticket-preview-note,
@@ -160,22 +156,49 @@
             margin-top: 1rem;
             font-size: 0.95rem;
             color: #495057;
+            white-space: pre-line;
         }
 
         .ticket-preview-note {
-            border-top: 1px dashed #dee2e6;
             padding-top: 0.75rem;
+            border-top: 1px dashed #dee2e6;
         }
 
         .ticket-preview-footer {
             color: #adb5bd;
         }
 
+        .ticket-preview-qr {
+            margin: 1.25rem auto 0.5rem;
+            width: 140px;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ticket-preview-qr-placeholder {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ticket-preview-qr canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        .ticket-preview-qr-fallback {
+            font-size: 0.85rem;
+            color: #6c757d;
+            text-align: center;
+            word-break: break-word;
+        }
+
         .ticket-preview-print-count {
             margin-top: 1.25rem;
             font-size: 0.95rem;
             color: #6c757d;
-            text-align: center;
         }
 
         .swal2-popup.swal-ticket-preview-popup {
@@ -361,34 +384,80 @@
             return escapeHtml(text).replace(/\r?\n/g, '<br>');
         }
 
-        function buildTicketPreviewHtml(ticket, printCount) {
-            const rows = [];
+        function buildTicketPreview(ticket, printCount) {
+            const previewId = `ticket-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const qrElementId = `${previewId}-qr`;
 
-            if (ticket.servicePoint) {
-                rows.push(`<div class="ticket-preview-row"><span>ช่องบริการ:</span><strong>${escapeHtml(ticket.servicePoint)}</strong></div>`);
-            }
+            const hospitalName = (ticket.hospitalName || '').toString().trim();
+            const label = (ticket.label || 'บัตรคิว').toString().trim();
+            const serviceType = (ticket.serviceType || '').toString().trim();
+            const queueNumber = (ticket.queueNumber || '').toString().trim();
+            const servicePoint = (ticket.servicePoint || '').toString().trim();
+            const issuedAt = (ticket.issuedAt || '').toString().trim();
+            const waitingRaw = ticket.waitingCount;
+            const waitingNumber = typeof waitingRaw === 'number' ? waitingRaw : Number.parseInt(waitingRaw, 10);
+            const waitingText = Number.isFinite(waitingNumber) ? `รอคิวก่อนหน้า ${waitingNumber}` : '';
+            const additionalNote = (ticket.additionalNote || '').toString();
+            const footer = (ticket.footer || '').toString();
+            const qrData = (ticket.qrData || '').toString().trim();
+            const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
 
-            rows.push(`<div class="ticket-preview-row"><span>ออกบัตรเมื่อ:</span><strong>${escapeHtml(ticket.issuedAt || '')}</strong></div>`);
+            const html = [
+                `<div class="ticket-preview" id="${previewId}">`,
+                hospitalName ? `<div class="ticket-preview-hospital">${escapeHtml(hospitalName.toLocaleUpperCase('th-TH'))}</div>` : '',
+                label ? `<div class="ticket-preview-label">${escapeHtml(label)}</div>` : '',
+                serviceType ? `<div class="ticket-preview-service">${escapeHtml(serviceType)}</div>` : '',
+                queueNumber ? `<div class="ticket-preview-queue">${escapeHtml(queueNumber)}</div>` : '',
+                servicePoint ? `<div class="ticket-preview-service-point">${escapeHtml(servicePoint)}</div>` : '',
+                issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
+                waitingText ? `<div class="ticket-preview-waiting">${escapeHtml(waitingText)}</div>` : '',
+                additionalNote ? `<div class="ticket-preview-note">${formatMultiline(additionalNote)}</div>` : '',
+                `<div class="ticket-preview-qr" id="${qrElementId}">${qrData ? '<div class="ticket-preview-qr-placeholder">&nbsp;</div>' : ''}</div>`,
+                footer ? `<div class="ticket-preview-footer">${formatMultiline(footer)}</div>` : '',
+                `<div class="ticket-preview-print-count">จำนวนสำเนา: <strong>${escapeHtml(copiesText)}</strong></div>`,
+                '</div>'
+            ].join('');
 
-            if (typeof ticket.waitingCount === 'number') {
-                rows.push(`<div class="ticket-preview-row"><span>จำนวนคิวที่รอ:</span><strong>${escapeHtml(ticket.waitingCount)}</strong></div>`);
-            }
+            return {
+                html,
+                onOpen(modalElement) {
+                    const qrContainer = modalElement && modalElement.querySelector(`#${qrElementId}`);
+                    if (!qrContainer) {
+                        return;
+                    }
 
-            const additionalNote = ticket.additionalNote ? `<div class="ticket-preview-note">${formatMultiline(ticket.additionalNote)}</div>` : '';
-            const footer = ticket.footer ? `<div class="ticket-preview-footer">${formatMultiline(ticket.footer)}</div>` : '';
+                    qrContainer.innerHTML = '';
 
-            return `
-                <div class="ticket-preview">
-                    <span class="ticket-preview-label">${escapeHtml(ticket.label || 'บัตรคิว')}</span>
-                    <span class="ticket-preview-hospital">${escapeHtml(ticket.hospitalName || '')}</span>
-                    <span class="ticket-preview-queue">${escapeHtml(ticket.queueNumber || '')}</span>
-                    <span class="ticket-preview-service">${escapeHtml(ticket.serviceType || '')}</span>
-                    ${rows.join('')}
-                    ${additionalNote}
-                    ${footer}
-                    <div class="ticket-preview-print-count">จำนวนพิมพ์: <strong>${escapeHtml(printCount)}</strong></div>
-                </div>
-            `;
+                    if (!qrData) {
+                        const noData = document.createElement('div');
+                        noData.className = 'ticket-preview-qr-fallback';
+                        noData.textContent = 'ไม่มีข้อมูล QR Code';
+                        qrContainer.appendChild(noData);
+                        return;
+                    }
+
+                    const renderFallback = () => {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'ticket-preview-qr-fallback';
+                        fallback.textContent = qrData;
+                        qrContainer.appendChild(fallback);
+                    };
+
+                    if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
+                        const canvas = document.createElement('canvas');
+                        QRCode.toCanvas(canvas, qrData, { width: 140, margin: 1 }, function(error) {
+                            if (error) {
+                                console.error('Ticket preview QR Code error:', error);
+                                renderFallback();
+                                return;
+                            }
+                            qrContainer.appendChild(canvas);
+                        });
+                    } else {
+                        renderFallback();
+                    }
+                }
+            };
         }
 
         $(document).ready(function() {
@@ -742,11 +811,11 @@
 
             const ticket = buildTicketForPrinting();
             const printCount = Math.max(1, parseInt(appSettings.queue_print_count, 10) || 1);
-            const previewHtml = buildTicketPreviewHtml(ticket, printCount);
+            const preview = buildTicketPreview(ticket, printCount);
 
             const result = await Swal.fire({
                 title: 'ตรวจสอบบัตรคิวก่อนพิมพ์',
-                html: previewHtml,
+                html: preview.html,
                 focusConfirm: false,
                 showCancelButton: true,
                 confirmButtonText: 'พิมพ์บัตรคิว',
@@ -756,7 +825,12 @@
                     htmlContainer: 'swal-ticket-preview-container'
                 },
                 returnFocus: false,
-                width: '32rem'
+                width: '32rem',
+                didOpen: (modalElement) => {
+                    if (preview.onOpen) {
+                        preview.onOpen(modalElement);
+                    }
+                }
             });
 
             if (result.isConfirmed) {
