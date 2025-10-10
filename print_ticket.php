@@ -10,14 +10,10 @@ if (!$queue_id) {
 try {
     $db = getDB();
     $stmt = $db->prepare("
-        SELECT 
+        SELECT
             q.queue_number,
             q.creation_time AS created_at,
             qt.type_name,
-<<<<<<< Updated upstream
-            qt.prefix,
-            (SELECT COUNT(*) FROM queues WHERE queue_type_id = q.queue_type_id AND current_status = 'waiting' AND queue_id < q.queue_id) as waiting_count
-=======
             qt.prefix_char AS prefix,
             (
                 SELECT COUNT(*)
@@ -26,7 +22,6 @@ try {
                     AND current_status = 'waiting'
                     AND queue_id < q.queue_id
             ) AS waiting_count
->>>>>>> Stashed changes
         FROM queues q
         JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
         WHERE q.queue_id = ?

@@ -238,7 +238,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- QR Code library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
-    <!-- BIXOLON Web Print helper -->
+    <!-- ESC/POS encoder & BIXOLON Web Print helper -->
+    <script src="assets/vendor/esc-pos-encoder.umd.js"></script>
     <script src="assets/js/bixolon-webprint.js"></script>
     
     <script>
@@ -286,8 +287,11 @@
                     printerPort: appSettings.bixolon_printer_port || '9100',
                     printerModel: (appSettings.bixolon_printer_model || '').trim(),
                     qrModuleSize: appSettings.bixolon_qr_module_size || '6',
+                    qrModel: appSettings.bixolon_qr_model || '2',
+                    qrErrorLevel: appSettings.bixolon_qr_error_level || 'm',
                     cutType: (appSettings.bixolon_cut_type || '').trim() || 'partial',
-                    timeout: appSettings.bixolon_timeout || '5000'
+                    timeout: appSettings.bixolon_timeout || '5000',
+                    trailingFeed: appSettings.bixolon_trailing_feed || '6'
                 });
 
                 if (!bixolonClient.isReady()) {

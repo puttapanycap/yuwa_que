@@ -37,6 +37,7 @@ Thumbs.db
 # Composer
 vendor/
 composer.lock
+!assets/vendor/
 
 # Node modules (if using)
 node_modules/

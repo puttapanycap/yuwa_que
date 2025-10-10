@@ -1,166 +1,133 @@
 (function(window) {
     'use strict';
 
-    function chunkToBinaryString(uint8Array) {
+    function chunkToBase64(uint8Array) {
+        if (!(uint8Array instanceof Uint8Array)) {
+            return '';
+        }
+
         let result = '';
         const chunkSize = 0x8000;
         for (let i = 0; i < uint8Array.length; i += chunkSize) {
             const chunk = uint8Array.subarray(i, i + chunkSize);
             result += String.fromCharCode.apply(null, chunk);
         }
+        return btoa(result);
+    }
+
+    function clamp(value, min, max, fallback) {
+        const number = Number(value);
+        if (Number.isFinite(number)) {
+            return Math.min(max, Math.max(min, number));
+        }
+        return fallback;
+    }
+
+    function resolveEncoder() {
+        if (typeof window.EscPosEncoder === 'function') {
+            return window.EscPosEncoder;
+        }
+        if (window.escpos && typeof window.escpos.EscPosEncoder === 'function') {
+            return window.escpos.EscPosEncoder;
+        }
+        return null;
+    }
+
+    function normalizeCutType(value) {
+        return value === 'full' ? 'full' : 'partial';
+    }
+
+    function normalizeErrorLevel(value) {
+        const level = (value || 'm').toString().toLowerCase();
+        return ['l', 'm', 'q', 'h'].includes(level) ? level : 'm';
+    }
+
+    function mergeUint8Arrays(chunks) {
+        if (!Array.isArray(chunks) || !chunks.length) {
+            return new Uint8Array(0);
+        }
+
+        const totalLength = chunks.reduce((sum, chunk) => sum + (chunk?.length || 0), 0);
+        const result = new Uint8Array(totalLength);
+        let offset = 0;
+        chunks.forEach((chunk) => {
+            if (chunk instanceof Uint8Array) {
+                result.set(chunk, offset);
+                offset += chunk.length;
+            }
+        });
         return result;
     }
 
-    class EscPosBuilder {
-        constructor(options = {}) {
-            this.options = Object.assign({
-                qrModuleSize: 6,
-                qrErrorCorrection: 'M',
-                cutType: 'partial',
-                encoding: 'utf-8'
-            }, options);
-            this.commands = [];
-            this.textEncoder = new TextEncoder();
+    function buildTicketData(ticket, copies, options) {
+        const EscPosEncoder = resolveEncoder();
+        if (!EscPosEncoder) {
+            throw new Error('EscPosEncoder library is not loaded.');
         }
 
-        push(...bytes) {
-            for (let i = 0; i < bytes.length; i += 1) {
-                const value = bytes[i];
-                if (Array.isArray(value)) {
-                    this.push.apply(this, value);
-                } else if (typeof value === 'number') {
-                    this.commands.push(value & 0xFF);
+        const encoderOptions = {};
+        const encodedCopies = [];
+        const copyCount = Math.max(1, parseInt(copies, 10) || 1);
+
+        for (let i = 0; i < copyCount; i += 1) {
+            const encoder = new EscPosEncoder(encoderOptions);
+            encoder.initialize().align('center');
+
+            if (ticket.hospitalName) {
+                encoder.bold(true).line(ticket.hospitalName.toUpperCase());
+                encoder.bold(false);
+            }
+
+            if (ticket.serviceType) {
+                encoder.line(ticket.serviceType);
+            }
+
+            if (ticket.queueNumber) {
+                encoder.size(2, 2).line(ticket.queueNumber);
+                encoder.size(1, 1);
+            }
+
+            if (ticket.servicePoint) {
+                encoder.line(ticket.servicePoint);
+            }
+
+            if (ticket.datetime) {
+                encoder.line(ticket.datetime);
+            }
+
+            if (ticket.additionalNote) {
+                encoder.line(ticket.additionalNote);
+            }
+
+            if (ticket.qrData) {
+                encoder.newline();
+                try {
+                    encoder.qrcode(ticket.qrData, {
+                        model: options.qrModel,
+                        size: options.qrSize,
+                        errorlevel: options.qrErrorLevel
+                    });
+                    encoder.newline();
+                } catch (error) {
+                    console.warn('Unable to encode QR code for ticket', error);
+                    encoder.line(ticket.qrData);
+                    encoder.newline();
                 }
             }
-        }
 
-        initialize() {
-            this.push(0x1B, 0x40);
-        }
-
-        align(mode = 'left') {
-            const map = { left: 0, center: 1, right: 2 };
-            this.push(0x1B, 0x61, map[mode] ?? 0);
-        }
-
-        bold(enable = false) {
-            this.push(0x1B, 0x45, enable ? 1 : 0);
-        }
-
-        doubleSize(enable = false) {
-            this.push(0x1D, 0x21, enable ? 0x11 : 0x00);
-        }
-
-        text(value = '') {
-            if (!value) {
-                return;
-            }
-            const encoded = this.textEncoder.encode(value);
-            this.push(Array.from(encoded));
-        }
-
-        textLine(value = '', options = {}) {
-            if (options.align) this.align(options.align);
-            if (options.bold !== undefined) this.bold(options.bold);
-            if (options.doubleSize !== undefined) this.doubleSize(options.doubleSize);
-            if (options.uppercase) {
-                this.text((value || '').toUpperCase());
-            } else {
-                this.text(value);
-            }
-            this.newLine();
-            if (options.bold !== undefined) this.bold(false);
-            if (options.doubleSize !== undefined) this.doubleSize(false);
-            if (options.align) this.align('left');
-        }
-
-        newLine(count = 1) {
-            for (let i = 0; i < count; i += 1) {
-                this.push(0x0A);
-            }
-        }
-
-        feed(lines = 1) {
-            this.push(0x1B, 0x64, Math.max(1, Math.min(255, lines)));
-        }
-
-        drawSeparator(width = 32) {
-            const line = '-'.repeat(Math.max(8, Math.min(64, width)));
-            this.textLine(line, { align: 'center' });
-        }
-
-        qrCode(data, moduleSize = this.options.qrModuleSize, errorCorrection = this.options.qrErrorCorrection) {
-            if (!data) return;
-            const encoder = this.textEncoder;
-            const dataBytes = encoder.encode(data);
-            const size = Math.max(1, Math.min(16, moduleSize));
-            const eccMap = { L: 48, M: 49, Q: 50, H: 51 };
-            const ecc = eccMap[(errorCorrection || 'M').toUpperCase()] ?? eccMap.M;
-
-            this.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
-            this.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size);
-            this.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, ecc);
-
-            const length = dataBytes.length + 3;
-            const pL = length & 0xFF;
-            const pH = (length >> 8) & 0xFF;
-            const storeCommand = [0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30];
-            this.push(storeCommand.concat(Array.from(dataBytes)));
-            this.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
-        }
-
-        cut(mode = this.options.cutType) {
-            if (mode === 'partial') {
-                this.push(0x1D, 0x56, 0x42, 0x00);
-            } else {
-                this.push(0x1D, 0x56, 0x00);
-            }
-        }
-
-        appendTicket(ticket) {
-            this.initialize();
-            this.align('center');
-            this.bold(true);
-            if (ticket.hospitalName) {
-                this.textLine(ticket.hospitalName, { uppercase: true });
-            }
-            this.bold(false);
-            if (ticket.serviceType) {
-                this.textLine(ticket.serviceType, { align: 'center' });
-            }
-            this.doubleSize(true);
-            this.textLine(ticket.queueNumber || '', { align: 'center' });
-            this.doubleSize(false);
-            if (ticket.servicePoint) {
-                this.textLine(ticket.servicePoint, { align: 'center' });
-            }
-            if (ticket.datetime) {
-                this.textLine(ticket.datetime, { align: 'center' });
-            }
-            if (ticket.additionalNote) {
-                this.textLine(ticket.additionalNote, { align: 'center' });
-            }
-            if (ticket.qrData) {
-                this.newLine();
-                this.align('center');
-                this.qrCode(ticket.qrData);
-                this.newLine();
-            }
             if (ticket.footer) {
-                this.textLine(ticket.footer, { align: 'center' });
+                encoder.line(ticket.footer);
             }
-            this.feed(6);
-            this.cut(this.options.cutType);
+
+            for (let feed = 0; feed < options.trailingFeed; feed += 1) {
+                encoder.newline();
+            }
+
+            encoder.cut(options.cutType);
+            encodedCopies.push(encoder.encode());
         }
 
-        toUint8Array() {
-            return Uint8Array.from(this.commands);
-        }
-
-        toBase64() {
-            const bytes = this.toUint8Array();
-            return btoa(chunkToBinaryString(bytes));
-        }
+        return chunkToBase64(mergeUint8Arrays(encodedCopies));
     }
 
     class BixolonWebPrintClient {
@@ -172,9 +139,12 @@
             this.printerTarget = config.printerTarget || '';
             this.printerPort = config.printerPort ? parseInt(config.printerPort, 10) : 9100;
             this.printerModel = config.printerModel || '';
-            this.qrModuleSize = config.qrModuleSize ? parseInt(config.qrModuleSize, 10) : 6;
-            this.cutType = config.cutType || 'partial';
+            this.qrModuleSize = clamp(config.qrModuleSize, 1, 8, 6);
+            this.qrModel = clamp(config.qrModel, 1, 2, 2);
+            this.qrErrorLevel = normalizeErrorLevel(config.qrErrorLevel);
+            this.cutType = normalizeCutType(config.cutType);
             this.timeout = config.timeout ? parseInt(config.timeout, 10) : 4000;
+            this.trailingFeed = clamp(config.trailingFeed, 0, 12, 6);
         }
 
         isReady() {
@@ -182,14 +152,13 @@
         }
 
         buildTicketPayload(ticket, copies = 1) {
-            const builder = new EscPosBuilder({
-                qrModuleSize: this.qrModuleSize,
-                cutType: this.cutType
+            return buildTicketData(ticket, copies, {
+                qrSize: this.qrModuleSize,
+                qrModel: this.qrModel,
+                qrErrorLevel: this.qrErrorLevel,
+                cutType: this.cutType,
+                trailingFeed: this.trailingFeed
             });
-            for (let i = 0; i < copies; i += 1) {
-                builder.appendTicket(ticket);
-            }
-            return builder.toBase64();
         }
 
         async printTicket(ticket, copies = 1) {
@@ -197,15 +166,16 @@
                 throw new Error('BIXOLON printer is not configured.');
             }
 
+            const sanitizedCopies = Math.max(1, parseInt(copies, 10) || 1);
             const payload = {
                 requestId: `queue-${Date.now()}`,
                 interface: this.interfaceType,
                 target: this.printerTarget,
                 port: this.printerPort,
                 model: this.printerModel,
-                copies: Math.max(1, parseInt(copies, 10) || 1),
+                copies: sanitizedCopies,
                 dataFormat: 'base64',
-                data: this.buildTicketPayload(ticket, copies)
+                data: this.buildTicketPayload(ticket, sanitizedCopies)
             };
 
             const controller = new AbortController();
@@ -237,7 +207,6 @@
     }
 
     window.BixolonWebPrint = {
-        EscPosBuilder,
         BixolonWebPrintClient
     };
 })(window);
