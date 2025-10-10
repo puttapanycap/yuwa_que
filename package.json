@@ -52,7 +52,6 @@
     "datatables.net": "^1.13.0",
     "datatables.net-bs5": "^1.13.0",
     "dropzone": "^6.0.0-beta.1",
-    "esc-pos-encoder": "^3.0.0",
     "fullcalendar": "^6.1.0",
     "html2canvas": "^1.4.0",
     "jquery": "^3.7.0",

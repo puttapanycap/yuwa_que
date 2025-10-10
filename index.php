@@ -94,6 +94,121 @@
             margin: 1rem 0;
         }
 
+        .ticket-preview {
+            background: #ffffff;
+            border: 1px dashed #ced4da;
+            border-radius: 15px;
+            padding: 1.75rem 1.5rem;
+            text-align: center;
+            color: #212529;
+            box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.05);
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        .ticket-preview-hospital {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .ticket-preview-label {
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #0d6efd;
+            margin-top: 0.35rem;
+        }
+
+        .ticket-preview-service {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 0.75rem;
+        }
+
+        .ticket-preview-queue {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #0d6efd;
+            margin: 0.75rem 0 0.5rem;
+        }
+
+        .ticket-preview-service-point,
+        .ticket-preview-issued-at,
+        .ticket-preview-waiting {
+            display: block;
+            font-size: 1rem;
+            color: #495057;
+        }
+
+        .ticket-preview-service-point {
+            margin-top: 0.35rem;
+        }
+
+        .ticket-preview-issued-at,
+        .ticket-preview-waiting {
+            margin-top: 0.25rem;
+        }
+
+        .ticket-preview-note,
+        .ticket-preview-footer {
+            margin-top: 1rem;
+            font-size: 0.95rem;
+            color: #495057;
+            white-space: pre-line;
+        }
+
+        .ticket-preview-note {
+            padding-top: 0.75rem;
+            border-top: 1px dashed #dee2e6;
+        }
+
+        .ticket-preview-footer {
+            color: #adb5bd;
+        }
+
+        .ticket-preview-qr {
+            margin: 1.25rem auto 0.5rem;
+            width: 140px;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ticket-preview-qr-placeholder {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ticket-preview-qr canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        .ticket-preview-qr-fallback {
+            font-size: 0.85rem;
+            color: #6c757d;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        .ticket-preview-print-count {
+            margin-top: 1.25rem;
+            font-size: 0.95rem;
+            color: #6c757d;
+        }
+
+        .swal2-popup.swal-ticket-preview-popup {
+            border-radius: 18px;
+        }
+
+        .swal-ticket-preview-container {
+            margin: 0;
+        }
+
         @media print {
             body {
                 margin: 0;
@@ -238,17 +353,109 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- QR Code library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
+    <!-- SweetAlert2 for printing status -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- ESC/POS encoder & BIXOLON Web Print helper -->
     <script src="assets/vendor/esc-pos-encoder.umd.js"></script>
-    <script src="assets/js/bixolon-webprint.js"></script>
-    
     <script>
         let selectedServiceType = null;
         let currentQueue = null;
         let appSettings = {
             queue_print_count: 1
         };
-        let bixolonClient = null;
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            return text
+                .toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatMultiline(text) {
+            return escapeHtml(text).replace(/\r?\n/g, '<br>');
+        }
+
+        function buildTicketPreview(ticket, printCount) {
+            const previewId = `ticket-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const qrElementId = `${previewId}-qr`;
+
+            const hospitalName = (ticket.hospitalName || '').toString().trim();
+            const label = (ticket.label || 'บัตรคิว').toString().trim();
+            const serviceType = (ticket.serviceType || '').toString().trim();
+            const queueNumber = (ticket.queueNumber || '').toString().trim();
+            const servicePoint = (ticket.servicePoint || '').toString().trim();
+            const issuedAt = (ticket.issuedAt || '').toString().trim();
+            const waitingRaw = ticket.waitingCount;
+            const waitingNumber = typeof waitingRaw === 'number' ? waitingRaw : Number.parseInt(waitingRaw, 10);
+            const waitingText = Number.isFinite(waitingNumber) ? `รอคิวก่อนหน้า ${waitingNumber}` : '';
+            const additionalNote = (ticket.additionalNote || '').toString();
+            const footer = (ticket.footer || '').toString();
+            const qrData = (ticket.qrData || '').toString().trim();
+            const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
+
+            const html = [
+                `<div class="ticket-preview" id="${previewId}">`,
+                hospitalName ? `<div class="ticket-preview-hospital">${escapeHtml(hospitalName.toLocaleUpperCase('th-TH'))}</div>` : '',
+                label ? `<div class="ticket-preview-label">${escapeHtml(label)}</div>` : '',
+                serviceType ? `<div class="ticket-preview-service">${escapeHtml(serviceType)}</div>` : '',
+                queueNumber ? `<div class="ticket-preview-queue">${escapeHtml(queueNumber)}</div>` : '',
+                servicePoint ? `<div class="ticket-preview-service-point">${escapeHtml(servicePoint)}</div>` : '',
+                issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
+                waitingText ? `<div class="ticket-preview-waiting">${escapeHtml(waitingText)}</div>` : '',
+                additionalNote ? `<div class="ticket-preview-note">${formatMultiline(additionalNote)}</div>` : '',
+                `<div class="ticket-preview-qr" id="${qrElementId}">${qrData ? '<div class="ticket-preview-qr-placeholder">&nbsp;</div>' : ''}</div>`,
+                footer ? `<div class="ticket-preview-footer">${formatMultiline(footer)}</div>` : '',
+                `<div class="ticket-preview-print-count">จำนวนสำเนา: <strong>${escapeHtml(copiesText)}</strong></div>`,
+                '</div>'
+            ].join('');
+
+            return {
+                html,
+                onOpen(modalElement) {
+                    const qrContainer = modalElement && modalElement.querySelector(`#${qrElementId}`);
+                    if (!qrContainer) {
+                        return;
+                    }
+
+                    qrContainer.innerHTML = '';
+
+                    if (!qrData) {
+                        const noData = document.createElement('div');
+                        noData.className = 'ticket-preview-qr-fallback';
+                        noData.textContent = 'ไม่มีข้อมูล QR Code';
+                        qrContainer.appendChild(noData);
+                        return;
+                    }
+
+                    const renderFallback = () => {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'ticket-preview-qr-fallback';
+                        fallback.textContent = qrData;
+                        qrContainer.appendChild(fallback);
+                    };
+
+                    if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
+                        const canvas = document.createElement('canvas');
+                        QRCode.toCanvas(canvas, qrData, { width: 140, margin: 1 }, function(error) {
+                            if (error) {
+                                console.error('Ticket preview QR Code error:', error);
+                                renderFallback();
+                                return;
+                            }
+                            qrContainer.appendChild(canvas);
+                        });
+                    } else {
+                        renderFallback();
+                    }
+                }
+            };
+        }
 
         $(document).ready(function() {
             loadAppSettings();
@@ -259,48 +466,9 @@
         function loadAppSettings() {
             $.get('api/get_settings.php', function(data) {
                 appSettings = data;
-                initializeBixolonPrinter();
             }).fail(function() {
                 console.error('Could not load app settings.');
             });
-        }
-
-        function initializeBixolonPrinter() {
-            if (!window.BixolonWebPrint) {
-                console.warn('BIXOLON Web Print helper is not available.');
-                bixolonClient = null;
-                return;
-            }
-
-            if (!appSettings || appSettings.bixolon_enabled !== '1') {
-                bixolonClient = null;
-                return;
-            }
-
-            try {
-                bixolonClient = new window.BixolonWebPrint.BixolonWebPrintClient({
-                    enabled: true,
-                    serviceUrl: (appSettings.bixolon_service_url || '').trim() || 'http://127.0.0.1:18080',
-                    servicePath: (appSettings.bixolon_service_path || '').trim() || '/commands/print',
-                    interfaceType: (appSettings.bixolon_printer_interface || '').trim() || 'network',
-                    printerTarget: (appSettings.bixolon_printer_target || '').trim(),
-                    printerPort: appSettings.bixolon_printer_port || '9100',
-                    printerModel: (appSettings.bixolon_printer_model || '').trim(),
-                    qrModuleSize: appSettings.bixolon_qr_module_size || '6',
-                    qrModel: appSettings.bixolon_qr_model || '2',
-                    qrErrorLevel: appSettings.bixolon_qr_error_level || 'm',
-                    cutType: (appSettings.bixolon_cut_type || '').trim() || 'partial',
-                    timeout: appSettings.bixolon_timeout || '5000',
-                    trailingFeed: appSettings.bixolon_trailing_feed || '6'
-                });
-
-                if (!bixolonClient.isReady()) {
-                    console.warn('BIXOLON Web Print client is not fully configured.');
-                }
-            } catch (error) {
-                console.error('Failed to initialise BIXOLON Web Print client', error);
-                bixolonClient = null;
-            }
         }
 
         function getTicketDateTime() {
@@ -314,32 +482,127 @@
             return new Date().toLocaleString('th-TH');
         }
 
-        function attemptBixolonPrint(printCount) {
-            if (!bixolonClient || !bixolonClient.isReady()) {
-                return Promise.resolve(false);
-            }
-
-            const hospitalName = appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์';
-            const queueNumber = currentQueue?.queue_number || '';
-            const servicePoint = currentQueue?.service_point_name || '';
+        function buildTicketForPrinting() {
+            const hospitalName = (appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์').trim();
             const ticket = {
+                label: 'บัตรคิว',
                 hospitalName,
                 serviceType: selectedServiceType?.name || '',
-                queueNumber,
-                servicePoint,
-                datetime: getTicketDateTime(),
+                queueNumber: currentQueue?.queue_number || '',
+                servicePoint: currentQueue?.service_point_name || '',
+                issuedAt: getTicketDateTime(),
                 additionalNote: (appSettings.bixolon_additional_note || '').trim() || '',
                 footer: (appSettings.bixolon_ticket_footer || '').trim() || '',
                 qrData: `${window.location.origin}/check_status.php?queue_id=${currentQueue?.queue_id || ''}`
             };
 
-            return bixolonClient.printTicket(ticket, printCount)
-                .then(() => true)
-                .catch(error => {
-                    console.error('BIXOLON print failed', error);
-                    alert('ไม่สามารถพิมพ์ผ่านเครื่องพิมพ์ BIXOLON ได้\nกรุณาตรวจสอบการเชื่อมต่อเครื่องพิมพ์');
-                    return false;
+            if (typeof currentQueue?.waiting_position === 'number') {
+                ticket.waitingCount = currentQueue.waiting_position;
+            }
+
+            return ticket;
+        }
+
+        function resolveQueuePrinterEndpoint() {
+            const origin = window.location.origin;
+            const defaultEndpoint = `${origin}/api/queue_printer.php`;
+            const configured = ((appSettings.queue_printer_endpoint || '').trim() || (appSettings.bixolon_service_url || '').trim());
+            const path = (appSettings.bixolon_service_path || '').trim();
+
+            if (!configured) {
+                return defaultEndpoint;
+            }
+
+            const legacyLocalPattern = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i;
+            if (legacyLocalPattern.test(configured) && (!path || path === '/commands/print')) {
+                return defaultEndpoint;
+            }
+
+            const appendPath = (baseUrl) => {
+                if (!path) {
+                    return baseUrl;
+                }
+                if (/\.php(\?|$)/i.test(baseUrl)) {
+                    return baseUrl;
+                }
+                return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+            };
+
+            if (/^https?:\/\//i.test(configured)) {
+                return appendPath(configured);
+            }
+
+            if (configured.startsWith('/')) {
+                return appendPath(`${origin}${configured}`);
+            }
+
+            return appendPath(`${origin}/${configured.replace(/^\//, '')}`);
+        }
+
+        async function sendTicketToPrinterService(printCount) {
+            const endpoint = resolveQueuePrinterEndpoint();
+            const timeoutMs = Math.max(1000, parseInt(appSettings.bixolon_timeout, 10) || 5000);
+
+            const options = {
+                qrModel: parseInt(appSettings.bixolon_qr_model, 10),
+                qrSize: parseInt(appSettings.bixolon_qr_module_size, 10),
+                qrErrorLevel: (appSettings.bixolon_qr_error_level || 'm').toString().toUpperCase(),
+                cutType: (appSettings.bixolon_cut_type || 'partial').toString().toLowerCase(),
+                trailingFeed: parseInt(appSettings.bixolon_trailing_feed, 10),
+                profile: (appSettings.queue_printer_profile || '').trim() || undefined,
+                codeTable: parseInt((appSettings.queue_printer_code_table || appSettings.bixolon_code_table), 10)
+            };
+
+            const sanitizedOptions = Object.fromEntries(Object.entries(options).filter(([_, value]) => Number.isFinite(value) || typeof value === 'string'));
+
+            const payload = {
+                copies: Math.max(1, parseInt(printCount, 10) || 1),
+                interface: (appSettings.bixolon_printer_interface || '').trim() || undefined,
+                target: (appSettings.bixolon_printer_target || '').trim() || undefined,
+                port: appSettings.bixolon_printer_port ? parseInt(appSettings.bixolon_printer_port, 10) : undefined,
+                timeout: timeoutMs,
+                ticket: buildTicketForPrinting(),
+                options: sanitizedOptions
+            };
+
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
+                clearTimeout(timer);
+
+                const responseText = await response.text();
+                let json = null;
+                if (responseText) {
+                    try {
+                        json = JSON.parse(responseText);
+                    } catch (error) {
+                        console.warn('Printer service returned non-JSON response', responseText);
+                    }
+                }
+
+                if (!response.ok || (json && json.success === false)) {
+                    const message = json?.message || responseText || `บริการพิมพ์ตอบกลับสถานะ ${response.status}`;
+                    throw new Error(message);
+                }
+
+                return json || {};
+            } catch (error) {
+                clearTimeout(timer);
+                if (error.name === 'AbortError') {
+                    throw new Error('การเชื่อมต่อกับบริการพิมพ์หมดเวลา กรุณาตรวจสอบเครื่องพิมพ์');
+                }
+                console.error('Printer service request failed', error);
+                throw error;
+            }
         }
 
         function loadServiceTypes() {
@@ -519,267 +782,78 @@
             }
         }
 
-        function printQueue() {
-            const printCount = parseInt(appSettings.queue_print_count, 10) || 1;
-            const shouldPreOpenFallback = !bixolonClient || !bixolonClient.isReady();
-            const fallbackWindow = shouldPreOpenFallback ? window.open('', '_blank') : null;
+        async function printQueue() {
+            if (!currentQueue || !selectedServiceType) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ไม่พบข้อมูลคิว',
+                    text: 'กรุณากดรับบัตรคิวใหม่อีกครั้ง',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
 
-            attemptBixolonPrint(printCount).then(success => {
-                if (success) {
-                    if (fallbackWindow && !fallbackWindow.closed) {
-                        fallbackWindow.close();
+            const ticket = buildTicketForPrinting();
+            const printCount = Math.max(1, parseInt(appSettings.queue_print_count, 10) || 1);
+            const preview = buildTicketPreview(ticket, printCount);
+
+            const result = await Swal.fire({
+                title: 'ตรวจสอบบัตรคิวก่อนพิมพ์',
+                html: preview.html,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'พิมพ์บัตรคิว',
+                cancelButtonText: 'ยกเลิก',
+                customClass: {
+                    popup: 'swal-ticket-preview-popup',
+                    htmlContainer: 'swal-ticket-preview-container'
+                },
+                returnFocus: false,
+                width: '32rem',
+                didOpen: (modalElement) => {
+                    if (preview.onOpen) {
+                        preview.onOpen(modalElement);
                     }
-                    return;
                 }
-
-                let ticketsHtml = '';
-
-                for (let i = 0; i < printCount; i++) {
-                    ticketsHtml += `
-                        <div class="print-area" style="page-break-after: ${i < printCount - 1 ? 'always' : 'auto'};">
-                            <div class="hospital-name">${appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'}</div>
-                            <h3>บัตรคิว</h3>
-                            <div class="queue-number">${currentQueue.queue_number}</div>
-                            <div class="queue-type">${selectedServiceType.name}</div>
-                            <div class="datetime">${getTicketDateTime()}</div>
-                            <div class="qr-container">
-                                <canvas id="printQR_${i}" width="150" height="150"></canvas>
-                            </div>
-                            <div class="footer">${(appSettings.bixolon_ticket_footer || 'สแกน QR Code เพื่อตรวจสอบสถานะคิว')}</div>
-                        </div>
-                    `;
-                }
-
-                const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-
-                const content = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="UTF-8">
-                        <title>บัตรคิว</title>
-                        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-                        <style>
-                            @page {
-                                size: 80mm 140mm;
-                                margin: 0;
-                            }
-                            body {
-                                font-family: 'Sarabun', sans-serif;
-                                text-align: center;
-                                margin: 0;
-                                padding: 0;
-                                width: 80mm;
-                                box-sizing: border-box;
-                                color: #000;
-                            }
-                            .print-area {
-                                width: 80mm;
-                                height: 140mm;
-                                padding: 5mm;
-                                box-sizing: border-box;
-                                overflow: hidden;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: center;
-                                align-items: center;
-                            }
-                            .hospital-name {
-                                font-size: 12pt;
-                                font-weight: bold;
-                                margin-bottom: 5px;
-                            }
-                            h3 {
-                                font-size: 14pt;
-                                margin: 5px 0;
-                            }
-                            .queue-number {
-                                font-size: 32pt;
-                                font-weight: bold;
-                                margin: 10px 0;
-                            }
-                            .queue-type, .datetime {
-                                font-size: 10pt;
-                                margin: 5px 0;
-                            }
-                            .qr-container {
-                                margin: 10px 0;
-                            }
-                            .footer {
-                                font-size: 8pt;
-                                margin-top: 10px;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="ticket-sheet">
-                            ${ticketsHtml}
-                        </div>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIPo0PvyX+IWDVjYDL0J3QGa5VVP8YQRT9PxqXfsTZLXg1MYqMy3Itbwk5G6JX0R3t4FRTbwdUuHjQH5DsmA==" crossorigin="anonymous" referrerpolicy="no-referrer"><\/script>
-                        <script>
-                            window.__PRINT_SETTINGS__ = {
-                                printCount: ${printCount},
-                                qrData: ${JSON.stringify(qrData)}
-                            };
-                        <\/script>
-                        <script>
-                            (function() {
-                                function generateQrCodes() {
-                                    var settings = window.__PRINT_SETTINGS__ || {};
-                                    for (var i = 0; i < (settings.printCount || 0); i++) {
-                                        var canvas = document.getElementById('printQR_' + i);
-                                        if (!canvas) { continue; }
-                                        try {
-                                            new QRious({
-                                                element: canvas,
-                                                value: settings.qrData,
-                                                size: 150,
-                                                level: 'H'
-                                            });
-                                        } catch (error) {
-                                            console.error('QRious error:', error);
-                                        }
-                                    }
-                                }
-
-<<<<<<< Updated upstream
-                                function setupCloseHandler() {
-                                    if ('onafterprint' in window) {
-                                        window.addEventListener('afterprint', function() {
-                                            setTimeout(function() { window.close(); }, 500);
-                                        });
-                                    } else if (window.matchMedia) {
-                                        var mediaQuery = window.matchMedia('print');
-                                        if (mediaQuery && mediaQuery.addListener) {
-                                            mediaQuery.addListener(function(mql) {
-                                                if (!mql.matches) {
-                                                    setTimeout(function() { window.close(); }, 500);
-                                                }
-                                            });
-=======
-                                function printCopy(index) {
-                                    status.textContent = \`กำลังพิมพ์บัตรคิว (\${index + 1}/\${settings.copies})...\`;
-                                    const frame = document.createElement('iframe');
-                                    frame.style.position = 'fixed';
-                                    frame.style.right = '0';
-                                    frame.style.bottom = '0';
-                                    frame.style.width = '1px';
-                                    frame.style.height = '1px';
-                                    frame.style.opacity = '0';
-                                    frame.setAttribute('title', 'พิมพ์บัตรคิวอัตโนมัติ');
-
-                                    let cleaned = false;
-                                    const cleanup = () => {
-                                        if (cleaned) {
-                                            return;
->>>>>>> Stashed changes
-                                        }
-                                    }
-                                }
-
-                                function createPdfAndPrint() {
-                                    var ticketSheet = document.querySelector('.ticket-sheet');
-                                    if (!ticketSheet || typeof html2pdf === 'undefined') {
-                                        window.focus();
-                                        window.print();
-                                        return;
-                                    }
-
-                                    var options = {
-                                        margin: [0, 0, 0, 0],
-                                        filename: 'queue-ticket.pdf',
-                                        image: { type: 'jpeg', quality: 0.98 },
-                                        html2canvas: { scale: 2, useCORS: true },
-                                        jsPDF: { unit: 'mm', format: [80, 140], orientation: 'portrait' },
-                                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                                    };
-
-                                    html2pdf().set(options).from(ticketSheet).outputPdf('blob')
-                                        .then(function(blob) {
-                                            var blobUrl = URL.createObjectURL(blob);
-                                            var iframe = document.createElement('iframe');
-                                            iframe.style.position = 'fixed';
-                                            iframe.style.right = '0';
-                                            iframe.style.bottom = '0';
-                                            iframe.style.width = '1px';
-                                            iframe.style.height = '1px';
-                                            iframe.style.opacity = '0';
-                                            iframe.setAttribute('sandbox', 'allow-modals allow-scripts allow-same-origin');
-
-                                            var cleanedUp = false;
-                                            var cleanup = function() {
-                                                if (cleanedUp) { return; }
-                                                cleanedUp = true;
-                                                URL.revokeObjectURL(blobUrl);
-                                                iframe.remove();
-                                            };
-
-                                            iframe.onload = function() {
-                                                try {
-                                                    var frameWindow = iframe.contentWindow || iframe;
-                                                    frameWindow.focus();
-                                                    if (frameWindow) {
-                                                        frameWindow.onafterprint = cleanup;
-                                                    }
-                                                    frameWindow.print();
-                                                    setTimeout(cleanup, 30000);
-                                                } catch (error) {
-                                                    console.error('Automatic PDF print failed, opening preview window instead.', error);
-                                                    var pdfWindow = window.open(blobUrl, '_blank');
-                                                    if (!pdfWindow) {
-                                                        alert('ไม่สามารถเปิดหน้าต่างพิมพ์ PDF ได้ กรุณาปิดการบล็อกป๊อปอัป');
-                                                    }
-                                                    setTimeout(cleanup, 120000);
-                                                }
-                                            };
-
-                                            iframe.onabort = cleanup;
-                                            iframe.onerror = function() {
-                                                cleanup();
-                                                alert('ไม่สามารถโหลดไฟล์ PDF สำหรับพิมพ์ได้');
-                                            };
-
-                                            document.body.appendChild(iframe);
-                                            iframe.src = blobUrl;
-                                        })
-                                        .catch(function(error) {
-                                            console.error('Failed to render ticket PDF, falling back to window.print()', error);
-                                            window.focus();
-                                            window.print();
-                                        });
-                                }
-
-                                window.addEventListener('load', function() {
-                                    try {
-                                        generateQrCodes();
-                                    } catch (error) {
-                                        console.error('Failed to generate QR codes:', error);
-                                    }
-
-                                    setupCloseHandler();
-
-                                    setTimeout(createPdfAndPrint, 800);
-                                });
-                            })();
-                        <\/script>
-                    </body>
-                    </html>
-                `;
-
-                const printWindow = (fallbackWindow && !fallbackWindow.closed)
-                    ? fallbackWindow
-                    : window.open('', '_blank');
-
-                if (!printWindow || !printWindow.document) {
-                    alert('ไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาปิดการบล็อกป๊อปอัปหรือใช้โหมดปกติ');
-                    return;
-                }
-
-                printWindow.document.open();
-                printWindow.document.write(content);
-                printWindow.document.close();
             });
+
+            if (result.isConfirmed) {
+                await performTicketPrint(printCount);
+            }
+        }
+
+        async function performTicketPrint(printCount) {
+            Swal.fire({
+                title: 'กำลังพิมพ์บัตรคิว',
+                text: 'กรุณารอสักครู่...',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                allowEnterKey: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            try {
+                await sendTicketToPrinterService(printCount);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'พิมพ์บัตรคิวสำเร็จ',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                return true;
+            } catch (error) {
+                const message = error?.message || 'ไม่สามารถสั่งพิมพ์บัตรคิวได้ กรุณาตรวจสอบเครื่องพิมพ์';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'พิมพ์บัตรคิวไม่สำเร็จ',
+                    text: message,
+                    confirmButtonText: 'ตกลง'
+                });
+                return false;
+            }
         }
 
         function resetKiosk() {
