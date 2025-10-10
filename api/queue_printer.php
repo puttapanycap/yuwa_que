@@ -13,7 +13,6 @@ use chillerlan\QRCode\QROptions;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/queue_printer_fonts.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -328,12 +327,12 @@ function buildTicketImageResource(array $ticket, array $options)
     $fontRegular = resolveTicketFontPath('regular');
     $fontBold = resolveTicketFontPath('bold');
 
-    $y = 30.0;
+    $y = 15.0;
     $maxY = $y;
 
     $hospitalName = trim($ticket['hospitalName']);
     if ($hospitalName !== '') {
-        $y = drawCenteredTextBlock($canvas, [mb_strtoupper($hospitalName, 'UTF-8')], $fontBold, 38, $black, $y, 14, 24);
+        $y = drawCenteredTextBlock($canvas, [mb_strtoupper($hospitalName, 'UTF-8')], $fontBold, 25, $black, $y, 14, 24);
         $maxY = max($maxY, $y);
     }
 
@@ -348,7 +347,7 @@ function buildTicketImageResource(array $ticket, array $options)
     }
 
     if ($ticket['queueNumber'] !== '') {
-        $y = drawCenteredTextBlock($canvas, [$ticket['queueNumber']], $fontBold, 120, $black, $y, 10, 24);
+        $y = drawCenteredTextBlock($canvas, [$ticket['queueNumber']], $fontBold, 125, $black, $y, 10, 24);
         $maxY = max($maxY, $y);
     }
 
@@ -467,39 +466,18 @@ function resolveTicketFontPath(string $variant): string
     $key = $variant === 'bold' ? 'bold' : 'regular';
 
     if (!isset($cache[$key])) {
-        $data = loadEmbeddedFontData($key);
+        $fileName = $key === 'bold' ? 'LINESeedSansTH_Bd.ttf' : 'LINESeedSansTH_Rg.ttf';
+        $candidate = __DIR__ . '/../assets/fonts/LineSeed/' . $fileName;
+        $resolved = realpath($candidate);
 
-        $path = tempnam(sys_get_temp_dir(), 'ticket-font-');
-        if ($path === false) {
-            throw new \RuntimeException('Unable to allocate temporary file for ticket font');
+        if ($resolved === false || !is_file($resolved) || !is_readable($resolved)) {
+            throw new \RuntimeException('Ticket font file is missing or unreadable: ' . $fileName);
         }
 
-        if (file_put_contents($path, $data) === false) {
-            throw new \RuntimeException('Unable to write embedded ticket font to temporary file');
-        }
-
-        register_shutdown_function(static function () use ($path): void {
-            if (is_file($path)) {
-                @unlink($path);
-            }
-        });
-
-        $cache[$key] = $path;
+        $cache[$key] = $resolved;
     }
 
     return $cache[$key];
-}
-
-function loadEmbeddedFontData(string $variant): string
-{
-    $base64 = $variant === 'bold' ? SARABUN_BOLD_TTF_BASE64 : SARABUN_REGULAR_TTF_BASE64;
-
-    $decoded = base64_decode($base64, true);
-    if ($decoded === false) {
-        throw new \RuntimeException('Embedded ticket font data is corrupted');
-    }
-
-    return $decoded;
 }
 
 function createQrImage(string $data, string $errorLevel, int $moduleSize)
