@@ -213,25 +213,36 @@ class Cache {
 //     return htmlspecialchars(strip_tags(trim($data)));
 // }
 
-// function redirectTo($url) {
-//     header("Location: " . $url);
-//     exit();
-// }
+if (!function_exists('redirectTo')) {
+    function redirectTo($url) {
+        header('Location: ' . $url);
+        exit();
+    }
+}
 
-// function isLoggedIn() {
-//     return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
-// }
+if (!function_exists('isLoggedIn')) {
+    function isLoggedIn() {
+        return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
+    }
+}
 
-// function requireLogin() {
-//     if (!isLoggedIn()) {
-//         redirectTo(BASE_URL . '/staff/login.php');
-//     }
-// }
+if (!function_exists('requireLogin')) {
+    function requireLogin() {
+        if (!isLoggedIn()) {
+            redirectTo(BASE_URL . '/staff/login.php');
+        }
+    }
+}
 
-// function hasPermission($permission) {
-//     if (!isLoggedIn()) return false;
-//     return in_array($permission, $_SESSION['permissions'] ?? []);
-// }
+if (!function_exists('hasPermission')) {
+    function hasPermission($permission) {
+        if (!isLoggedIn()) {
+            return false;
+        }
+
+        return in_array($permission, $_SESSION['permissions'] ?? []);
+    }
+}
 
 function logActivity($description, $staff_id = null) {
     try {
