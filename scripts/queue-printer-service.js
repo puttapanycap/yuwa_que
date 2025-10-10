@@ -5,7 +5,11 @@
  *
  * Lightweight HTTP service that accepts queue ticket print requests and
  * forwards them to an ESC/POS compatible thermal printer using
+<<<<<<< HEAD
  * the `esc-pos-encoder` package and raw socket connections.
+=======
+ * the `escpos` package with its network adapter for transport.
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
  *
  * The service exposes two endpoints:
  *   - POST /commands/print
@@ -13,7 +17,11 @@
  *       request format used by the BIXOLON Web Print service.
  *   - POST /print-ticket
  *       Accepts structured JSON describing a queue ticket and renders it
+<<<<<<< HEAD
  *       with helper utilities powered by esc-pos-encoder.
+=======
+ *       with helper utilities powered by escpos commands.
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
  *
  * Environment variables:
  *   QUEUE_PRINTER_HOST            Host to bind the HTTP server (default: 0.0.0.0)
@@ -37,14 +45,33 @@
 
 const http = require('http');
 const { URL } = require('url');
+<<<<<<< HEAD
 const net = require('net');
 const EscPosEncoder = require('esc-pos-encoder');
+=======
+const escpos = require('escpos');
+
+let NetworkAdapter = escpos.Network;
+try {
+  if (!NetworkAdapter) {
+    NetworkAdapter = require('escpos-network');
+    escpos.Network = NetworkAdapter;
+  }
+} catch (error) {
+  console.warn(`⚠️  Unable to load escpos network adapter: ${error.message}`);
+  NetworkAdapter = null;
+}
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
 
 const HOST = process.env.QUEUE_PRINTER_HOST || '0.0.0.0';
 const PORT = Number.parseInt(process.env.QUEUE_PRINTER_PORT || '18080', 10);
 const DEFAULT_INTERFACE = (process.env.QUEUE_PRINTER_INTERFACE || '').trim() || null;
 const DEFAULT_TYPE = (process.env.QUEUE_PRINTER_TYPE || 'epson').toLowerCase();
 const DEFAULT_CODEPAGE = (process.env.QUEUE_PRINTER_CHARSET || 'thai11').trim() || 'thai11';
+<<<<<<< HEAD
+=======
+const DEFAULT_ENCODING = resolveEncoding(DEFAULT_CODEPAGE);
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
 const DEFAULT_TIMEOUT = Number.parseInt(process.env.QUEUE_PRINTER_TIMEOUT || '5000', 10);
 const DEFAULT_LINE_CHARACTER = (process.env.QUEUE_PRINTER_LINE_CHAR || '=').substring(0, 1) || '=';
 const MAX_BODY_SIZE = Number.parseInt(process.env.QUEUE_PRINTER_MAX_BODY || `${1024 * 1024}`, 10);
@@ -151,7 +178,11 @@ async function handleRawPrint(payload = {}) {
 
   let totalBytes = 0;
   for (let i = 0; i < copies; i += 1) {
+<<<<<<< HEAD
     totalBytes += await sendBufferToPrinter(target, buffer);
+=======
+    totalBytes += await printRawBuffer(target, buffer);
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
   }
 
   return {
@@ -192,7 +223,11 @@ async function handleStructuredPrint(payload = {}) {
   const target = parsePrinterInterface(interfaceUri);
   await ensurePrinterReachable(target);
 
+<<<<<<< HEAD
   const job = buildTicketBuffer(ticket, {
+=======
+  const job = await buildTicketBuffer(ticket, {
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
     qr: qrOptions,
     trailingFeed,
     cutType,
@@ -200,7 +235,11 @@ async function handleStructuredPrint(payload = {}) {
 
   let totalBytes = 0;
   for (let i = 0; i < copies; i += 1) {
+<<<<<<< HEAD
     totalBytes += await sendBufferToPrinter(target, job);
+=======
+    totalBytes += await printRawBuffer(target, job);
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
   }
 
   return {
@@ -215,7 +254,34 @@ async function handleStructuredPrint(payload = {}) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+<<<<<<< HEAD
 function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
+=======
+async function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
+  const adapter = new MemoryAdapter();
+  const printer = createEscposPrinter(adapter);
+
+  adapter.open(() => {});
+
+  applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType });
+
+  return new Promise((resolve, reject) => {
+    try {
+      printer.close((error) => {
+        if (error) {
+          reject(createHttpError(500, error.message || 'Failed to finalize ticket job'));
+          return;
+        }
+        resolve(adapter.getBuffer());
+      });
+    } catch (error) {
+      reject(createHttpError(500, error.message || 'Failed to build ticket data'));
+    }
+  });
+}
+
+function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
   const hospitalName = sanitizeLine(ticket.hospitalName);
   const queueLabel = sanitizeLine(ticket.label || ticket.title || 'บัตรคิว');
   const queueNumber = sanitizeLine(ticket.queueNumber);
@@ -227,6 +293,7 @@ function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
   const qrData = typeof ticket.qrData === 'string' && ticket.qrData.trim() ? ticket.qrData.trim() : null;
 
+<<<<<<< HEAD
   const encoder = new EscPosEncoder({ columns: TICKET_COLUMNS });
 
   encoder.initialize();
@@ -300,6 +367,80 @@ function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
   encoder.cut(cutType === 'full' ? 'full' : 'partial');
 
   return Buffer.from(encoder.encode());
+=======
+  const width = clampInt(TICKET_COLUMNS, 24, 64, 48);
+  const divider = DEFAULT_LINE_CHARACTER.repeat(width);
+
+  printer
+    .encode(DEFAULT_ENCODING)
+    .font('A')
+    .style('NORMAL')
+    .size(1, 1)
+    .align('ct');
+
+  if (hospitalName) {
+    printer.style('B').text(hospitalName).style('NORMAL');
+  }
+
+  if (queueLabel) {
+    printer.text(queueLabel);
+  }
+
+  printer.text(divider);
+
+  if (serviceType) {
+    printer.text(serviceType);
+  }
+
+  if (queueNumber) {
+    printer.newLine();
+    printer.style('B').size(2, 2).text(queueNumber).size(1, 1).style('NORMAL');
+    printer.newLine();
+  }
+
+  if (servicePoint) {
+    printer.text(servicePoint);
+  }
+
+  printer.align('lt').style('NORMAL');
+
+  if (issuedAt) {
+    printer.text(`ออกบัตร: ${issuedAt}`);
+  }
+
+  if (Number.isFinite(waitingCount)) {
+    printer.text(`จำนวนคิวก่อนหน้า: ${waitingCount}`);
+  }
+
+  printer.align('ct');
+
+  if (additionalNote) {
+    printer.newLine();
+    printer.text(additionalNote);
+  }
+
+  if (qrData) {
+    const qrSize = clampInt(qr.size, 1, 8, DEFAULT_QR_SIZE);
+    const qrVersion = clampInt(qr.model, 1, 40, DEFAULT_QR_MODEL);
+    const qrLevel = normalizeQrCorrection(qr.correction);
+
+    printer.newLine();
+    printer.qrcode(qrData, qrVersion, qrLevel, qrSize);
+    printer.newLine();
+  }
+
+  if (footer) {
+    printer.text(footer);
+  }
+
+  const feedLines = clampInt(trailingFeed, 0, 12, DEFAULT_TRAILING_FEED);
+  if (feedLines > 0) {
+    printer.feed(feedLines);
+  }
+  printer.cut(cutType === 'full' ? false : true);
+
+  return printer;
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
 }
 
 function extractTicket(payload) {
@@ -350,7 +491,16 @@ function parsePrinterInterface(interfaceUri) {
 
 async function ensurePrinterReachable(target) {
   if (target.type === 'tcp') {
+<<<<<<< HEAD
     await sendTcpBuffer(target.host, target.port, Buffer.alloc(0), { probe: true });
+=======
+    if (!NetworkAdapter) {
+      throw createHttpError(
+        500,
+        'escpos network adapter is not available. Install the "escpos-network" package to enable TCP printing.',
+      );
+    }
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
     return;
   }
 
@@ -370,13 +520,23 @@ async function ensurePrinterReachable(target) {
   }
 }
 
+<<<<<<< HEAD
 async function sendBufferToPrinter(target, buffer) {
+=======
+async function printRawBuffer(target, buffer) {
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
   if (!Buffer.isBuffer(buffer)) {
     throw createHttpError(500, 'Print payload must be a buffer');
   }
 
   if (target.type === 'tcp') {
+<<<<<<< HEAD
     return sendTcpBuffer(target.host, target.port, buffer);
+=======
+    return withEscposPrinter(target, (printer) => {
+      printer.raw(buffer);
+    });
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
   }
 
   if (target.type === 'driver') {
@@ -405,6 +565,7 @@ async function sendBufferToPrinter(target, buffer) {
   throw createHttpError(500, 'Unsupported printer transport');
 }
 
+<<<<<<< HEAD
 function sendTcpBuffer(host, port, buffer, { probe = false } = {}) {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
@@ -456,10 +617,162 @@ function sendTcpBuffer(host, port, buffer, { probe = false } = {}) {
         }
         socket.end();
       });
+=======
+function withEscposPrinter(target, job) {
+  if (!NetworkAdapter) {
+    throw createHttpError(
+      500,
+      'escpos network adapter is not available. Install the "escpos-network" package to enable TCP printing.',
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    const device = new NetworkAdapter(target.host, target.port);
+    const printer = createEscposPrinter(device);
+    const socket = device.device;
+    let totalBytes = 0;
+
+    if (device && typeof device.write === 'function') {
+      const originalWrite = device.write.bind(device);
+      device.write = (data, callback) => {
+        if (Buffer.isBuffer(data)) {
+          totalBytes += data.length;
+        }
+        return originalWrite(data, callback);
+      };
+    }
+
+    let timeoutListener = null;
+    if (socket && typeof socket.setTimeout === 'function' && Number.isFinite(DEFAULT_TIMEOUT) && DEFAULT_TIMEOUT > 0) {
+      timeoutListener = () => {
+        const timeoutError = new Error(`Printer ${target.host}:${target.port} timed out after ${DEFAULT_TIMEOUT}ms`);
+        timeoutError.code = 'ETIMEDOUT';
+        socket.destroy(timeoutError);
+      };
+      socket.setTimeout(DEFAULT_TIMEOUT);
+      socket.on('timeout', timeoutListener);
+    }
+
+    device.open((error) => {
+      if (timeoutListener && socket) {
+        socket.setTimeout(0);
+        socket.removeListener('timeout', timeoutListener);
+      }
+
+      if (error) {
+        const status = error.code === 'ETIMEDOUT' ? 504 : 503;
+        reject(createHttpError(status, `Unable to connect to printer ${target.host}:${target.port}: ${error.message}`));
+        return;
+      }
+
+      const run = async () => {
+        let jobError = null;
+        try {
+          await job(printer);
+        } catch (err) {
+          jobError = err;
+        }
+
+        try {
+          await closePrinter(printer);
+        } catch (closeError) {
+          if (!jobError) {
+            throw closeError;
+          }
+          console.warn(`⚠️  Failed to close printer after job error: ${closeError.message}`);
+        }
+
+        if (jobError) {
+          throw jobError;
+        }
+      };
+
+      run()
+        .then(() => {
+          resolve(totalBytes);
+        })
+        .catch((err) => {
+          const statusCode = err && err.code === 'ETIMEDOUT' ? 504 : 500;
+          if (err && err.statusCode) {
+            reject(err);
+            return;
+          }
+          reject(createHttpError(statusCode, err && err.message ? err.message : 'Printer job failed'));
+        });
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
     });
   });
 }
 
+<<<<<<< HEAD
+=======
+function closePrinter(printer) {
+  return new Promise((resolve, reject) => {
+    try {
+      printer.close((error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function createEscposPrinter(adapter) {
+  const printer = new escpos.Printer(adapter, { encoding: DEFAULT_ENCODING, width: TICKET_COLUMNS });
+  if (DEFAULT_ENCODING && typeof printer.encode === 'function') {
+    printer.encode(DEFAULT_ENCODING);
+  }
+  return printer;
+}
+
+class MemoryAdapter {
+  constructor() {
+    this.chunks = [];
+  }
+
+  open(callback) {
+    if (typeof callback === 'function') {
+      callback(null, this);
+    }
+    return this;
+  }
+
+  write(data, callback) {
+    if (data) {
+      if (Buffer.isBuffer(data)) {
+        this.chunks.push(Buffer.from(data));
+      } else if (typeof data === 'string') {
+        this.chunks.push(Buffer.from(data, 'binary'));
+      }
+    }
+    if (typeof callback === 'function') {
+      callback(null);
+    }
+    return this;
+  }
+
+  close(callback) {
+    if (typeof callback === 'function') {
+      callback(null, this);
+    }
+    return this;
+  }
+
+  read() {
+    return this;
+  }
+
+  getBuffer() {
+    return this.chunks.length > 0 ? Buffer.concat(this.chunks) : Buffer.alloc(0);
+  }
+}
+
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
 function decodePayloadData(data, format = 'base64') {
   if (typeof data !== 'string' || !data.trim()) {
     throw createHttpError(400, 'Payload data must be a non-empty string');
@@ -521,6 +834,33 @@ function resolveInterface(payload = {}) {
   return `tcp://${target}${resolvedPort ? `:${resolvedPort}` : ''}`;
 }
 
+<<<<<<< HEAD
+=======
+function resolveEncoding(codepage) {
+  if (!codepage) {
+    return 'tis620';
+  }
+
+  const normalized = codepage.toString().trim().toLowerCase();
+  const map = {
+    thai: 'tis620',
+    thai11: 'tis620',
+    'thai-11': 'tis620',
+    tis620: 'tis620',
+    'tis-620': 'tis620',
+    tis620_1: 'tis620',
+    cp874: 'cp874',
+    'cp-874': 'cp874',
+    windows874: 'cp874',
+    'windows-874': 'cp874',
+    utf8: 'utf8',
+    'utf-8': 'utf8',
+  };
+
+  return map[normalized] || normalized || 'tis620';
+}
+
+>>>>>>> origin/codex/implement-queue-ticket-printing-using-package-btavfk
 function normalizeCutType(value) {
   if (typeof value !== 'string') {
     return 'partial';
