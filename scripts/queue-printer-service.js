@@ -6,7 +6,6 @@
  * Lightweight HTTP service that accepts queue ticket print requests and
  * forwards them to an ESC/POS compatible thermal printer using
  * the `escpos` package with its network adapter for transport.
-
  *
  * The service exposes two endpoints:
  *   - POST /commands/print
@@ -15,7 +14,6 @@
  *   - POST /print-ticket
  *       Accepts structured JSON describing a queue ticket and renders it
  *       with helper utilities powered by escpos commands.
-
  *
  * Environment variables:
  *   QUEUE_PRINTER_HOST            Host to bind the HTTP server (default: 0.0.0.0)
@@ -23,8 +21,8 @@
  *   QUEUE_PRINTER_INTERFACE       Printer interface URI (e.g. tcp://192.168.0.50:9100)
  *   QUEUE_PRINTER_TYPE            Printer type: epson, star, tanca, daruma, brother, custom (default: epson)
  *   QUEUE_PRINTER_CHARSET         ESC/POS code page (default: thai11)
+ *   QUEUE_PRINTER_CODE_TABLE      Override ESC/POS code table number (ESC t n) when needed
  *   QUEUE_PRINTER_TIMEOUT         Connection timeout in ms (default: 5000)
- *   QUEUE_PRINTER_LINE_CHAR       Character used when drawing horizontal lines (default: '=')
  *   QUEUE_PRINTER_MAX_BODY        Maximum accepted JSON payload in bytes (default: 1_048_576)
  *   QUEUE_PRINTER_MAX_COPIES      Maximum copies per request (default: 5)
  *   QUEUE_PRINTER_DEFAULT_COPIES  Default copy count when not provided (default: 1)
@@ -39,7 +37,6 @@
 
 const http = require('http');
 const { URL } = require('url');
-
 const escpos = require('escpos');
 
 let NetworkAdapter = escpos.Network;
@@ -53,15 +50,24 @@ try {
   NetworkAdapter = null;
 }
 
-const HOST = process.env.QUEUE_PRINTER_HOST || '127.0.0.1';
+const HOST = process.env.QUEUE_PRINTER_HOST || '0.0.0.0';
 const PORT = Number.parseInt(process.env.QUEUE_PRINTER_PORT || '18080', 10);
 const DEFAULT_INTERFACE = (process.env.QUEUE_PRINTER_INTERFACE || '').trim() || null;
 const DEFAULT_TYPE = (process.env.QUEUE_PRINTER_TYPE || 'epson').toLowerCase();
 const DEFAULT_CODEPAGE = (process.env.QUEUE_PRINTER_CHARSET || 'thai11').trim() || 'thai11';
-
 const DEFAULT_ENCODING = resolveEncoding(DEFAULT_CODEPAGE);
+const CODE_TABLE_MAPPINGS = {
+  default: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  epson: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  custom: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  tanca: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  daruma: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  brother: { tis620: 21, thaiAlt: 26, cp874: 21 },
+  star: { tis620: 21, thaiAlt: 21, cp874: 21 },
+};
+const EXPLICIT_CODE_TABLE = parseCodeTable(process.env.QUEUE_PRINTER_CODE_TABLE);
+const DEFAULT_CODE_TABLE = resolveCodeTable(DEFAULT_ENCODING, DEFAULT_TYPE, EXPLICIT_CODE_TABLE);
 const DEFAULT_TIMEOUT = Number.parseInt(process.env.QUEUE_PRINTER_TIMEOUT || '5000', 10);
-const DEFAULT_LINE_CHARACTER = (process.env.QUEUE_PRINTER_LINE_CHAR || '=').substring(0, 1) || '=';
 const MAX_BODY_SIZE = Number.parseInt(process.env.QUEUE_PRINTER_MAX_BODY || `${1024 * 1024}`, 10);
 const MAX_COPIES = Math.max(1, Number.parseInt(process.env.QUEUE_PRINTER_MAX_COPIES || '5', 10));
 const DEFAULT_COPIES = clampInt(process.env.QUEUE_PRINTER_DEFAULT_COPIES, 1, MAX_COPIES, 1);
@@ -230,7 +236,6 @@ async function handleStructuredPrint(payload = {}) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-
 async function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
   const adapter = new MemoryAdapter();
   const printer = createEscposPrinter(adapter);
@@ -256,18 +261,15 @@ async function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
 
 function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
   const hospitalName = sanitizeLine(ticket.hospitalName);
-  const queueLabel = sanitizeLine(ticket.label || ticket.title || 'บัตรคิว');
+  const queueLabel = sanitizeLine(ticket.label || ticket.title);
   const queueNumber = sanitizeLine(ticket.queueNumber);
-  const serviceType = sanitizeLine(ticket.serviceType);
+  const serviceType = sanitizeLine(ticket.serviceType || ticket.queueType);
   const servicePoint = sanitizeLine(ticket.servicePoint || ticket.counterName);
   const issuedAt = sanitizeLine(ticket.issuedAt || ticket.datetime || ticket.createdAt);
   const waitingCount = typeof ticket.waitingCount === 'number' ? ticket.waitingCount : ticket.waiting;
   const additionalNote = sanitizeLine(ticket.additionalNote || ticket.note);
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
   const qrData = typeof ticket.qrData === 'string' && ticket.qrData.trim() ? ticket.qrData.trim() : null;
-
-  const width = clampInt(TICKET_COLUMNS, 24, 64, 48);
-  const divider = DEFAULT_LINE_CHARACTER.repeat(width);
 
   printer
     .encode(DEFAULT_ENCODING)
@@ -276,44 +278,39 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
     .size(1, 1)
     .align('ct');
 
+  if (Number.isFinite(DEFAULT_CODE_TABLE)) {
+    printer.setCharacterCodeTable(DEFAULT_CODE_TABLE);
+  }
+
   if (hospitalName) {
-    printer.style('B').text(hospitalName).style('NORMAL');
+    printer.style('B').text(hospitalName.toUpperCase()).style('NORMAL');
   }
 
   if (queueLabel) {
     printer.text(queueLabel);
   }
 
-  printer.text(divider);
-
   if (serviceType) {
     printer.text(serviceType);
   }
 
   if (queueNumber) {
-    printer.newLine();
     printer.style('B').size(2, 2).text(queueNumber).size(1, 1).style('NORMAL');
-    printer.newLine();
   }
 
   if (servicePoint) {
     printer.text(servicePoint);
   }
 
-  printer.align('lt').style('NORMAL');
-
   if (issuedAt) {
-    printer.text(`ออกบัตร: ${issuedAt}`);
+    printer.text(issuedAt);
   }
 
   if (Number.isFinite(waitingCount)) {
-    printer.text(`จำนวนคิวก่อนหน้า: ${waitingCount}`);
+    printer.text(`รอคิวก่อนหน้า ${waitingCount}`);
   }
 
-  printer.align('ct');
-
   if (additionalNote) {
-    printer.newLine();
     printer.text(additionalNote);
   }
 
@@ -413,14 +410,12 @@ async function ensurePrinterReachable(target) {
   }
 }
 
-
 async function printRawBuffer(target, buffer) {
   if (!Buffer.isBuffer(buffer)) {
     throw createHttpError(500, 'Print payload must be a buffer');
   }
 
   if (target.type === 'tcp') {
-
     return withEscposPrinter(target, (printer) => {
       printer.raw(buffer);
     });
@@ -451,7 +446,6 @@ async function printRawBuffer(target, buffer) {
 
   throw createHttpError(500, 'Unsupported printer transport');
 }
-
 
 function withEscposPrinter(target, job) {
   if (!NetworkAdapter) {
@@ -534,7 +528,6 @@ function withEscposPrinter(target, job) {
           }
           reject(createHttpError(statusCode, err && err.message ? err.message : 'Printer job failed'));
         });
-
     });
   });
 }
@@ -559,6 +552,9 @@ function createEscposPrinter(adapter) {
   const printer = new escpos.Printer(adapter, { encoding: DEFAULT_ENCODING, width: TICKET_COLUMNS });
   if (DEFAULT_ENCODING && typeof printer.encode === 'function') {
     printer.encode(DEFAULT_ENCODING);
+  }
+  if (Number.isFinite(DEFAULT_CODE_TABLE) && typeof printer.setCharacterCodeTable === 'function') {
+    printer.setCharacterCodeTable(DEFAULT_CODE_TABLE);
   }
   return printer;
 }
@@ -604,7 +600,6 @@ class MemoryAdapter {
     return this.chunks.length > 0 ? Buffer.concat(this.chunks) : Buffer.alloc(0);
   }
 }
-
 
 function decodePayloadData(data, format = 'base64') {
   if (typeof data !== 'string' || !data.trim()) {
@@ -691,6 +686,74 @@ function resolveEncoding(codepage) {
   return map[normalized] || normalized || 'tis620';
 }
 
+function parseCodeTable(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 255) {
+    return parsed;
+  }
+
+  console.warn(`⚠️  Ignoring invalid QUEUE_PRINTER_CODE_TABLE value: ${value}`);
+  return null;
+}
+
+function resolveCodeTable(encoding, printerType, overrideValue = null) {
+  if (Number.isFinite(overrideValue)) {
+    return overrideValue;
+  }
+
+  const normalizedType = typeof printerType === 'string' ? printerType.trim().toLowerCase() : '';
+  const typeKey = normalizedType || 'default';
+
+  const key = normalizeCodeTableKey(encoding);
+  if (!key) {
+    return null;
+  }
+
+  const lookup = CODE_TABLE_MAPPINGS[typeKey] || CODE_TABLE_MAPPINGS.default;
+  return typeof lookup[key] === 'number' ? lookup[key] : null;
+}
+
+function normalizeCodeTableKey(encoding) {
+  if (!encoding) {
+    return null;
+  }
+
+  const normalized = encoding.toString().trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (['thai18', 'tis18', 'tis-18', 'tis620-18', 'tis620_alt', 'thai-alt'].includes(normalized)) {
+    return 'thaiAlt';
+  }
+
+  if (['cp874', 'cp-874', 'windows874', 'windows-874'].includes(normalized)) {
+    return 'cp874';
+  }
+
+  if (
+    [
+      'thai',
+      'thai11',
+      'thai-11',
+      'tis620',
+      'tis-620',
+      'tis620_1',
+      'tis6201',
+      'tis11',
+      'tis-11',
+    ].includes(normalized)
+  ) {
+    return 'tis620';
+  }
+
+  return normalized;
+}
 
 function normalizeCutType(value) {
   if (typeof value !== 'string') {
