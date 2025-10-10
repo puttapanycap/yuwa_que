@@ -4,8 +4,8 @@
  * ------------------------------------
  *
  * Lightweight HTTP service that accepts queue ticket print requests and
- * forwards them to an ESC/POS compatible thermal printer using the
- * `node-thermal-printer` package.
+ * forwards them to an ESC/POS compatible thermal printer using
+ * the `esc-pos-encoder` package and raw socket connections.
  *
  * The service exposes two endpoints:
  *   - POST /commands/print
@@ -13,14 +13,14 @@
  *       request format used by the BIXOLON Web Print service.
  *   - POST /print-ticket
  *       Accepts structured JSON describing a queue ticket and renders it
- *       with helper utilities provided by node-thermal-printer.
+ *       with helper utilities powered by esc-pos-encoder.
  *
  * Environment variables:
  *   QUEUE_PRINTER_HOST            Host to bind the HTTP server (default: 0.0.0.0)
  *   QUEUE_PRINTER_PORT            Port to bind the HTTP server (default: 18080)
  *   QUEUE_PRINTER_INTERFACE       Printer interface URI (e.g. tcp://192.168.0.50:9100)
  *   QUEUE_PRINTER_TYPE            Printer type: epson, star, tanca, daruma, brother, custom (default: epson)
- *   QUEUE_PRINTER_CHARSET         ESC/POS code page (default: TIS11_THAI)
+ *   QUEUE_PRINTER_CHARSET         ESC/POS code page (default: thai11)
  *   QUEUE_PRINTER_TIMEOUT         Connection timeout in ms (default: 5000)
  *   QUEUE_PRINTER_LINE_CHAR       Character used when drawing horizontal lines (default: '=')
  *   QUEUE_PRINTER_MAX_BODY        Maximum accepted JSON payload in bytes (default: 1_048_576)
@@ -32,18 +32,19 @@
  *   QUEUE_PRINTER_QR_MODEL        Default QR model (1,2,3; default: 2)
  *   QUEUE_PRINTER_QR_CORRECTION   Default QR correction level (L,M,Q,H; default: M)
  *   QUEUE_PRINTER_ALLOWED_ORIGIN  CORS Access-Control-Allow-Origin header (default: *)
- *   QUEUE_PRINTER_DRIVER          Optional printer driver module name for system printers
+ *   QUEUE_PRINTER_DRIVER          Optional printer driver module name for non-network printers
  */
 
 const http = require('http');
 const { URL } = require('url');
-const { ThermalPrinter, PrinterTypes } = require('node-thermal-printer');
+const net = require('net');
+const EscPosEncoder = require('esc-pos-encoder');
 
 const HOST = process.env.QUEUE_PRINTER_HOST || '0.0.0.0';
 const PORT = Number.parseInt(process.env.QUEUE_PRINTER_PORT || '18080', 10);
 const DEFAULT_INTERFACE = (process.env.QUEUE_PRINTER_INTERFACE || '').trim() || null;
 const DEFAULT_TYPE = (process.env.QUEUE_PRINTER_TYPE || 'epson').toLowerCase();
-const DEFAULT_CHARSET = (process.env.QUEUE_PRINTER_CHARSET || 'TIS11_THAI').trim();
+const DEFAULT_CODEPAGE = (process.env.QUEUE_PRINTER_CHARSET || 'thai11').trim() || 'thai11';
 const DEFAULT_TIMEOUT = Number.parseInt(process.env.QUEUE_PRINTER_TIMEOUT || '5000', 10);
 const DEFAULT_LINE_CHARACTER = (process.env.QUEUE_PRINTER_LINE_CHAR || '=').substring(0, 1) || '=';
 const MAX_BODY_SIZE = Number.parseInt(process.env.QUEUE_PRINTER_MAX_BODY || `${1024 * 1024}`, 10);
@@ -56,8 +57,7 @@ const DEFAULT_QR_MODEL = clampInt(process.env.QUEUE_PRINTER_QR_MODEL, 1, 3, 2);
 const DEFAULT_QR_CORRECTION = normalizeQrCorrection(process.env.QUEUE_PRINTER_QR_CORRECTION);
 const ALLOWED_ORIGIN = process.env.QUEUE_PRINTER_ALLOWED_ORIGIN || '*';
 const DRIVER_MODULE = (process.env.QUEUE_PRINTER_DRIVER || '').trim() || null;
-
-const PRINTER_TYPE = resolvePrinterType(DEFAULT_TYPE);
+const TICKET_COLUMNS = clampInt(process.env.QUEUE_PRINTER_COLUMNS, 24, 64, DEFAULT_TYPE === 'star' ? 42 : 48);
 
 let optionalDriver = null;
 if (DRIVER_MODULE) {
@@ -146,20 +146,18 @@ async function handleRawPrint(payload = {}) {
   const copies = clampInt(payload.copies ?? payload.copy ?? payload.printCopies, 1, MAX_COPIES, DEFAULT_COPIES);
   const buffer = decodePayloadData(payload.data, payload.dataFormat);
 
-  const printer = createPrinter(interfaceUri);
-  const connected = await printer.isPrinterConnected();
-  if (connected === false) {
-    throw createHttpError(503, `Printer "${interfaceUri}" is not reachable`);
-  }
+  const target = parsePrinterInterface(interfaceUri);
+  await ensurePrinterReachable(target);
 
+  let totalBytes = 0;
   for (let i = 0; i < copies; i += 1) {
-    await printer.raw(buffer);
+    totalBytes += await sendBufferToPrinter(target, buffer);
   }
 
   return {
     copiesPrinted: copies,
     interface: interfaceUri,
-    bytesSent: buffer.length * copies,
+    bytesSent: totalBytes,
   };
 }
 
@@ -191,22 +189,24 @@ async function handleStructuredPrint(payload = {}) {
   const trailingFeed = clampInt(payload.trailingFeed ?? ticket.trailingFeed, 0, 12, DEFAULT_TRAILING_FEED);
   const cutType = normalizeCutType(payload.cutType ?? ticket.cutType) || DEFAULT_CUT_TYPE;
 
-  const printer = createPrinter(interfaceUri);
-  const connected = await printer.isPrinterConnected();
-  if (connected === false) {
-    throw createHttpError(503, `Printer "${interfaceUri}" is not reachable`);
-  }
+  const target = parsePrinterInterface(interfaceUri);
+  await ensurePrinterReachable(target);
 
+  const job = buildTicketBuffer(ticket, {
+    qr: qrOptions,
+    trailingFeed,
+    cutType,
+  });
+
+  let totalBytes = 0;
   for (let i = 0; i < copies; i += 1) {
-    printer.clear();
-    composeTicket(printer, ticket, { qr: qrOptions, trailingFeed });
-    applyCut(printer, cutType);
-    await printer.execute();
+    totalBytes += await sendBufferToPrinter(target, job);
   }
 
   return {
     copiesPrinted: copies,
     interface: interfaceUri,
+    bytesSent: totalBytes,
     ticket: { queueNumber: ticket.queueNumber, serviceType: ticket.serviceType, hospitalName: ticket.hospitalName },
   };
 }
@@ -215,30 +215,7 @@ async function handleStructuredPrint(payload = {}) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createPrinter(interfaceUri) {
-  if (!interfaceUri) {
-    throw createHttpError(400, 'Printer interface is required');
-  }
-
-  const printerConfig = {
-    type: PRINTER_TYPE,
-    interface: interfaceUri,
-    characterSet: DEFAULT_CHARSET,
-    removeSpecialCharacters: false,
-    lineCharacter: DEFAULT_LINE_CHARACTER,
-    options: {
-      timeout: Number.isFinite(DEFAULT_TIMEOUT) ? DEFAULT_TIMEOUT : 5000,
-    },
-  };
-
-  if (optionalDriver) {
-    printerConfig.driver = optionalDriver;
-  }
-
-  return new ThermalPrinter(printerConfig);
-}
-
-function composeTicket(printer, ticket, { qr, trailingFeed }) {
+function buildTicketBuffer(ticket, { qr, trailingFeed, cutType }) {
   const hospitalName = sanitizeLine(ticket.hospitalName);
   const queueLabel = sanitizeLine(ticket.label || ticket.title || 'บัตรคิว');
   const queueNumber = sanitizeLine(ticket.queueNumber);
@@ -250,82 +227,79 @@ function composeTicket(printer, ticket, { qr, trailingFeed }) {
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
   const qrData = typeof ticket.qrData === 'string' && ticket.qrData.trim() ? ticket.qrData.trim() : null;
 
-  printer.alignCenter();
-  printer.setTextNormal();
+  const encoder = new EscPosEncoder({ columns: TICKET_COLUMNS });
+
+  encoder.initialize();
+
+  if (DEFAULT_CODEPAGE) {
+    encoder.codepage(DEFAULT_CODEPAGE);
+  }
+
+  encoder.align('center');
 
   if (hospitalName) {
-    printer.bold(true);
-    printer.println(hospitalName);
-    printer.bold(false);
+    encoder.bold(true).line(hospitalName).bold(false);
   }
 
   if (queueLabel) {
-    printer.println(queueLabel);
+    encoder.line(queueLabel);
   }
 
-  printer.drawLine();
+  encoder.line(DEFAULT_LINE_CHARACTER.repeat(TICKET_COLUMNS));
 
   if (serviceType) {
-    printer.println(serviceType);
+    encoder.line(serviceType);
   }
 
   if (queueNumber) {
-    printer.newLine();
-    printer.bold(true);
-    printer.setTextSize(2, 2);
-    printer.println(queueNumber);
-    printer.setTextNormal();
-    printer.bold(false);
-    printer.newLine();
+    encoder.newline();
+    encoder.bold(true).size(2, 2).line(queueNumber).size(1, 1).bold(false);
+    encoder.newline();
   }
 
   if (servicePoint) {
-    printer.println(servicePoint);
+    encoder.line(servicePoint);
   }
 
-  printer.alignLeft();
+  encoder.align('left');
 
   if (issuedAt) {
-    printer.println(`ออกบัตร: ${issuedAt}`);
+    encoder.line(`ออกบัตร: ${issuedAt}`);
   }
 
   if (Number.isFinite(waitingCount)) {
-    printer.println(`จำนวนคิวก่อนหน้า: ${waitingCount}`);
+    encoder.line(`จำนวนคิวก่อนหน้า: ${waitingCount}`);
   }
 
-  printer.alignCenter();
+  encoder.align('center');
 
   if (additionalNote) {
-    printer.newLine();
-    printer.println(additionalNote);
+    encoder.newline();
+    encoder.line(additionalNote);
   }
 
   if (qrData) {
-    printer.newLine();
-    printer.printQR(qrData, {
+    encoder.newline();
+    encoder.qrcode(qrData, {
       model: qr.model,
-      cellSize: qr.size,
-      correction: qr.correction,
+      size: qr.size,
+      errorlevel: (qr.correction || 'M').toLowerCase(),
     });
-    printer.newLine();
+    encoder.newline();
   }
 
   if (footer) {
-    printer.println(footer);
+    encoder.line(footer);
   }
 
   const feedLines = clampInt(trailingFeed, 0, 12, DEFAULT_TRAILING_FEED);
   for (let i = 0; i < feedLines; i += 1) {
-    printer.newLine();
+    encoder.newline();
   }
-}
 
-function applyCut(printer, cutType) {
-  if (cutType === 'full') {
-    printer.cut();
-  } else {
-    printer.partialCut();
-  }
+  encoder.cut(cutType === 'full' ? 'full' : 'partial');
+
+  return Buffer.from(encoder.encode());
 }
 
 function extractTicket(payload) {
@@ -339,6 +313,151 @@ function extractTicket(payload) {
     return payload;
   }
   return null;
+}
+
+function parsePrinterInterface(interfaceUri) {
+  if (!interfaceUri || typeof interfaceUri !== 'string') {
+    throw createHttpError(400, 'Printer interface is required');
+  }
+
+  const trimmed = interfaceUri.trim();
+
+  if (trimmed.toLowerCase().startsWith('tcp://')) {
+    try {
+      const url = new URL(trimmed);
+      const port = clampInt(url.port, 1, 65535, 9100);
+      return {
+        type: 'tcp',
+        uri: trimmed,
+        host: url.hostname,
+        port,
+      };
+    } catch (error) {
+      throw createHttpError(400, `Invalid TCP printer interface: ${interfaceUri}`);
+    }
+  }
+
+  if (trimmed.startsWith('printer:') || trimmed.startsWith('\\\\.\\')) {
+    return {
+      type: 'driver',
+      uri: trimmed,
+      name: trimmed.startsWith('printer:') ? trimmed.slice('printer:'.length) : trimmed,
+    };
+  }
+
+  throw createHttpError(400, `Unsupported printer interface "${interfaceUri}"`);
+}
+
+async function ensurePrinterReachable(target) {
+  if (target.type === 'tcp') {
+    await sendTcpBuffer(target.host, target.port, Buffer.alloc(0), { probe: true });
+    return;
+  }
+
+  if (target.type === 'driver') {
+    if (!optionalDriver) {
+      throw createHttpError(500, `Printer driver is required for interface "${target.uri}"`);
+    }
+
+    if (typeof optionalDriver.isReady === 'function') {
+      const ready = await optionalDriver.isReady(target.name);
+      if (ready === false) {
+        throw createHttpError(503, `Printer "${target.uri}" is not reachable`);
+      }
+    }
+
+    return;
+  }
+}
+
+async function sendBufferToPrinter(target, buffer) {
+  if (!Buffer.isBuffer(buffer)) {
+    throw createHttpError(500, 'Print payload must be a buffer');
+  }
+
+  if (target.type === 'tcp') {
+    return sendTcpBuffer(target.host, target.port, buffer);
+  }
+
+  if (target.type === 'driver') {
+    if (!optionalDriver) {
+      throw createHttpError(500, `Printer driver is required for interface "${target.uri}"`);
+    }
+
+    const handler = optionalDriver.print || optionalDriver.write || optionalDriver.send;
+    if (typeof handler !== 'function') {
+      throw createHttpError(500, 'Printer driver module must expose a print(), write(), or send() function');
+    }
+
+    const maybePromise = handler({
+      interface: target.uri,
+      name: target.name,
+      data: buffer,
+    });
+
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      await maybePromise;
+    }
+
+    return buffer.length;
+  }
+
+  throw createHttpError(500, 'Unsupported printer transport');
+}
+
+function sendTcpBuffer(host, port, buffer, { probe = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    let finished = false;
+
+    const cleanup = () => {
+      socket.removeAllListeners();
+    };
+
+    const finish = (error, bytes = 0) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      cleanup();
+      socket.destroy();
+      if (error) {
+        reject(error);
+      } else {
+        resolve(bytes);
+      }
+    };
+
+    const timeout = Number.isFinite(DEFAULT_TIMEOUT) ? DEFAULT_TIMEOUT : 5000;
+    socket.setTimeout(timeout, () => {
+      finish(createHttpError(504, `Printer ${host}:${port} timed out`));
+    });
+
+    socket.once('error', (error) => {
+      finish(createHttpError(503, `Printer ${host}:${port} error: ${error.message}`));
+    });
+
+    socket.once('close', () => {
+      if (!finished) {
+        finish(null, probe ? 0 : buffer.length);
+      }
+    });
+
+    socket.connect(port, host, () => {
+      if (probe || buffer.length === 0) {
+        finish(null, 0);
+        return;
+      }
+
+      socket.write(buffer, (error) => {
+        if (error) {
+          finish(createHttpError(503, `Printer ${host}:${port} write failed: ${error.message}`));
+          return;
+        }
+        socket.end();
+      });
+    });
+  });
 }
 
 function decodePayloadData(data, format = 'base64') {
@@ -400,23 +519,6 @@ function resolveInterface(payload = {}) {
 
   const resolvedPort = port ?? 9100;
   return `tcp://${target}${resolvedPort ? `:${resolvedPort}` : ''}`;
-}
-
-function resolvePrinterType(type) {
-  switch ((type || '').toLowerCase()) {
-    case 'star':
-      return PrinterTypes.STAR;
-    case 'tanca':
-      return PrinterTypes.TANCA;
-    case 'daruma':
-      return PrinterTypes.DARUMA;
-    case 'brother':
-      return PrinterTypes.BROTHER;
-    case 'custom':
-      return PrinterTypes.CUSTOM;
-    default:
-      return PrinterTypes.EPSON;
-  }
 }
 
 function normalizeCutType(value) {
