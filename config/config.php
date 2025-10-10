@@ -198,40 +198,58 @@ class Cache {
 }
 
 // Functions
-// function generateCSRFToken() {
-//     if (!isset($_SESSION[CSRF_TOKEN_NAME])) {
-//         $_SESSION[CSRF_TOKEN_NAME] = bin2hex(random_bytes(32));
-//     }
-//     return $_SESSION[CSRF_TOKEN_NAME];
-// }
+if (!function_exists('generateCSRFToken')) {
+    function generateCSRFToken() {
+        if (!isset($_SESSION[CSRF_TOKEN_NAME])) {
+            $_SESSION[CSRF_TOKEN_NAME] = bin2hex(random_bytes(32));
+        }
 
-// function verifyCSRFToken($token) {
-//     return isset($_SESSION[CSRF_TOKEN_NAME]) && hash_equals($_SESSION[CSRF_TOKEN_NAME], $token);
-// }
+        return $_SESSION[CSRF_TOKEN_NAME];
+    }
+}
 
-// function sanitizeInput($data) {
-//     return htmlspecialchars(strip_tags(trim($data)));
-// }
+if (!function_exists('verifyCSRFToken')) {
+    function verifyCSRFToken($token) {
+        return isset($_SESSION[CSRF_TOKEN_NAME]) && hash_equals($_SESSION[CSRF_TOKEN_NAME], $token);
+    }
+}
 
-// function redirectTo($url) {
-//     header("Location: " . $url);
-//     exit();
-// }
+if (!function_exists('sanitizeInput')) {
+    function sanitizeInput($data) {
+        return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
+    }
+}
 
-// function isLoggedIn() {
-//     return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
-// }
+if (!function_exists('redirectTo')) {
+    function redirectTo($url) {
+        header('Location: ' . $url);
+        exit();
+    }
+}
 
-// function requireLogin() {
-//     if (!isLoggedIn()) {
-//         redirectTo(BASE_URL . '/staff/login.php');
-//     }
-// }
+if (!function_exists('isLoggedIn')) {
+    function isLoggedIn() {
+        return isset($_SESSION['staff_id']) && isset($_SESSION['username']);
+    }
+}
 
-// function hasPermission($permission) {
-//     if (!isLoggedIn()) return false;
-//     return in_array($permission, $_SESSION['permissions'] ?? []);
-// }
+if (!function_exists('requireLogin')) {
+    function requireLogin() {
+        if (!isLoggedIn()) {
+            redirectTo(BASE_URL . '/staff/login.php');
+        }
+    }
+}
+
+if (!function_exists('hasPermission')) {
+    function hasPermission($permission) {
+        if (!isLoggedIn()) {
+            return false;
+        }
+
+        return in_array($permission, $_SESSION['permissions'] ?? []);
+    }
+}
 
 function logActivity($description, $staff_id = null) {
     try {
