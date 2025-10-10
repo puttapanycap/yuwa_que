@@ -373,7 +373,16 @@ function resolveInterface(payload = {}) {
     return DEFAULT_INTERFACE;
   }
 
-  const interfaceType = typeof payload.interface === 'string' ? payload.interface.trim().toLowerCase() : '';
+  const interfaceValue = typeof payload.interface === 'string' ? payload.interface.trim() : '';
+  const interfaceType = interfaceValue.toLowerCase();
+
+  if (
+    interfaceValue &&
+    (interfaceType.includes('://') || interfaceType.startsWith('printer:') || interfaceType.startsWith('\\\\.\\'))
+  ) {
+    return interfaceValue;
+  }
+
   const target = typeof payload.target === 'string' ? payload.target.trim() : '';
   const port = clampInt(payload.port, 1, 65535, null);
 
