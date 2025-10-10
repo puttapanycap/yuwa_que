@@ -94,6 +94,98 @@
             margin: 1rem 0;
         }
 
+        .ticket-preview {
+            background: #ffffff;
+            border: 1px dashed #ced4da;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: left;
+            color: #212529;
+            box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.05);
+        }
+
+        .ticket-preview-label,
+        .ticket-preview-hospital,
+        .ticket-preview-queue,
+        .ticket-preview-service {
+            display: block;
+            text-align: center;
+        }
+
+        .ticket-preview-label {
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #0d6efd;
+        }
+
+        .ticket-preview-hospital {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-top: 0.5rem;
+        }
+
+        .ticket-preview-queue {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #0d6efd;
+            margin: 1rem 0 0.5rem;
+        }
+
+        .ticket-preview-service {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .ticket-preview-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1rem;
+            margin: 0.35rem 0;
+        }
+
+        .ticket-preview-row span {
+            color: #6c757d;
+        }
+
+        .ticket-preview-row strong {
+            color: #212529;
+        }
+
+        .ticket-preview-note,
+        .ticket-preview-footer {
+            margin-top: 1rem;
+            font-size: 0.95rem;
+            color: #495057;
+        }
+
+        .ticket-preview-note {
+            border-top: 1px dashed #dee2e6;
+            padding-top: 0.75rem;
+        }
+
+        .ticket-preview-footer {
+            color: #adb5bd;
+        }
+
+        .ticket-preview-print-count {
+            margin-top: 1.25rem;
+            font-size: 0.95rem;
+            color: #6c757d;
+            text-align: center;
+        }
+
+        .swal2-popup.swal-ticket-preview-popup {
+            border-radius: 18px;
+        }
+
+        .swal-ticket-preview-container {
+            margin: 0;
+        }
+
         @media print {
             body {
                 margin: 0;
@@ -251,6 +343,53 @@
             queue_print_count: 1
         };
         let bixolonClient = null;
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            return text
+                .toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatMultiline(text) {
+            return escapeHtml(text).replace(/\r?\n/g, '<br>');
+        }
+
+        function buildTicketPreviewHtml(ticket, printCount) {
+            const rows = [];
+
+            if (ticket.servicePoint) {
+                rows.push(`<div class="ticket-preview-row"><span>ช่องบริการ:</span><strong>${escapeHtml(ticket.servicePoint)}</strong></div>`);
+            }
+
+            rows.push(`<div class="ticket-preview-row"><span>ออกบัตรเมื่อ:</span><strong>${escapeHtml(ticket.issuedAt || '')}</strong></div>`);
+
+            if (typeof ticket.waitingCount === 'number') {
+                rows.push(`<div class="ticket-preview-row"><span>จำนวนคิวที่รอ:</span><strong>${escapeHtml(ticket.waitingCount)}</strong></div>`);
+            }
+
+            const additionalNote = ticket.additionalNote ? `<div class="ticket-preview-note">${formatMultiline(ticket.additionalNote)}</div>` : '';
+            const footer = ticket.footer ? `<div class="ticket-preview-footer">${formatMultiline(ticket.footer)}</div>` : '';
+
+            return `
+                <div class="ticket-preview">
+                    <span class="ticket-preview-label">${escapeHtml(ticket.label || 'บัตรคิว')}</span>
+                    <span class="ticket-preview-hospital">${escapeHtml(ticket.hospitalName || '')}</span>
+                    <span class="ticket-preview-queue">${escapeHtml(ticket.queueNumber || '')}</span>
+                    <span class="ticket-preview-service">${escapeHtml(ticket.serviceType || '')}</span>
+                    ${rows.join('')}
+                    ${additionalNote}
+                    ${footer}
+                    <div class="ticket-preview-print-count">จำนวนพิมพ์: <strong>${escapeHtml(printCount)}</strong></div>
+                </div>
+            `;
+        }
 
         $(document).ready(function() {
             loadAppSettings();
@@ -601,8 +740,31 @@
                 return;
             }
 
+            const ticket = buildTicketForPrinting();
             const printCount = Math.max(1, parseInt(appSettings.queue_print_count, 10) || 1);
+            const previewHtml = buildTicketPreviewHtml(ticket, printCount);
 
+            const result = await Swal.fire({
+                title: 'ตรวจสอบบัตรคิวก่อนพิมพ์',
+                html: previewHtml,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'พิมพ์บัตรคิว',
+                cancelButtonText: 'ยกเลิก',
+                customClass: {
+                    popup: 'swal-ticket-preview-popup',
+                    htmlContainer: 'swal-ticket-preview-container'
+                },
+                returnFocus: false,
+                width: '32rem'
+            });
+
+            if (result.isConfirmed) {
+                await performTicketPrint(printCount);
+            }
+        }
+
+        async function performTicketPrint(printCount) {
             Swal.fire({
                 title: 'กำลังพิมพ์บัตรคิว',
                 text: 'กรุณารอสักครู่...',
@@ -650,6 +812,8 @@
                     confirmButtonText: 'ตกลง'
                 });
             }
+
+            return printed;
         }
 
         function resetKiosk() {
