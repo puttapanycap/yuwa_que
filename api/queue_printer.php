@@ -2,14 +2,18 @@
 declare(strict_types=1);
 
 use Mike42\Escpos\CapabilityProfile;
+use Mike42\Escpos\GdEscposImage;
 use Mike42\Escpos\Printer;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
 use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 use Mike42\Escpos\PrintConnectors\PrintConnector;
 use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/queue_printer_fonts.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -278,80 +282,15 @@ function selectCodeTable(Printer $printer, int $table): void
 
 function renderTicket(Printer $printer, array $ticket, array $options): void
 {
+    $image = createTicketEscposImage($ticket, $options);
+
     $printer->setJustification(Printer::JUSTIFY_CENTER);
 
-    if ($ticket['hospitalName'] !== '') {
-        $printer->setEmphasis(true);
-        $printer->text(mb_strtoupper($ticket['hospitalName'], 'UTF-8') . "
-");
-        $printer->setEmphasis(false);
-    }
-
-    if ($ticket['label'] !== '') {
-        $printer->text($ticket['label'] . "
-");
-    }
-
-    if ($ticket['serviceType'] !== '') {
-        $printer->text($ticket['serviceType'] . "
-");
-    }
-
-    if ($ticket['queueNumber'] !== '') {
-        $printer->setEmphasis(true);
-        $printer->setTextSize(2, 2);
-        $printer->text($ticket['queueNumber'] . "
-");
-        $printer->setTextSize(1, 1);
-        $printer->setEmphasis(false);
-    }
-
-    if ($ticket['servicePoint'] !== '') {
-        $printer->text($ticket['servicePoint'] . "
-");
-    }
-
-    if ($ticket['issuedAt'] !== '') {
-        $printer->text($ticket['issuedAt'] . "
-");
-    }
-
-    if ($ticket['waitingCount'] !== null) {
-        $printer->text('รอคิวก่อนหน้า ' . $ticket['waitingCount'] . "
-");
-    }
-
-    if ($ticket['additionalNote'] !== '') {
-        foreach (explode("
-", $ticket['additionalNote']) as $line) {
-            $printer->text($line . "
-");
-        }
-    }
-
-    if ($ticket['qrData'] !== '') {
-        $printer->feed(1);
-        try {
-            $printer->qrCode(
-                $ticket['qrData'],
-                mapQrErrorLevel($options['qrErrorLevel']),
-                $options['qrSize'],
-                mapQrModel($options['qrModel'])
-            );
-            $printer->feed(1);
-        } catch (\Throwable $error) {
-            error_log('Unable to render QR code: ' . $error->getMessage());
-            $printer->text($ticket['qrData'] . "
-");
-        }
-    }
-
-    if ($ticket['footer'] !== '') {
-        foreach (explode("
-", $ticket['footer']) as $line) {
-            $printer->text($line . "
-");
-        }
+    try {
+        $printer->graphics($image);
+    } catch (\Throwable $error) {
+        error_log('Falling back to bit image mode: ' . $error->getMessage());
+        $printer->bitImage($image);
     }
 
     if ($options['trailingFeed'] > 0) {
@@ -361,34 +300,261 @@ function renderTicket(Printer $printer, array $ticket, array $options): void
     $printer->cut($options['cutType'] === 'full' ? Printer::CUT_FULL : Printer::CUT_PARTIAL);
 }
 
-function mapQrErrorLevel(string $level): int
+function createTicketEscposImage(array $ticket, array $options): GdEscposImage
+{
+    $resource = buildTicketImageResource($ticket, $options);
+
+    $image = new GdEscposImage();
+    $image->readImageFromGdResource($resource);
+
+    imagedestroy($resource);
+
+    return $image;
+}
+
+function buildTicketImageResource(array $ticket, array $options)
+{
+    $width = 550;
+    $initialHeight = 1800;
+    $canvas = imagecreatetruecolor($width, $initialHeight);
+    if ($canvas === false) {
+        throw new \RuntimeException('Unable to allocate image canvas for ticket rendering');
+    }
+
+    $white = imagecolorallocate($canvas, 255, 255, 255);
+    $black = imagecolorallocate($canvas, 0, 0, 0);
+    imagefilledrectangle($canvas, 0, 0, $width, $initialHeight, $white);
+
+    $fontRegular = resolveTicketFontPath('regular');
+    $fontBold = resolveTicketFontPath('bold');
+
+    $y = 30.0;
+    $maxY = $y;
+
+    $hospitalName = trim($ticket['hospitalName']);
+    if ($hospitalName !== '') {
+        $y = drawCenteredTextBlock($canvas, [mb_strtoupper($hospitalName, 'UTF-8')], $fontBold, 38, $black, $y, 14, 24);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['label'] !== '') {
+        $y = drawCenteredTextBlock($canvas, [$ticket['label']], $fontRegular, 32, $black, $y, 10, 18);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['serviceType'] !== '') {
+        $y = drawCenteredTextBlock($canvas, [$ticket['serviceType']], $fontRegular, 30, $black, $y, 10, 18);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['queueNumber'] !== '') {
+        $y = drawCenteredTextBlock($canvas, [$ticket['queueNumber']], $fontBold, 120, $black, $y, 10, 24);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['servicePoint'] !== '') {
+        $y = drawCenteredTextBlock($canvas, [$ticket['servicePoint']], $fontRegular, 30, $black, $y, 10, 18);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['issuedAt'] !== '') {
+        $y = drawCenteredTextBlock($canvas, [$ticket['issuedAt']], $fontRegular, 26, $black, $y, 10, 14);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['waitingCount'] !== null) {
+        $waitingLine = 'รอคิวก่อนหน้า ' . $ticket['waitingCount'];
+        $y = drawCenteredTextBlock($canvas, [$waitingLine], $fontRegular, 26, $black, $y, 10, 18);
+        $maxY = max($maxY, $y);
+    }
+
+    if ($ticket['additionalNote'] !== '') {
+        $noteLines = array_filter(array_map('trim', explode("\n", $ticket['additionalNote'])), static function ($line) {
+            return $line !== '';
+        });
+        if (!empty($noteLines)) {
+            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, 24, $black, $y, 12, 18);
+            $maxY = max($maxY, $y);
+        }
+    }
+
+    if ($ticket['qrData'] !== '') {
+        $qrResource = createQrImage($ticket['qrData'], $options['qrErrorLevel'], $options['qrSize']);
+        if ($qrResource !== null) {
+            $qrWidth = imagesx($qrResource);
+            $qrHeight = imagesy($qrResource);
+            $y += 12;
+            $x = (int) round((imagesx($canvas) - $qrWidth) / 2);
+            imagecopy($canvas, $qrResource, $x, (int) round($y), 0, 0, $qrWidth, $qrHeight);
+            $y += $qrHeight + 18;
+            $maxY = max($maxY, $y);
+            imagedestroy($qrResource);
+        }
+    }
+
+    if ($ticket['footer'] !== '') {
+        $footerLines = array_filter(array_map('trim', explode("\n", $ticket['footer'])), static function ($line) {
+            return $line !== '';
+        });
+        if (!empty($footerLines)) {
+            $y = drawCenteredTextBlock($canvas, $footerLines, $fontRegular, 22, $black, $y, 12, 16);
+            $maxY = max($maxY, $y);
+        }
+    }
+
+    $paddingBottom = 40;
+    $targetHeight = (int) min($initialHeight, max($maxY + $paddingBottom, 120));
+    if ($targetHeight < $initialHeight) {
+        $cropped = imagecrop($canvas, [
+            'x' => 0,
+            'y' => 0,
+            'width' => $width,
+            'height' => $targetHeight,
+        ]);
+        if ($cropped !== false) {
+            imagedestroy($canvas);
+            $canvas = $cropped;
+        }
+    }
+
+    return $canvas;
+}
+
+function drawCenteredTextBlock($image, array $lines, string $font, float $fontSize, int $color, float $currentY, float $lineSpacing, float $blockSpacing): float
+{
+    $width = imagesx($image);
+    $y = $currentY;
+    $drawn = false;
+
+    foreach ($lines as $line) {
+        $text = trim((string) $line);
+        if ($text === '') {
+            continue;
+        }
+
+        [$textWidth, $textHeight] = measureText($font, $fontSize, $text);
+        $baseline = $y + $textHeight;
+        $x = (int) round(($width - $textWidth) / 2);
+        imagettftext($image, $fontSize, 0, $x, (int) round($baseline), $color, $font, $text);
+        $y = $baseline + $lineSpacing;
+        $drawn = true;
+    }
+
+    if ($drawn) {
+        $y += $blockSpacing;
+    }
+
+    return $y;
+}
+
+function measureText(string $font, float $fontSize, string $text): array
+{
+    $box = imagettfbbox($fontSize, 0, $font, $text);
+    if ($box === false) {
+        throw new \RuntimeException('Unable to measure text bounds for ticket rendering');
+    }
+
+    $width = abs($box[2] - $box[0]);
+    $height = abs($box[7] - $box[1]);
+
+    return [$width, $height];
+}
+
+function resolveTicketFontPath(string $variant): string
+{
+    static $cache = [];
+
+    $key = $variant === 'bold' ? 'bold' : 'regular';
+
+    if (!isset($cache[$key])) {
+        $data = loadEmbeddedFontData($key);
+
+        $path = tempnam(sys_get_temp_dir(), 'ticket-font-');
+        if ($path === false) {
+            throw new \RuntimeException('Unable to allocate temporary file for ticket font');
+        }
+
+        if (file_put_contents($path, $data) === false) {
+            throw new \RuntimeException('Unable to write embedded ticket font to temporary file');
+        }
+
+        register_shutdown_function(static function () use ($path): void {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        });
+
+        $cache[$key] = $path;
+    }
+
+    return $cache[$key];
+}
+
+function loadEmbeddedFontData(string $variant): string
+{
+    $base64 = $variant === 'bold' ? SARABUN_BOLD_TTF_BASE64 : SARABUN_REGULAR_TTF_BASE64;
+
+    $decoded = base64_decode($base64, true);
+    if ($decoded === false) {
+        throw new \RuntimeException('Embedded ticket font data is corrupted');
+    }
+
+    return $decoded;
+}
+
+function createQrImage(string $data, string $errorLevel, int $moduleSize)
+{
+    try {
+        $scale = max(4, min(12, $moduleSize + 2));
+        $options = new QROptions([
+            'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+            'eccLevel' => mapQrErrorLevelToEcc($errorLevel),
+            'scale' => $scale,
+            'imageTransparent' => false,
+            'imageBase64' => false,
+            'moduleValues' => [
+                0 => [255, 255, 255],
+                1 => [0, 0, 0],
+            ],
+        ]);
+
+        $pngData = (new QRCode($options))->render($data);
+        $image = imagecreatefromstring($pngData);
+        if ($image === false) {
+            throw new \RuntimeException('Unable to decode QR code image data');
+        }
+
+        $width = imagesx($image);
+        $target = (int) max(180, min(320, $width));
+        if ($width !== $target) {
+            $scaled = imagescale($image, $target, $target, IMG_NEAREST_NEIGHBOUR);
+            if ($scaled !== false) {
+                imagedestroy($image);
+                $image = $scaled;
+            }
+        }
+
+        return $image;
+    } catch (\Throwable $error) {
+        error_log('Unable to generate QR code image: ' . $error->getMessage());
+        return null;
+    }
+}
+
+function mapQrErrorLevelToEcc(string $level): int
 {
     switch ($level) {
         case 'L':
-            return Printer::QR_ECLEVEL_L;
+            return QRCode::ECC_L;
         case 'Q':
-            return Printer::QR_ECLEVEL_Q;
+            return QRCode::ECC_Q;
         case 'H':
-            return Printer::QR_ECLEVEL_H;
+            return QRCode::ECC_H;
         case 'M':
         default:
-            return Printer::QR_ECLEVEL_M;
+            return QRCode::ECC_M;
     }
 }
-
-function mapQrModel(int $model): int
-{
-    switch ($model) {
-        case 1:
-            return Printer::QR_MODEL_1;
-        case 3:
-            return Printer::QR_MICRO;
-        case 2:
-        default:
-            return Printer::QR_MODEL_2;
-    }
-}
-
 function sendJson(int $status, array $payload): void
 {
     http_response_code($status);

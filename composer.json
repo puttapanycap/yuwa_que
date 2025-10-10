@@ -19,6 +19,7 @@
     "firebase/php-jwt": "^6.8",
     "google/cloud-text-to-speech": "^1.7",
     "intervention/image": "^2.7",
+    "chillerlan/php-qrcode": "^4.3",
     "league/csv": "^9.10",
     "mike42/escpos-php": "^4.0",
     "monolog/monolog": "^3.4",
