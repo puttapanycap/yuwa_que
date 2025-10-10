@@ -7,6 +7,7 @@
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
     "start": "webpack-dev-server --mode development",
+    "start:queue-printer": "node scripts/queue-printer-service.js",
     "lint": "eslint assets/js/**/*.js",
     "lint:fix": "eslint assets/js/**/*.js --fix",
     "sass": "sass assets/scss:assets/css --watch",
