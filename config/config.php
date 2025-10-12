@@ -357,10 +357,234 @@ function formatFileSize($bytes) {
     $bytes = max($bytes, 0);
     $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
     $pow = min($pow, count($units) - 1);
-    
+
     $bytes /= (1 << (10 * $pow));
-    
+
     return round($bytes, 2) . ' ' . $units[$pow];
+}
+
+// -------------------------------------------------------------------------
+// Kiosk management helpers
+// -------------------------------------------------------------------------
+
+if (!function_exists('getKioskCookieName')) {
+    /**
+     * Get the cookie name used for kiosk device identification.
+     *
+     * @return string
+     */
+    function getKioskCookieName() {
+        return 'queue_kiosk_token';
+    }
+}
+
+if (!function_exists('sanitizeKioskToken')) {
+    /**
+     * Sanitize and validate kiosk token values.
+     *
+     * @param string|null $token Raw token value
+     *
+     * @return string|null Sanitized token or null when invalid
+     */
+    function sanitizeKioskToken($token) {
+        if (!is_string($token)) {
+            return null;
+        }
+
+        $trimmed = trim($token);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (!preg_match('/^[A-Fa-f0-9]{32,128}$/', $trimmed)) {
+            return null;
+        }
+
+        return strtoupper($trimmed);
+    }
+}
+
+if (!function_exists('ensureKioskCookie')) {
+    /**
+     * Ensure the kiosk cookie exists and return its value.
+     *
+     * If the cookie is missing or invalid, a new secure token will be
+     * generated and stored for one year.
+     *
+     * @return string The kiosk token stored in the browser cookie
+     */
+    function ensureKioskCookie() {
+        $existing = sanitizeKioskToken($_COOKIE[getKioskCookieName()] ?? null);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $token = strtoupper(bin2hex(random_bytes(32)));
+
+        $secure = !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+        setcookie(
+            getKioskCookieName(),
+            $token,
+            [
+                'expires' => time() + (86400 * 365),
+                'path' => '/',
+                'secure' => $secure,
+                'httponly' => false,
+                'samesite' => 'Lax',
+            ]
+        );
+
+        $_COOKIE[getKioskCookieName()] = $token;
+
+        return $token;
+    }
+}
+
+if (!function_exists('getKioskTokenFromCookie')) {
+    /**
+     * Retrieve the kiosk token from the current request cookie without creating
+     * a new one.
+     *
+     * @return string|null
+     */
+    function getKioskTokenFromCookie() {
+        return sanitizeKioskToken($_COOKIE[getKioskCookieName()] ?? null);
+    }
+}
+
+if (!function_exists('generateKioskIdentifier')) {
+    /**
+     * Generate a short identifier for kiosk records.
+     *
+     * @return string
+     */
+    function generateKioskIdentifier() {
+        return 'KIOSK_' . strtoupper(bin2hex(random_bytes(4)));
+    }
+}
+
+if (!function_exists('ensureKioskDevicesTableExists')) {
+    /**
+     * Create kiosk_devices table when it does not exist yet.
+     *
+     * @return void
+     */
+    function ensureKioskDevicesTableExists() {
+        try {
+            $db = getDB();
+            $db->exec(
+                "CREATE TABLE IF NOT EXISTS kiosk_devices (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    kiosk_name VARCHAR(100) NOT NULL,
+                    cookie_token VARCHAR(128) NOT NULL UNIQUE,
+                    identifier VARCHAR(50) NOT NULL UNIQUE,
+                    printer_ip VARCHAR(100) DEFAULT NULL,
+                    printer_port INT DEFAULT 9100,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1,
+                    notes TEXT DEFAULT NULL,
+                    last_seen_at DATETIME DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        } catch (Exception $e) {
+            Logger::error('Failed to ensure kiosk_devices table exists', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+}
+
+if (!function_exists('findKioskByToken')) {
+    /**
+     * Find kiosk record by cookie token.
+     *
+     * @param string|null $token Kiosk token to lookup
+     *
+     * @return array|null
+     */
+    function findKioskByToken($token) {
+        if ($token === null) {
+            return null;
+        }
+
+        try {
+            $db = getDB();
+            $stmt = $db->prepare('SELECT * FROM kiosk_devices WHERE cookie_token = ? LIMIT 1');
+            $stmt->execute([$token]);
+            $kiosk = $stmt->fetch();
+
+            if ($kiosk && empty($kiosk['identifier'])) {
+                $identifier = generateKioskIdentifier();
+                $updateStmt = $db->prepare('UPDATE kiosk_devices SET identifier = ?, updated_at = NOW() WHERE id = ?');
+                $updateStmt->execute([$identifier, $kiosk['id']]);
+                $kiosk['identifier'] = $identifier;
+            }
+
+            return $kiosk ?: null;
+        } catch (Exception $e) {
+            Logger::error('Failed to fetch kiosk by token', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+}
+
+if (!function_exists('getActiveKioskFromRequest')) {
+    /**
+     * Retrieve active kiosk record associated with the current request.
+     *
+     * @return array|null
+     */
+    function getActiveKioskFromRequest() {
+        $token = getKioskTokenFromCookie();
+        if ($token === null) {
+            return null;
+        }
+
+        $kiosk = findKioskByToken($token);
+        if (!$kiosk || (int) $kiosk['is_active'] !== 1) {
+            return null;
+        }
+
+        return $kiosk;
+    }
+}
+
+if (!function_exists('updateKioskLastSeen')) {
+    /**
+     * Update kiosk last seen timestamp.
+     *
+     * @param int $kioskId Kiosk primary key
+     *
+     * @return void
+     */
+    function updateKioskLastSeen($kioskId) {
+        try {
+            $db = getDB();
+            $stmt = $db->prepare('UPDATE kiosk_devices SET last_seen_at = NOW() WHERE id = ?');
+            $stmt->execute([$kioskId]);
+        } catch (Exception $e) {
+            Logger::error('Failed to update kiosk last seen', [
+                'error' => $e->getMessage(),
+                'kiosk_id' => $kioskId,
+            ]);
+        }
+    }
+}
+
+if (!function_exists('formatKioskTokenForDisplay')) {
+    /**
+     * Split kiosk token into readable chunks for UI display.
+     *
+     * @param string $token
+     *
+     * @return string
+     */
+    function formatKioskTokenForDisplay($token) {
+        return trim(chunk_split($token, 8, ' '));
+    }
 }
 
 

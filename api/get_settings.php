@@ -1,6 +1,13 @@
 <?php
 require_once '../config/config.php';
 
+ensureKioskDevicesTableExists();
+$kioskToken = ensureKioskCookie();
+$kioskRecord = findKioskByToken($kioskToken);
+if ($kioskRecord && (int) $kioskRecord['is_active'] === 1) {
+    updateKioskLastSeen((int) $kioskRecord['id']);
+}
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
@@ -40,7 +47,27 @@ try {
         'last_updated' => date('Y-m-d H:i:s')
     ];
     
-    echo json_encode($settings);
+    if ($kioskRecord && (int) $kioskRecord['is_active'] === 1) {
+        $settings['kiosk_registered'] = true;
+        $settings['kiosk_name'] = $kioskRecord['kiosk_name'];
+        $settings['kiosk_identifier'] = $kioskRecord['identifier'];
+        $settings['kiosk_token'] = $kioskRecord['cookie_token'];
+        $settings['kiosk_printer_ip'] = $kioskRecord['printer_ip'];
+        $settings['kiosk_printer_port'] = $kioskRecord['printer_port'];
+
+        if (!empty($kioskRecord['printer_ip'])) {
+            $settings['bixolon_printer_interface'] = 'network';
+            $settings['bixolon_printer_target'] = $kioskRecord['printer_ip'];
+            if (!empty($kioskRecord['printer_port'])) {
+                $settings['bixolon_printer_port'] = (string) $kioskRecord['printer_port'];
+            }
+        }
+    } else {
+        $settings['kiosk_registered'] = false;
+        $settings['kiosk_token'] = $kioskToken;
+    }
+
+    echo json_encode($settings, JSON_UNESCAPED_UNICODE);
     
 } catch (Exception $e) {
     http_response_code(500);

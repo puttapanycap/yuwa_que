@@ -1,3 +1,37 @@
+<?php
+require_once __DIR__ . '/config/config.php';
+
+ensureKioskDevicesTableExists();
+$kioskToken = ensureKioskCookie();
+$kioskRecord = findKioskByToken($kioskToken);
+$kioskRegistered = $kioskRecord && (int) $kioskRecord['is_active'] === 1;
+
+if ($kioskRegistered) {
+    updateKioskLastSeen((int) $kioskRecord['id']);
+}
+
+$kioskClientData = [
+    'isRegistered' => $kioskRegistered,
+    'token' => $kioskToken,
+    'tokenDisplay' => formatKioskTokenForDisplay($kioskToken),
+];
+
+if ($kioskRegistered) {
+    $kioskClientData['kioskName'] = $kioskRecord['kiosk_name'];
+    $kioskClientData['identifier'] = $kioskRecord['identifier'];
+    if (!empty($kioskRecord['printer_ip'])) {
+        $kioskClientData['printerTarget'] = $kioskRecord['printer_ip'];
+    }
+    if (!empty($kioskRecord['printer_port'])) {
+        $kioskClientData['printerPort'] = (int) $kioskRecord['printer_port'];
+    }
+    if (!empty($kioskRecord['notes'])) {
+        $kioskClientData['notes'] = $kioskRecord['notes'];
+    }
+} else {
+    $kioskClientData['message'] = 'เครื่องนี้ยังไม่ได้ลงทะเบียน กรุณาติดต่อผู้ดูแลระบบ';
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -20,6 +54,78 @@
             font-family: 'Sarabun', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+        }
+
+        body.kiosk-locked {
+            overflow: hidden;
+        }
+
+        .kiosk-lock-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(7, 15, 43, 0.92);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            z-index: 9999;
+        }
+
+        .kiosk-lock-card {
+            background: #ffffff;
+            border-radius: 20px;
+            max-width: 540px;
+            width: 100%;
+            padding: 2.5rem 2rem;
+            text-align: center;
+            box-shadow: 0 25px 55px rgba(0, 0, 0, 0.25);
+            position: relative;
+        }
+
+        .kiosk-lock-card h2 {
+            font-weight: 700;
+            color: #0d6efd;
+            margin-bottom: 1rem;
+        }
+
+        .kiosk-lock-card p {
+            color: #4a5568;
+            margin-bottom: 1.25rem;
+            line-height: 1.6;
+        }
+
+        .kiosk-lock-token {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            background: #f1f3f5;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: 1.5px;
+            word-break: break-word;
+            border: 1px dashed rgba(13, 110, 253, 0.4);
+        }
+
+        .kiosk-lock-token small {
+            display: block;
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+            letter-spacing: normal;
+        }
+
+        .kiosk-lock-help {
+            background: rgba(13, 110, 253, 0.08);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            color: #1d3557;
+            margin-top: 1.25rem;
+            text-align: left;
+        }
+
+        .kiosk-lock-help i {
+            color: #0d6efd;
+            margin-right: 0.5rem;
         }
         
         .kiosk-container {
@@ -323,7 +429,27 @@
         }
     </style>
 </head>
-<body>
+<body class="<?php echo $kioskRegistered ? '' : 'kiosk-locked'; ?>">
+    <?php if (!$kioskRegistered): ?>
+    <div class="kiosk-lock-overlay" id="kioskLockOverlay">
+        <div class="kiosk-lock-card">
+            <h2><i class="fas fa-lock me-2"></i>เครื่องนี้ยังไม่ได้เปิดใช้งาน</h2>
+            <p>
+                กรุณาติดต่อผู้ดูแลระบบเพื่อเพิ่มเครื่อง Kiosk ในระบบ
+                โดยแจ้งรหัส Cookie ด้านล่างเพื่อยืนยันตัวตนของเครื่องนี้
+            </p>
+            <div class="kiosk-lock-token">
+                <small>รหัส Cookie สำหรับลงทะเบียน</small>
+                <?php echo htmlspecialchars($kioskClientData['tokenDisplay'], ENT_QUOTES, 'UTF-8'); ?>
+            </div>
+            <div class="kiosk-lock-help">
+                <p class="mb-1"><i class="fas fa-info-circle"></i>เมื่อผู้ดูแลระบบเพิ่มเครื่องเรียบร้อยแล้ว กรุณารีเฟรชหน้านี้เพื่อเริ่มใช้งาน</p>
+                <p class="mb-0"><i class="fas fa-print"></i>ผู้ดูแลระบบสามารถกำหนดค่าเครื่องพิมพ์สำหรับเครื่องนี้ได้จากเมนู "เครื่อง Kiosk"</p>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="container">
         <div class="kiosk-container">
             <!-- Header -->
@@ -432,6 +558,7 @@
     <!-- ESC/POS encoder & BIXOLON Web Print helper -->
     <script src="assets/vendor/esc-pos-encoder.umd.js"></script>
     <script>
+        const kioskConfig = <?php echo json_encode($kioskClientData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         let deferredInstallPrompt = null;
         const installPromptState = {
             banner: null,
@@ -445,6 +572,26 @@
         let appSettings = {
             queue_print_count: 1
         };
+
+        function isKioskLocked() {
+            return !kioskConfig || kioskConfig.isRegistered !== true;
+        }
+
+        function disableKioskInteractions() {
+            const container = document.querySelector('.kiosk-container');
+            if (container) {
+                container.classList.add('opacity-50');
+                container.setAttribute('aria-hidden', 'true');
+            }
+
+            try {
+                document.querySelectorAll('.kiosk-container button, .kiosk-container input, .kiosk-container select, .kiosk-container textarea').forEach((element) => {
+                    element.setAttribute('disabled', 'disabled');
+                });
+            } catch (error) {
+                console.warn('Unable to disable kiosk controls.', error);
+            }
+        }
 
         function matchesDisplayMode(mode) {
             if (!window.matchMedia) {
@@ -692,13 +839,35 @@
             initializeInstallPromptElements();
             registerServiceWorker();
             loadAppSettings();
+
+            if (isKioskLocked()) {
+                console.warn('Kiosk is locked until it is registered by an administrator.');
+                disableKioskInteractions();
+                return;
+            }
+
             loadServiceTypes();
             setupIdCardInput();
         });
 
         function loadAppSettings() {
             $.get('api/get_settings.php', function(data) {
-                appSettings = data;
+                appSettings = data || {};
+
+                if (typeof kioskConfig === 'object' && kioskConfig) {
+                    appSettings.kiosk_registered = kioskConfig.isRegistered === true;
+                    appSettings.kiosk_token = kioskConfig.token || appSettings.kiosk_token;
+                    appSettings.kiosk_identifier = kioskConfig.identifier || appSettings.kiosk_identifier;
+
+                    if (kioskConfig.printerTarget) {
+                        appSettings.bixolon_printer_interface = 'network';
+                        appSettings.bixolon_printer_target = kioskConfig.printerTarget;
+                    }
+
+                    if (typeof kioskConfig.printerPort === 'number' && Number.isFinite(kioskConfig.printerPort)) {
+                        appSettings.bixolon_printer_port = String(kioskConfig.printerPort);
+                    }
+                }
             }).fail(function() {
                 console.error('Could not load app settings.');
             });
@@ -788,11 +957,24 @@
 
             const sanitizedOptions = Object.fromEntries(Object.entries(options).filter(([_, value]) => Number.isFinite(value) || typeof value === 'string'));
 
+            let printerInterface = (appSettings.bixolon_printer_interface || '').trim();
+            let printerTarget = (appSettings.bixolon_printer_target || '').trim();
+            let printerPort = appSettings.bixolon_printer_port ? parseInt(appSettings.bixolon_printer_port, 10) : undefined;
+
+            if (kioskConfig && kioskConfig.printerTarget) {
+                printerInterface = 'network';
+                printerTarget = kioskConfig.printerTarget.toString().trim();
+            }
+
+            if (kioskConfig && typeof kioskConfig.printerPort === 'number' && Number.isFinite(kioskConfig.printerPort)) {
+                printerPort = kioskConfig.printerPort;
+            }
+
             const payload = {
                 copies: Math.max(1, parseInt(printCount, 10) || 1),
-                interface: (appSettings.bixolon_printer_interface || '').trim() || undefined,
-                target: (appSettings.bixolon_printer_target || '').trim() || undefined,
-                port: appSettings.bixolon_printer_port ? parseInt(appSettings.bixolon_printer_port, 10) : undefined,
+                interface: printerInterface || undefined,
+                target: printerTarget || undefined,
+                port: Number.isFinite(printerPort) ? parseInt(printerPort, 10) : undefined,
                 timeout: timeoutMs,
                 ticket: buildTicketForPrinting(),
                 options: sanitizedOptions
@@ -917,8 +1099,18 @@
         }
 
         function generateQueue() {
+            if (isKioskLocked()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ยังไม่สามารถใช้งานได้',
+                    text: 'เครื่อง Kiosk นี้ยังไม่ได้รับอนุญาตให้ใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+
             const idCard = $('#idCardNumber').val().replace(/\D/g, '');
-            
+
             if (idCard.length !== 13) {
                 alert('กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลัก');
                 return;
@@ -1016,6 +1208,16 @@
         }
 
         async function printQueue() {
+            if (isKioskLocked()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ยังไม่สามารถพิมพ์ได้',
+                    text: 'เครื่อง Kiosk นี้ยังไม่ได้ลงทะเบียน กรุณาติดต่อผู้ดูแลระบบ',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+
             if (!currentQueue || !selectedServiceType) {
                 Swal.fire({
                     icon: 'warning',

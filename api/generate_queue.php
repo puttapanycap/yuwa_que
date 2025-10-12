@@ -1,6 +1,8 @@
 <?php
 require_once '../config/config.php';
 
+ensureKioskDevicesTableExists();
+
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -11,6 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $queueTypeId = $_POST['queue_type_id'] ?? null;
 $idCardNumber = $_POST['id_card_number'] ?? null;
+
+$kiosk = getActiveKioskFromRequest();
+if (!$kiosk) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'เครื่อง Kiosk นี้ยังไม่ได้รับอนุญาตให้ใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
+    ]);
+    exit;
+}
 
 if (!$queueTypeId || !$idCardNumber) {
     echo json_encode(['success' => false, 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -73,8 +84,9 @@ try {
     
     // Insert queue
     $stmt = $db->prepare("INSERT INTO queues (queue_number, queue_type_id, patient_id_card_number, current_service_point_id, kiosk_id) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$queueNumber, $queueTypeId, $idCardNumber, $firstServicePoint['service_point_id'], 'KIOSK_01']);
-    
+    $kioskIdentifier = $kiosk['identifier'] ?? ('KIOSK_' . str_pad((string) $kiosk['id'], 3, '0', STR_PAD_LEFT));
+    $stmt->execute([$queueNumber, $queueTypeId, $idCardNumber, $firstServicePoint['service_point_id'], $kioskIdentifier]);
+
     $queueId = $db->lastInsertId();
     
     // Log queue creation in service flow history
@@ -96,7 +108,7 @@ try {
         VALUES (NULL, ?, ?, ?, NOW())
     ");
     $stmt->execute([
-        "สร้างคิว {$queueNumber} จาก Kiosk - บัตรประชาชน: " . substr($idCardNumber, 0, 4) . "****" . substr($idCardNumber, -4),
+        "สร้างคิว {$queueNumber} จาก Kiosk {$kiosk['kiosk_name']} - บัตรประชาชน: " . substr($idCardNumber, 0, 4) . "****" . substr($idCardNumber, -4),
         $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
         $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
     ]);
@@ -115,7 +127,9 @@ try {
             'queue_number' => $queueNumber,
             'queue_type_id' => $queueTypeId,
             'service_point_name' => 'จุดคัดกรอง',
-            'creation_time' => date('Y-m-d H:i:s')
+            'creation_time' => date('Y-m-d H:i:s'),
+            'kiosk_identifier' => $kioskIdentifier,
+            'kiosk_name' => $kiosk['kiosk_name'],
         ]
     ]);
     

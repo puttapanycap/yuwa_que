@@ -8,6 +8,7 @@ $navItems = [
     ['queue_types.php', 'fas fa-list', 'ประเภทคิว'],
     ['service_flows.php', 'fas fa-route', 'Service Flows'],
     ['queue_management.php', 'fas fa-tasks', 'จัดการคิว'],
+    ['kiosks.php', 'fas fa-tablet-screen-button', 'เครื่อง Kiosk'],
     ['settings.php', 'fas fa-cog', 'การตั้งค่า'],
     ['environment_settings.php', 'fas fa-server', 'Environment'],
     ['audio_settings.php', 'fas fa-volume-up', 'ระบบเสียงเรียกคิว'],
