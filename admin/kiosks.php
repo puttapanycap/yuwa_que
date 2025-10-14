@@ -162,11 +162,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 try {
     $db = getDB();
     $stmt = $db->query('
-        SELECT kd.*, COUNT(q.queue_id) AS queue_count
-        FROM kiosk_devices kd
-        LEFT JOIN queues q ON q.kiosk_id = kd.identifier
-        GROUP BY kd.id
-        ORDER BY kd.created_at DESC
+        SELECT
+            kd.*, 
+            COUNT(q.queue_id) AS queue_count
+        FROM
+            kiosk_devices AS kd
+            LEFT JOIN
+            queues AS q
+            ON 
+                q.kiosk_id = kd.id
+        GROUP BY
+            kd.id
+        ORDER BY
+            kd.created_at DESC
     ');
     $kiosks = $stmt->fetchAll();
 } catch (Exception $e) {
