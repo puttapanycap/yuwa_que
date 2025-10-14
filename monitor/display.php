@@ -44,7 +44,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
     <link rel="manifest" href="../manifest_display.json">
     <title>หน้าจอแสดงคิว - <?php echo htmlspecialchars($servicePointName); ?></title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/plugins/bootstrap-5.3.8-dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
@@ -437,7 +437,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="../assets/plugins/jquery/jquery-3.7.1.js"></script>
     
     <script>
         let servicePointId = <?php echo json_encode($servicePointId); ?>;

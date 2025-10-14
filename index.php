@@ -43,7 +43,7 @@ if ($kioskRegistered) {
     <title>ระบบเรียกคิว - โรงพยาบาลยุวประสาทไวทโยปถัมภ์</title>
 
     <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./assets/plugins/bootstrap-5.3.8-dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Font - Sarabun -->
@@ -549,8 +549,8 @@ if ($kioskRegistered) {
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="./assets/plugins/bootstrap-5.3.8-dist/js/bootstrap.min.js"></script>
+    <script src="./assets/plugins/jquery/jquery-3.7.1.js"></script>
     <!-- QR Code library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
     <!-- SweetAlert2 for printing status -->
