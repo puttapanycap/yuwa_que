@@ -459,10 +459,23 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                 console.log(`[Audio Debug] ${message}`, data || '');
             }
         }
+
+        function registerServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                return;
+            }
+
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../sw.js').catch((error) => {
+                    console.error('Service worker registration failed.', error);
+                });
+            });
+        }
         
         $(document).ready(function() {
             updateTime();
             loadQueueData();
+            registerServiceWorker();
 
             // Update time every second
             setInterval(updateTime, 1000);
