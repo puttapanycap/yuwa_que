@@ -297,45 +297,16 @@ try {
                         <?php endif; ?>
                     </div>
                     
-                    <!-- Monitor Links -->
+                    <!-- Monitor Links CTA -->
                     <div class="content-card">
-                        <h5 class="mb-4">ลิงก์หน้าจอแสดงผล</h5>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th><?php echo $servicePointLabel; ?></th>
-                                        <th>URL</th>
-                                        <th>การดำเนินการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>ทุก<?php echo $servicePointLabel; ?></td>
-                                        <td><code><?php echo BASE_URL; ?>/monitor/display.php</code></td>
-                                        <td>
-                                            <a href="../monitor/display.php" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-external-link-alt me-1"></i>เปิด
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    <?php foreach ($servicePoints as $sp): ?>
-                                        <?php if ($sp['is_active']): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars(trim(($sp['point_label'] ? $sp['point_label'].' ' : '') . $sp['point_name'])); ?></td>
-                                                <td><code><?php echo BASE_URL; ?>/monitor/display.php?service_point=<?php echo $sp['service_point_id']; ?></code></td>
-                                                <td>
-                                                    <a href="../monitor/display.php?service_point=<?php echo $sp['service_point_id']; ?>" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-external-link-alt me-1"></i>เปิด
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                        <h5 class="mb-3">หน้าจอแสดงผลคิว</h5>
+                        <p class="text-muted mb-4">
+                            จัดการลิงก์หน้าจอเรียกคิวสำหรับ<?php echo $servicePointLabel; ?>ทุกแบบได้ที่เมนู
+                            <strong>หน้าจอเรียกคิว</strong>
+                        </p>
+                        <a href="display_screens.php" class="btn btn-outline-primary">
+                            <i class="fas fa-tv me-2"></i>ไปที่หน้าจอเรียกคิว
+                        </a>
                     </div>
                 </div>
             </div>

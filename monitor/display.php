@@ -11,13 +11,50 @@
 
 require_once '../config/config.php';
 
-// Get service point from URL parameter
+// Determine layout type and selected service points
+$layout = strtolower($_GET['layout'] ?? 'single');
+$isDualLayout = $layout === 'dual';
 $servicePointId = $_GET['service_point'] ?? null;
+$leftServicePointId = $_GET['left'] ?? $_GET['left_service_point'] ?? null;
+$rightServicePointId = $_GET['right'] ?? $_GET['right_service_point'] ?? null;
 $servicePointName = 'ทุกจุดบริการ';
+$voiceTemplateId = null;
+$servicePointConfigs = [
+    'left' => [
+        'id' => $leftServicePointId ? (int)$leftServicePointId : null,
+        'name' => '',
+        'voice_template_id' => null,
+    ],
+    'right' => [
+        'id' => $rightServicePointId ? (int)$rightServicePointId : null,
+        'name' => '',
+        'voice_template_id' => null,
+    ],
+];
 
-if ($servicePointId) {
-    try {
-        $db = getDB();
+try {
+    $db = getDB();
+
+    if ($isDualLayout) {
+        foreach ($servicePointConfigs as $position => &$config) {
+            if (!$config['id']) {
+                continue;
+            }
+
+            $stmt = $db->prepare("SELECT TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) AS service_point_name, voice_template_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
+            $stmt->execute([$config['id']]);
+            $servicePoint = $stmt->fetch();
+            if ($servicePoint) {
+                $config['name'] = $servicePoint['service_point_name'];
+                $config['voice_template_id'] = $servicePoint['voice_template_id'] ?? null;
+            }
+        }
+        unset($config);
+
+        $leftDisplayName = $servicePointConfigs['left']['name'] ?: 'ยังไม่เลือก';
+        $rightDisplayName = $servicePointConfigs['right']['name'] ?: 'ยังไม่เลือก';
+        $servicePointName = "ซ้าย: {$leftDisplayName} | ขวา: {$rightDisplayName}";
+    } elseif ($servicePointId) {
         $stmt = $db->prepare("SELECT TRIM(CONCAT(COALESCE(point_label,''),' ', point_name)) AS service_point_name, voice_template_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
         $stmt->execute([$servicePointId]);
         $servicePoint = $stmt->fetch();
@@ -25,9 +62,16 @@ if ($servicePointId) {
             $servicePointName = $servicePoint['service_point_name'];
             $voiceTemplateId = $servicePoint['voice_template_id'] ?? null;
         }
-    } catch (Exception $e) {
-        // Use default name
     }
+} catch (Exception $e) {
+    if ($isDualLayout) {
+        $servicePointName = 'หน้าจอ 2 จุดบริการ';
+    }
+}
+
+if ($isDualLayout && !isset($leftDisplayName, $rightDisplayName)) {
+    $leftDisplayName = $servicePointConfigs['left']['name'] ?: 'ยังไม่เลือก';
+    $rightDisplayName = $servicePointConfigs['right']['name'] ?: 'ยังไม่เลือก';
 }
 
 $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
@@ -109,6 +153,29 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             gap: clamp(1rem, 2vw, 2rem);
             min-height: 0;
             overflow: hidden;
+        }
+
+        .content.dual-mode {
+            display: block;
+        }
+
+        .dual-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: clamp(1rem, 2vw, 2rem);
+        }
+
+        .dual-column {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(1rem, 2vw, 1.5rem);
+        }
+
+        .dual-column-title {
+            font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+            font-weight: 600;
+            text-align: center;
+            color: var(--primary-green);
         }
 
         .current-queue-section,
@@ -381,35 +448,98 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         </div>
         
         <!-- Content -->
-        <div class="content">
-            <!-- Current Queue -->
-            <div class="current-queue-section">
-                <div class="current-queue-title">
-                    <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
-                </div>
-                
-                <div id="currentQueueDisplay">
-                    <div class="no-current-queue">
-                        <i class="fas fa-clock me-2"></i>
-                        รอการเรียกคิว
+        <div class="content <?php echo $isDualLayout ? 'dual-mode' : ''; ?>">
+            <?php if ($isDualLayout): ?>
+                <div class="dual-layout">
+                    <div class="dual-column">
+                        <div class="dual-column-title">
+                            <i class="fas fa-arrow-left me-2"></i>ฝั่งซ้าย: <?php echo htmlspecialchars($leftDisplayName); ?>
+                        </div>
+                        <div class="current-queue-section">
+                            <div class="current-queue-title">
+                                <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
+                            </div>
+
+                            <div id="currentQueueDisplayLeft">
+                                <div class="no-current-queue">
+                                    <i class="fas fa-clock me-2"></i>
+                                    รอการเรียกคิว
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="waiting-queue-section">
+                            <div class="waiting-title">
+                                <i class="fas fa-list me-2"></i>คิวรอ
+                            </div>
+
+                            <div class="waiting-queues-container" id="waitingQueuesListLeft">
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dual-column">
+                        <div class="dual-column-title">
+                            <i class="fas fa-arrow-right me-2"></i>ฝั่งขวา: <?php echo htmlspecialchars($rightDisplayName); ?>
+                        </div>
+                        <div class="current-queue-section">
+                            <div class="current-queue-title">
+                                <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
+                            </div>
+
+                            <div id="currentQueueDisplayRight">
+                                <div class="no-current-queue">
+                                    <i class="fas fa-clock me-2"></i>
+                                    รอการเรียกคิว
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="waiting-queue-section">
+                            <div class="waiting-title">
+                                <i class="fas fa-list me-2"></i>คิวรอ
+                            </div>
+
+                            <div class="waiting-queues-container" id="waitingQueuesListRight">
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <div id="announcementArea"></div>
-            </div>
-            
-            <!-- Waiting Queues -->
-            <div class="waiting-queue-section">
-                <div class="waiting-title">
-                    <i class="fas fa-list me-2"></i>คิวรอ
+            <?php else: ?>
+                <!-- Current Queue -->
+                <div class="current-queue-section">
+                    <div class="current-queue-title">
+                        <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
+                    </div>
+
+                    <div id="currentQueueDisplay">
+                        <div class="no-current-queue">
+                            <i class="fas fa-clock me-2"></i>
+                            รอการเรียกคิว
+                        </div>
+                    </div>
+
+                    <div id="announcementArea"></div>
                 </div>
-                
-                <div class="waiting-queues-container" id="waitingQueuesList">
-                    <div class="text-center text-muted">
-                        <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+
+                <!-- Waiting Queues -->
+                <div class="waiting-queue-section">
+                    <div class="waiting-title">
+                        <i class="fas fa-list me-2"></i>คิวรอ
+                    </div>
+
+                    <div class="waiting-queues-container" id="waitingQueuesList">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-spinner fa-spin"></i> กำลังโหลด...
+                        </div>
                     </div>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
         
         <!-- Footer -->
@@ -440,16 +570,27 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
     <script src="../assets/plugins/jquery/jquery-3.7.1.js"></script>
     
     <script>
-        let servicePointId = <?php echo json_encode($servicePointId); ?>;
-        let voiceTemplateId = <?php echo json_encode($voiceTemplateId ?? null); ?>;
-        let lastCalledQueue = null;
-        let lastCalledCount = 0; // เก็บจำนวนครั้งที่เรียกล่าสุด
-        let lastCalledTime = null; // เก็บเวลาที่เรียกล่าสุด
+        const layoutType = <?php echo json_encode($isDualLayout ? 'dual' : 'single'); ?>;
+        let servicePointId = <?php echo $isDualLayout ? 'null' : json_encode($servicePointId); ?>;
+        let voiceTemplateId = <?php echo $isDualLayout ? 'null' : json_encode($voiceTemplateId ?? null); ?>;
+        const servicePointConfigs = <?php echo json_encode($servicePointConfigs); ?>;
+        const layoutSelectors = {
+            left: {
+                current: '#currentQueueDisplayLeft',
+                waiting: '#waitingQueuesListLeft'
+            },
+            right: {
+                current: '#currentQueueDisplayRight',
+                waiting: '#waitingQueuesListRight'
+            }
+        };
+        let lastCalledData = {};
         let audioEnabled = false; // Default to false, will be set by settings
         let audioContext = null;
         let activeAudios = []; // เก็บเสียงที่กำลังเล่นอยู่
         let currentPlaybackMeta = null;
         const audioVolumeSetting = 1.0;
+        const defaultTestServicePointId = 1;
 
         // Debug mode toggle
         let debugMode = false; // Set to true for development, false for production
@@ -691,8 +832,16 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
         }
 
         // Request audio playback with simple retry for reliability
-        function requestAudio(queueId, attempt = 0) {
-            $.post('../api/play_queue_audio.php', { queue_id: queueId, service_point_id: servicePointId, template_id: voiceTemplateId })
+        function requestAudio(queueId, targetServicePointId = servicePointId, templateIdOverride = voiceTemplateId, attempt = 0) {
+            const payload = { queue_id: queueId };
+            if (targetServicePointId) {
+                payload.service_point_id = targetServicePointId;
+            }
+            if (templateIdOverride) {
+                payload.template_id = templateIdOverride;
+            }
+
+            $.post('../api/play_queue_audio.php', payload)
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Audio API response for queue:', response);
@@ -701,14 +850,14 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             reportAudioIssue(queueId, response.missing_words);
                         }
                     } else if (attempt < 2) {
-                        setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
+                        setTimeout(() => requestAudio(queueId, targetServicePointId, templateIdOverride, attempt + 1), 2000);
                     } else {
                         console.error('Failed to get audio parameters from API:', response.message);
                     }
                 })
                 .fail(function(xhr, status, error) {
                     if (attempt < 2) {
-                        setTimeout(() => requestAudio(queueId, attempt + 1), 2000);
+                        setTimeout(() => requestAudio(queueId, targetServicePointId, templateIdOverride, attempt + 1), 2000);
                     } else {
                         console.error('AJAX call to play_queue_audio.php failed:', error);
                     }
@@ -766,8 +915,14 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
 
             const testMessage = 'ทดสอบระบบเสียง หมายเลข A001 เชิญที่ห้องตรวจ 1';
+            const testConfig = getTestAudioConfig();
+            const payload = { custom_message: testMessage };
+            payload.service_point_id = testConfig.id || defaultTestServicePointId;
+            if (testConfig.template) {
+                payload.template_id = testConfig.template;
+            }
 
-            $.post('../api/play_queue_audio.php', { custom_message: testMessage, service_point_id: servicePointId || 1, template_id: voiceTemplateId })
+            $.post('../api/play_queue_audio.php', payload)
                 .done(function(response) {
                     if (response.success) {
                         debugLog('Test audio API response:', response);
@@ -883,8 +1038,8 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         });
 
-        function displayCurrentQueue(queue) {
-            const currentQueueDisplay = $('#currentQueueDisplay');
+        function displayCurrentQueue(queue, containerSelector) {
+            const currentQueueDisplay = $(containerSelector);
             if (queue) {
                 currentQueueDisplay.html(`
                     <div class="current-queue-number calling-animation">${htmlspecialchars(queue.queue_number)}</div>
@@ -908,8 +1063,8 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             }
         }
 
-        function displayWaitingQueues(queues) {
-            const waitingQueuesList = $('#waitingQueuesList');
+        function displayWaitingQueues(queues, containerSelector) {
+            const waitingQueuesList = $(containerSelector);
             waitingQueuesList.empty();
             if (queues && queues.length > 0) {
                 queues.forEach((queue, index) => {
@@ -948,54 +1103,106 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                       .replace(/'/g, '&#039;');
         }
 
-        function loadQueueData() {
-            const url = servicePointId ?
-                `../api/get_monitor_data.php?service_point_id=${servicePointId}` :
-                '../api/get_monitor_data.php';
+        function handleAudioForServicePoint(servicePointKey, currentQueue, templateId) {
+            const key = servicePointKey !== null ? String(servicePointKey) : 'all';
 
-            $.get(url, { _: Date.now() }, function(data) {
-                displayCurrentQueue(data.current);
-                displayWaitingQueues(data.waiting);
-                updateLastUpdate();
+            if (!currentQueue) {
+                lastCalledData[key] = { queueId: null, count: 0, time: null };
+                return;
+            }
 
-                // Check for newly called queue or repeat call
-                if (data.current) {
-                    const currentQueueId = data.current.queue_id;
-                    const currentCalledCount = parseInt(data.current.called_count) || 1;
-                    const currentCallTime = data.current.last_called_time || null;
+            const previous = lastCalledData[key] || { queueId: null, count: 0, time: null };
+            const currentQueueId = currentQueue.queue_id;
+            const currentCalledCount = parseInt(currentQueue.called_count) || 1;
+            const currentCallTime = currentQueue.last_called_time || null;
 
-                    // Check if it's a new call or a repeat call
-                    const isNewCall = currentQueueId !== lastCalledQueue;
-                    const isRepeatCall = currentQueueId === lastCalledQueue && (
-                        currentCalledCount > lastCalledCount || currentCallTime !== lastCalledTime
-                    );
-                    
-                    if (isNewCall || isRepeatCall) {
-                        debugLog('Queue call detected:', {
-                            isNewCall: isNewCall,
-                            isRepeatCall: isRepeatCall,
-                            queueId: currentQueueId,
-                            calledCount: currentCalledCount
-                        });
-                        
-                        // Fetch audio parameters from backend API with retry
-                        requestAudio(currentQueueId);
-                    }
-                    
-                    // Update last values
-                    lastCalledQueue = currentQueueId;
-                    lastCalledCount = currentCalledCount;
-                    lastCalledTime = currentCallTime;
-                } else {
-                    // No current queue
-                    lastCalledQueue = null;
-                    lastCalledCount = 0;
-                    lastCalledTime = null;
+            const isNewCall = currentQueueId !== previous.queueId;
+            const isRepeatCall = currentQueueId === previous.queueId && (
+                currentCalledCount > previous.count || currentCallTime !== previous.time
+            );
+
+            if (isNewCall || isRepeatCall) {
+                debugLog('Queue call detected:', {
+                    isNewCall: isNewCall,
+                    isRepeatCall: isRepeatCall,
+                    queueId: currentQueueId,
+                    calledCount: currentCalledCount,
+                    servicePointKey: key
+                });
+
+                const targetServicePointId = key === 'all'
+                    ? (currentQueue.current_service_point_id || null)
+                    : servicePointKey;
+
+                requestAudio(currentQueueId, targetServicePointId, templateId);
+            }
+
+            lastCalledData[key] = {
+                queueId: currentQueueId,
+                count: currentCalledCount,
+                time: currentCallTime
+            };
+        }
+
+        function getTestAudioConfig() {
+            if (layoutType === 'dual') {
+                const leftConfig = servicePointConfigs.left || {};
+                const rightConfig = servicePointConfigs.right || {};
+                if (leftConfig.id) {
+                    return { id: leftConfig.id, template: leftConfig.voice_template_id || null };
                 }
-            }).fail(function() {
-                console.error('Failed to load queue data');
-                showOfflineStatus();
-            });
+                if (rightConfig.id) {
+                    return { id: rightConfig.id, template: rightConfig.voice_template_id || null };
+                }
+            }
+
+            return { id: servicePointId || null, template: voiceTemplateId || null };
+        }
+
+        function loadQueueData() {
+            if (layoutType === 'dual') {
+                Object.keys(servicePointConfigs).forEach(position => {
+                    const config = servicePointConfigs[position] || {};
+                    const selectors = layoutSelectors[position];
+
+                    if (!selectors) {
+                        return;
+                    }
+
+                    if (!config.id) {
+                        displayCurrentQueue(null, selectors.current);
+                        displayWaitingQueues([], selectors.waiting);
+                        return;
+                    }
+
+                    const url = `../api/get_monitor_data.php?service_point_id=${config.id}`;
+                    $.get(url, { _: Date.now() }, function(data) {
+                        displayCurrentQueue(data.current, selectors.current);
+                        displayWaitingQueues(data.waiting, selectors.waiting);
+                        updateLastUpdate();
+                        handleAudioForServicePoint(config.id, data.current, config.voice_template_id);
+                    }).fail(function() {
+                        console.error('Failed to load queue data for service point', config.id);
+                        showOfflineStatus();
+                    });
+                });
+            } else {
+                const url = servicePointId ?
+                    `../api/get_monitor_data.php?service_point_id=${servicePointId}` :
+                    '../api/get_monitor_data.php';
+
+                $.get(url, { _: Date.now() }, function(data) {
+                    displayCurrentQueue(data.current, '#currentQueueDisplay');
+                    displayWaitingQueues(data.waiting, '#waitingQueuesList');
+                    updateLastUpdate();
+
+                    const key = servicePointId ? servicePointId : 'all';
+                    handleAudioForServicePoint(key, data.current, voiceTemplateId);
+                }).fail(function() {
+                    console.error('Failed to load queue data');
+                    showOfflineStatus();
+                });
+            }
         }
     </script>
 </body>

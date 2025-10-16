@@ -5,6 +5,7 @@ $navItems = [
     ['users.php', 'fas fa-users', 'จัดการผู้ใช้'],
     ['roles.php', 'fas fa-user-tag', 'บทบาทและสิทธิ์'],
     ['service_points.php', 'fas fa-map-marker-alt', getServicePointLabel()],
+    ['display_screens.php', 'fas fa-tv', 'หน้าจอเรียกคิว'],
     ['queue_types.php', 'fas fa-list', 'ประเภทคิว'],
     ['service_flows.php', 'fas fa-route', 'Service Flows'],
     ['queue_management.php', 'fas fa-tasks', 'จัดการคิว'],
