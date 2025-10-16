@@ -31,7 +31,8 @@ try {
     $stmt->execute([$status, $callId]);
     
     $deletedFiles = [];
-    $baseStoragePath = realpath(ROOT_PATH . '/storage/tts');
+    $publicRoot = ROOT_PATH . '/public';
+    $baseStoragePath = realpath($publicRoot . '/storage/tts');
 
     if ($baseStoragePath !== false) {
         foreach ($audioFiles as $file) {
@@ -40,7 +41,7 @@ try {
             }
 
             $relativePath = ltrim($file, '/');
-            $absolutePath = ROOT_PATH . '/' . $relativePath;
+            $absolutePath = $publicRoot . '/' . $relativePath;
             $absoluteDir = realpath(dirname($absolutePath));
 
             if ($absoluteDir === false || strpos($absoluteDir, $baseStoragePath) !== 0) {

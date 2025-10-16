@@ -134,7 +134,7 @@ if (!function_exists('synthesizeTtsAudio')) {
             throw new Exception($errorMessage !== '' ? $errorMessage : 'API Service ไม่ได้ส่งข้อมูลเสียงกลับมา');
         }
 
-        $outputDir = ROOT_PATH . '/storage/tts';
+        $outputDir = ROOT_PATH . '/public/storage/tts';
         if (!is_dir($outputDir)) {
             @mkdir($outputDir, 0777, true);
         }
