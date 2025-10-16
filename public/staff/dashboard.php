@@ -2,6 +2,25 @@
 require_once dirname(__DIR__, 2) . '/config/config.php';
 requireLogin();
 
+// Refresh accessible service points from database on each request
+try {
+    $db = getDB();
+    $stmt = $db->prepare("
+        SELECT sp.service_point_id, sp.point_name, sp.position_key
+        FROM staff_service_point_access sspa
+        JOIN service_points sp ON sspa.service_point_id = sp.service_point_id
+        WHERE sspa.staff_id = ? AND sp.is_active = 1
+        ORDER BY sp.display_order, sp.point_name
+    ");
+    $stmt->execute([$_SESSION['staff_id']]);
+    $_SESSION['service_points'] = $stmt->fetchAll();
+} catch (Exception $e) {
+    // If database refresh fails, keep existing session data
+    Logger::error('Failed to refresh service points: ' . $e->getMessage(), [
+        'staff_id' => $_SESSION['staff_id'] ?? null
+    ]);
+}
+
 // Get current user's accessible service points
 $accessibleServicePoints = $_SESSION['service_points'] ?? [];
 $selectedServicePoint = $_GET['service_point'] ?? ($accessibleServicePoints[0]['service_point_id'] ?? null);
