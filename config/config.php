@@ -603,6 +603,8 @@ if (env('PERFORMANCE_MONITORING', false)) {
 }
 
 // Initialize components
+require_once __DIR__ . '/appointments.php';
+
 Logger::init();
 Cache::init();
 ?>

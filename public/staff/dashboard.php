@@ -74,10 +74,56 @@ if (!$hasAccess) {
             margin-bottom: 1rem;
             transition: all 0.3s ease;
         }
-        
+
         .queue-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .appointment-highlight {
+            background: rgba(13, 110, 253, 0.08);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-top: 0.75rem;
+        }
+
+        .appointment-highlight h6 {
+            font-weight: 600;
+        }
+
+        .appointment-time-range,
+        .appointment-location {
+            font-size: 0.95rem;
+            color: #1d3557;
+        }
+
+        .appointment-location {
+            color: #495057;
+        }
+
+        .appointment-description {
+            font-size: 0.9rem;
+            color: #495057;
+        }
+
+        .appointment-chip {
+            background: rgba(13, 110, 253, 0.08);
+            border-radius: 10px;
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #0d6efd;
+            line-height: 1.4;
+        }
+
+        .appointment-chip div {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .appointment-status-badge {
+            font-size: 0.75rem;
         }
         
         .queue-number {
@@ -455,6 +501,7 @@ if (!$hasAccess) {
                             <option value="">เลือกจุดบริการถัดไป</option>
                         </select>
                     </div>
+                    <div class="alert alert-info d-none" id="appointmentForwardNotice"></div>
                     <div class="mb-3">
                         <label class="form-label">หมายเหตุ (ถ้ามี)</label>
                         <textarea class="form-control" id="completeNotes" rows="3"></textarea>
@@ -505,6 +552,7 @@ if (!$hasAccess) {
 
     <script>
         let currentQueueId = null;
+        let currentQueueData = null;
         let servicePointId = <?php echo $selectedServicePoint; ?>;
         const csrfToken = '<?php echo generateCSRFToken(); ?>';
         
@@ -539,10 +587,12 @@ if (!$hasAccess) {
         function displayCurrentQueue(queue) {
             const container = $('#currentQueue');
             const banner = $('#currentStatusBanner');
-            
+
             if (queue) {
                 currentQueueId = queue.queue_id;
-                
+                currentQueueData = queue;
+                const appointmentHtml = renderCurrentAppointment(queue.appointment || null);
+
                 // Update banner
                 banner.removeClass('no-queue')
                       .addClass('fade-in');
@@ -575,12 +625,14 @@ if (!$hasAccess) {
                                     </span>
                                 </div>
                             </div>
+                            ${appointmentHtml}
                         </div>
                     </div>
                 `);
             } else {
                 currentQueueId = null;
-                
+                currentQueueData = null;
+
                 // Update banner
                 banner.addClass('no-queue')
                       .removeClass('fade-in');
@@ -614,6 +666,7 @@ if (!$hasAccess) {
             
             let html = '';
             queues.forEach(function(queue, index) {
+                const appointmentSnippet = renderWaitingAppointment(queue.appointment || null);
                 html += `
                     <div class="queue-card waiting-queue">
                         <div class="card-body px-4 py-2">
@@ -627,6 +680,7 @@ if (!$hasAccess) {
                                         <i class="fas fa-clock me-1"></i>
                                         ${formatTime(queue.creation_time)}
                                     </small>
+                                    ${appointmentSnippet}
                                 </div>
                                 <div class="col-md-3">
                                     <span class="queue-status bg-warning text-dark">
@@ -662,6 +716,8 @@ if (!$hasAccess) {
             $('#completeBtn').prop('disabled', !hasCurrentQueue);
             $('#cancelBtn').prop('disabled', !hasCurrentQueue);
             $('#startServiceBtn').prop('disabled', !(hasCurrentQueue && status === 'called'));
+
+            updateCompleteModalState(currentQueue);
         }
 
         function loadCallTimeGroups() {
@@ -792,6 +848,7 @@ if (!$hasAccess) {
         
         function completeQueue() {
             if (!currentQueueId) return;
+            updateCompleteModalState(currentQueueData);
             $('#completeModal').modal('show');
         }
         
@@ -809,8 +866,23 @@ if (!$hasAccess) {
                 if (response.success) {
                     $('#completeModal').modal('hide');
                     loadQueues();
-                    showAlert('ส่งต่อคิวสำเร็จ', 'success');
-                    
+                    let message = response.message || 'ส่งต่อคิวสำเร็จ';
+                    if (response.next_appointment) {
+                        const summary = formatAppointmentSummaryText(response.next_appointment);
+                        const location = appointmentLocationText(response.next_appointment);
+                        const detailParts = [];
+                        if (summary) {
+                            detailParts.push(summary);
+                        }
+                        if (location) {
+                            detailParts.push(`จุดบริการ: ${location}`);
+                        }
+                        if (detailParts.length > 0) {
+                            message += ` (${detailParts.join(' | ')})`;
+                        }
+                    }
+                    showAlert(escapeHtml(message), 'success');
+
                     // Clear form
                     $('#nextServicePoint').val('');
                     $('#completeNotes').val('');
@@ -880,6 +952,169 @@ if (!$hasAccess) {
                     });
                 }
             });
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            return text.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatMultiline(text) {
+            return escapeHtml(text).replace(/\r?\n/g, '<br>');
+        }
+
+        function parseAppointmentDateValue(value) {
+            if (!value) {
+                return null;
+            }
+            const date = new Date(value);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatAppointmentWindowText(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            if (appointment.time_window) {
+                return appointment.time_window;
+            }
+            const start = parseAppointmentDateValue(appointment.start_time_iso || appointment.start_time);
+            const end = parseAppointmentDateValue(appointment.end_time_iso || appointment.end_time);
+            const options = { hour: '2-digit', minute: '2-digit' };
+            if (start && end) {
+                return `${start.toLocaleTimeString('th-TH', options)} - ${end.toLocaleTimeString('th-TH', options)}`;
+            }
+            if (start) {
+                return start.toLocaleTimeString('th-TH', options);
+            }
+            return '';
+        }
+
+        function formatAppointmentDateText(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            const date = parseAppointmentDateValue(appointment.start_time_iso || appointment.start_time);
+            if (!date) {
+                return '';
+            }
+            return date.toLocaleDateString('th-TH', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+
+        function formatAppointmentSummaryText(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            const dateText = formatAppointmentDateText(appointment);
+            const windowText = formatAppointmentWindowText(appointment);
+            if (dateText && windowText) {
+                return `${dateText} เวลา ${windowText}`;
+            }
+            return dateText || windowText || '';
+        }
+
+        function appointmentLocationText(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            if (appointment.service_point_name) {
+                return appointment.service_point_name;
+            }
+            if (appointment.point_label && appointment.point_name) {
+                return `${appointment.point_label} ${appointment.point_name}`;
+            }
+            return appointment.point_name || '';
+        }
+
+        function renderCurrentAppointment(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            const title = escapeHtml(appointment.title || 'รายการนัดหมาย');
+            const summary = formatAppointmentSummaryText(appointment);
+            const location = appointmentLocationText(appointment);
+            const statusBadge = appointment.status === 'active'
+                ? '<span class="badge bg-light text-success border border-success appointment-status-badge"><i class="fas fa-check-circle me-1"></i>กำลังให้บริการ</span>'
+                : '';
+            const summaryHtml = summary ? `<div class="appointment-time-range"><i class="fas fa-clock me-2"></i>${escapeHtml(summary)}</div>` : '';
+            const locationHtml = location ? `<div class="appointment-location"><i class="fas fa-location-dot me-2"></i>${escapeHtml(location)}</div>` : '';
+            const descriptionHtml = appointment.description ? `<div class="appointment-description mt-2">${formatMultiline(appointment.description)}</div>` : '';
+
+            return `
+                <div class="appointment-highlight">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0"><i class="fas fa-calendar-check me-2"></i>${title}</h6>
+                        ${statusBadge}
+                    </div>
+                    ${summaryHtml}
+                    ${locationHtml}
+                    ${descriptionHtml}
+                </div>
+            `;
+        }
+
+        function renderWaitingAppointment(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            const rows = [];
+            const dateText = formatAppointmentDateText(appointment);
+            const windowText = formatAppointmentWindowText(appointment);
+            const location = appointmentLocationText(appointment);
+            if (dateText) {
+                rows.push(`<div><i class="fas fa-calendar-day me-1"></i><span>${escapeHtml(dateText)}</span></div>`);
+            }
+            if (windowText) {
+                rows.push(`<div><i class="fas fa-clock me-1"></i><span>${escapeHtml(windowText)}</span></div>`);
+            }
+            if (location) {
+                rows.push(`<div><i class="fas fa-location-dot me-1"></i><span>${escapeHtml(location)}</span></div>`);
+            }
+            if (rows.length === 0) {
+                return '';
+            }
+            return `<div class="appointment-chip">${rows.join('')}</div>`;
+        }
+
+        function updateCompleteModalState(currentQueue) {
+            const notice = $('#appointmentForwardNotice');
+            if (!notice.length) {
+                return;
+            }
+
+            if (currentQueue && currentQueue.ticket_template === 'appointment_list') {
+                const appointment = currentQueue.appointment || null;
+                let message = 'คิวนี้มีรายการนัดหมาย ระบบจะจัดส่งต่อให้อัตโนมัติเมื่อเสร็จสิ้น';
+                if (appointment) {
+                    const summary = formatAppointmentSummaryText(appointment);
+                    const location = appointmentLocationText(appointment);
+                    const detailParts = [];
+                    if (summary) {
+                        detailParts.push(summary);
+                    }
+                    if (location) {
+                        detailParts.push(`จุดบริการ: ${location}`);
+                    }
+                    if (detailParts.length > 0) {
+                        message = `ระบบจะส่งต่ออัตโนมัติเมื่อเสร็จสิ้น<br><small>${detailParts.map(escapeHtml).join(' • ')}</small>`;
+                    }
+                }
+                notice.removeClass('d-none').html(`<i class="fas fa-circle-info me-2"></i>${message}`);
+            } else {
+                notice.addClass('d-none').empty();
+            }
         }
 
         function formatTime(timeString) {
