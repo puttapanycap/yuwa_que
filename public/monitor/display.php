@@ -436,6 +436,10 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
             .content { padding: 0.5rem; }
             .current-queue-title, .current-queue-number { margin-bottom: 0.5rem; margin-top: 0.5rem; }
         }
+
+        .current-queue-section.mh-475px {
+            max-height: 475px;
+        }
     </style>
 </head>
 <body>
@@ -455,7 +459,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                         <div class="dual-column-title">
                             <i class="fas fa-arrow-left me-2"></i>ฝั่งซ้าย: <?php echo htmlspecialchars($leftDisplayName); ?>
                         </div>
-                        <div class="current-queue-section">
+                        <div class="current-queue-section mh-475px">
                             <div class="current-queue-title">
                                 <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
                             </div>
@@ -468,7 +472,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             </div>
                         </div>
 
-                        <div class="waiting-queue-section">
+                        <div class="waiting-queue-section mh-475px">
                             <div class="waiting-title">
                                 <i class="fas fa-list me-2"></i>คิวรอ
                             </div>
@@ -484,7 +488,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                         <div class="dual-column-title">
                             <i class="fas fa-arrow-right me-2"></i>ฝั่งขวา: <?php echo htmlspecialchars($rightDisplayName); ?>
                         </div>
-                        <div class="current-queue-section">
+                        <div class="current-queue-section mh-475px">
                             <div class="current-queue-title">
                                 <i class="fas fa-bullhorn me-2"></i>กำลังเรียกคิว
                             </div>
@@ -497,7 +501,7 @@ $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุ�
                             </div>
                         </div>
 
-                        <div class="waiting-queue-section">
+                        <div class="waiting-queue-section mh-475px">
                             <div class="waiting-title">
                                 <i class="fas fa-list me-2"></i>คิวรอ
                             </div>
