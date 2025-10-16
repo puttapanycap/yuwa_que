@@ -6,13 +6,89 @@ if (!hasPermission('manage_service_points')) {
     die('ไม่มีสิทธิ์เข้าถึงหน้านี้');
 }
 
+function ensureQueueTypeExtendedSchema($db)
+{
+    static $checked = false;
+
+    if ($checked || !$db) {
+        return;
+    }
+
+    $checked = true;
+
+    try {
+        $stmt = $db->query("SHOW COLUMNS FROM queue_types LIKE 'ticket_template'");
+        if (!$stmt->fetch()) {
+            $db->exec("ALTER TABLE queue_types ADD COLUMN ticket_template ENUM('standard','appointment_list') NOT NULL DEFAULT 'standard' AFTER prefix_char");
+        }
+    } catch (Exception $e) {
+        error_log('Failed to ensure ticket_template column: ' . $e->getMessage());
+    }
+
+    try {
+        $stmt = $db->query("SHOW COLUMNS FROM queue_types LIKE 'default_service_point_id'");
+        if (!$stmt->fetch()) {
+            $db->exec("ALTER TABLE queue_types ADD COLUMN default_service_point_id INT NULL DEFAULT NULL AFTER ticket_template");
+        }
+    } catch (Exception $e) {
+        error_log('Failed to ensure default_service_point_id column: ' . $e->getMessage());
+    }
+
+    try {
+        $stmt = $db->prepare("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'queue_types' AND COLUMN_NAME = 'default_service_point_id' AND REFERENCED_TABLE_NAME = 'service_points' LIMIT 1");
+        $stmt->execute();
+        if (!$stmt->fetchColumn()) {
+            $db->exec("ALTER TABLE queue_types ADD CONSTRAINT fk_queue_types_default_service_point FOREIGN KEY (default_service_point_id) REFERENCES service_points(service_point_id) ON DELETE SET NULL ON UPDATE RESTRICT");
+        }
+    } catch (Exception $e) {
+        error_log('Failed to ensure queue_types default service point FK: ' . $e->getMessage());
+    }
+
+    try {
+        $stmt = $db->query("SHOW INDEX FROM queue_types WHERE Key_name = 'idx_queue_types_default_sp'");
+        if (!$stmt->fetch()) {
+            $db->exec("ALTER TABLE queue_types ADD INDEX idx_queue_types_default_sp (default_service_point_id)");
+        }
+    } catch (Exception $e) {
+        error_log('Failed to ensure queue_types default service point index: ' . $e->getMessage());
+    }
+}
+
+try {
+    $schemaDb = getDB();
+    ensureQueueTypeExtendedSchema($schemaDb);
+} catch (Exception $e) {
+    error_log('Queue type schema check failed: ' . $e->getMessage());
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
 
+$servicePoints = [];
+$servicePointNames = [];
+
+try {
+    $db = getDB();
+    $stmt = $db->query("SELECT service_point_id, point_label, point_name, is_active FROM service_points ORDER BY is_active DESC, display_order, point_name");
+    $servicePoints = $stmt->fetchAll();
+
+    foreach ($servicePoints as &$servicePoint) {
+        $label = trim((string)($servicePoint['point_label'] ?? ''));
+        $name = trim((string)($servicePoint['point_name'] ?? ''));
+        $display = trim(($label !== '' ? $label . ' ' : '') . $name);
+        $servicePoint['display_name'] = $display !== '' ? $display : $name;
+        $servicePointNames[$servicePoint['service_point_id']] = $servicePoint['display_name'];
+    }
+    unset($servicePoint);
+} catch (Exception $e) {
+    $servicePoints = [];
+    $servicePointNames = [];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    
+
     try {
         $db = getDB();
         
@@ -22,11 +98,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $description = sanitizeInput($_POST['description']);
                 $prefixChar = sanitizeInput($_POST['prefix_char']);
                 $isActive = isset($_POST['is_active']) ? 1 : 0;
-                
+                $ticketTemplate = $_POST['ticket_template'] ?? 'standard';
+                $defaultServicePointInput = $_POST['default_service_point_id'] ?? '';
+
+                if (!in_array($ticketTemplate, ['standard', 'appointment_list'], true)) {
+                    throw new Exception('รูปแบบบัตรคิวไม่ถูกต้อง');
+                }
+
+                $defaultServicePointId = null;
+                if ($defaultServicePointInput !== '' && $defaultServicePointInput !== null) {
+                    if (!ctype_digit((string) $defaultServicePointInput)) {
+                        throw new Exception('จุดบริการที่เลือกไม่ถูกต้อง');
+                    }
+
+                    $defaultServicePointId = (int) $defaultServicePointInput;
+
+                    $stmt = $db->prepare("SELECT service_point_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
+                    $stmt->execute([$defaultServicePointId]);
+
+                    if (!$stmt->fetchColumn()) {
+                        throw new Exception('จุดบริการที่เลือกไม่ถูกต้องหรือปิดใช้งาน');
+                    }
+                }
+
                 if (empty($typeName) || empty($prefixChar)) {
                     throw new Exception('กรุณากรอกข้อมูลให้ครบถ้วน');
                 }
-                
+
                 if (strlen($prefixChar) != 1 || !preg_match('/[A-Z]/', $prefixChar)) {
                     throw new Exception('รหัสนำหน้าต้องเป็นตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ 1 ตัวเท่านั้น');
                 }
@@ -39,28 +137,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $stmt = $db->prepare("
-                    INSERT INTO queue_types (type_name, description, prefix_char, is_active) 
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO queue_types (type_name, description, prefix_char, ticket_template, default_service_point_id, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$typeName, $description, $prefixChar, $isActive]);
-                
+                $stmt->execute([$typeName, $description, $prefixChar, $ticketTemplate, $defaultServicePointId, $isActive]);
+
                 logActivity("เพิ่มประเภทคิวใหม่: {$typeName}");
-                
+
                 $message = 'เพิ่มประเภทคิวสำเร็จ';
                 $messageType = 'success';
                 break;
-                
+
             case 'edit_queue_type':
                 $queueTypeId = $_POST['queue_type_id'];
                 $typeName = sanitizeInput($_POST['type_name']);
                 $description = sanitizeInput($_POST['description']);
                 $prefixChar = sanitizeInput($_POST['prefix_char']);
                 $isActive = isset($_POST['is_active']) ? 1 : 0;
-                
+                $ticketTemplate = $_POST['ticket_template'] ?? 'standard';
+                $defaultServicePointInput = $_POST['default_service_point_id'] ?? '';
+
+                if (!in_array($ticketTemplate, ['standard', 'appointment_list'], true)) {
+                    throw new Exception('รูปแบบบัตรคิวไม่ถูกต้อง');
+                }
+
+                $defaultServicePointId = null;
+                if ($defaultServicePointInput !== '' && $defaultServicePointInput !== null) {
+                    if (!ctype_digit((string) $defaultServicePointInput)) {
+                        throw new Exception('จุดบริการที่เลือกไม่ถูกต้อง');
+                    }
+
+                    $defaultServicePointId = (int) $defaultServicePointInput;
+
+                    $stmt = $db->prepare("SELECT service_point_id FROM service_points WHERE service_point_id = ? AND is_active = 1");
+                    $stmt->execute([$defaultServicePointId]);
+
+                    if (!$stmt->fetchColumn()) {
+                        throw new Exception('จุดบริการที่เลือกไม่ถูกต้องหรือปิดใช้งาน');
+                    }
+                }
+
                 if (empty($typeName) || empty($prefixChar)) {
                     throw new Exception('กรุณากรอกข้อมูลให้ครบถ้วน');
                 }
-                
+
                 if (strlen($prefixChar) != 1 || !preg_match('/[A-Z]/', $prefixChar)) {
                     throw new Exception('รหัสนำหน้าต้องเป็นตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ 1 ตัวเท่านั้น');
                 }
@@ -73,13 +193,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $stmt = $db->prepare("
-                    UPDATE queue_types 
-                    SET type_name = ?, description = ?, prefix_char = ?, is_active = ? 
+                    UPDATE queue_types
+                    SET type_name = ?, description = ?, prefix_char = ?, ticket_template = ?, default_service_point_id = ?, is_active = ?
                     WHERE queue_type_id = ?
                 ");
-                $stmt->execute([$typeName, $description, $prefixChar, $isActive, $queueTypeId]);
-                
-                logActivity("แก้ไ��ประเภทคิว: {$typeName}");
+                $stmt->execute([$typeName, $description, $prefixChar, $ticketTemplate, $defaultServicePointId, $isActive, $queueTypeId]);
+
+                logActivity("แก้ไขประเภทคิว: {$typeName}");
                 
                 $message = 'แก้ไขประเภทคิวสำเร็จ';
                 $messageType = 'success';
@@ -270,10 +390,29 @@ try {
                                                 <?php if (!$qt['is_active']): ?>
                                                     <span class="badge bg-secondary ms-2">ปิดใช้งาน</span>
                                                 <?php endif; ?>
+                                                <?php if (($qt['ticket_template'] ?? 'standard') === 'appointment_list'): ?>
+                                                    <span class="badge bg-info ms-2">แสดงรายการนัด</span>
+                                                <?php endif; ?>
                                             </h6>
                                             <small class="text-muted">
                                                 <?php echo htmlspecialchars($qt['description'] ?: 'ไม่มีคำอธิบาย'); ?>
                                             </small>
+                                            <?php
+                                                $defaultServicePointLabel = 'ตามผังบริการ';
+                                                if (!empty($qt['default_service_point_id']) && isset($servicePointNames[$qt['default_service_point_id']])) {
+                                                    $defaultServicePointLabel = $servicePointNames[$qt['default_service_point_id']];
+                                                }
+                                            ?>
+                                            <div class="mt-3 small text-muted">
+                                                <div class="mb-1">
+                                                    <i class="fa-regular fa-id-card me-1"></i>
+                                                    รูปแบบบัตรคิว: <?php echo ($qt['ticket_template'] ?? 'standard') === 'appointment_list' ? 'แสดงรายการนัด' : 'ทั่วไป'; ?>
+                                                </div>
+                                                <div>
+                                                    <i class="fa-solid fa-location-dot me-1"></i>
+                                                    จุดบริการแรก: <?php echo htmlspecialchars($defaultServicePointLabel); ?>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="d-flex">
@@ -356,11 +495,33 @@ try {
                         <div class="mb-3">
                             <label class="form-label">รหัสนำหน้า *</label>
                             <input type="text" class="form-control" name="prefix_char" required
-                                   maxlength="1" pattern="[A-Z]" title="ใช้ตัวอักษรภาษาอังกฤษพิมพ์ใหญ�� 1 ตัวเท่านั้น"
+                                   maxlength="1" pattern="[A-Z]" title="ใช้ตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ 1 ตัวเท่านั้น"
                                    style="text-align: center; font-size: 1.5rem; font-weight: bold;">
                             <div class="form-text">ใช้ตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ 1 ตัวเท่านั้น เช่น A, B, C</div>
                         </div>
-                        
+
+                        <div class="mb-3">
+                            <label class="form-label">รูปแบบบัตรคิว *</label>
+                            <select class="form-select" name="ticket_template" required>
+                                <option value="standard" selected>ทั่วไป (รูปแบบปัจจุบัน)</option>
+                                <option value="appointment_list">แสดงรายการนัด</option>
+                            </select>
+                            <div class="form-text">หากเลือก "แสดงรายการนัด" ระบบจะเรียกดูรายการนัดจาก API ก่อนพิมพ์บัตรคิว</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">จุดบริการแรก</label>
+                            <select class="form-select" name="default_service_point_id">
+                                <option value="">ใช้ลำดับจากผังเส้นทางบริการ</option>
+                                <?php foreach ($servicePoints as $servicePoint): ?>
+                                    <option value="<?php echo (int) $servicePoint['service_point_id']; ?>">
+                                        <?php echo htmlspecialchars($servicePoint['display_name']); ?><?php echo !$servicePoint['is_active'] ? ' (ปิดใช้งาน)' : ''; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">กำหนดจุดบริการแรกเมื่อออกบัตรคิว หากไม่เลือกจะอ้างอิงผังบริการ</div>
+                        </div>
+
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="is_active" id="add_is_active" checked>
                             <label class="form-check-label" for="add_is_active">
@@ -406,7 +567,28 @@ try {
                                    style="text-align: center; font-size: 1.5rem; font-weight: bold;">
                             <div class="form-text">ใช้ตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ 1 ตัวเท่านั้น เช่น A, B, C</div>
                         </div>
-                        
+
+                        <div class="mb-3">
+                            <label class="form-label">รูปแบบบัตรคิว *</label>
+                            <select class="form-select" name="ticket_template" id="edit_ticket_template" required>
+                                <option value="standard">ทั่วไป (รูปแบบปัจจุบัน)</option>
+                                <option value="appointment_list">แสดงรายการนัด</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">จุดบริการแรก</label>
+                            <select class="form-select" name="default_service_point_id" id="edit_default_service_point_id">
+                                <option value="">ใช้ลำดับจากผังเส้นทางบริการ</option>
+                                <?php foreach ($servicePoints as $servicePoint): ?>
+                                    <option value="<?php echo (int) $servicePoint['service_point_id']; ?>">
+                                        <?php echo htmlspecialchars($servicePoint['display_name']); ?><?php echo !$servicePoint['is_active'] ? ' (ปิดใช้งาน)' : ''; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">หากจุดบริการถูกปิดใช้งาน กรุณาเลือกจุดใหม่เพื่อไม่ให้คิวติดขัด</div>
+                        </div>
+
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="is_active" id="edit_is_active">
                             <label class="form-check-label" for="edit_is_active">
@@ -433,7 +615,11 @@ try {
             $('#edit_description').val(queueType.description);
             $('#edit_prefix_char').val(queueType.prefix_char);
             $('#edit_is_active').prop('checked', queueType.is_active == 1);
-            
+            $('#edit_ticket_template').val(queueType.ticket_template || 'standard');
+
+            const defaultServicePointId = queueType.default_service_point_id ? queueType.default_service_point_id : '';
+            $('#edit_default_service_point_id').val(defaultServicePointId);
+
             $('#editQueueTypeModal').modal('show');
         }
         

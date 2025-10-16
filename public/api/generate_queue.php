@@ -39,10 +39,10 @@ try {
     $db->beginTransaction();
     
     // Get queue type info
-    $stmt = $db->prepare("SELECT type_name, prefix_char FROM queue_types WHERE queue_type_id = ? AND is_active = 1");
+    $stmt = $db->prepare("SELECT type_name, prefix_char, ticket_template, default_service_point_id FROM queue_types WHERE queue_type_id = ? AND is_active = 1");
     $stmt->execute([$queueTypeId]);
     $queueType = $stmt->fetch();
-    
+
     if (!$queueType) {
         throw new Exception('ประเภทคิวไม่ถูกต้อง');
     }
@@ -69,15 +69,64 @@ try {
     }
     $queueNumber = $queueType['prefix_char'] . str_pad($nextNo, 3, '0', STR_PAD_LEFT);
     
-    // Get first service point (screening)
-    $stmt = $db->prepare("SELECT service_point_id FROM service_points WHERE position_key = 'SCREENING_01' AND is_active = 1");
-    $stmt->execute();
-    $firstServicePoint = $stmt->fetch();
-    
+    $firstServicePoint = null;
+
+    if (!empty($queueType['default_service_point_id'])) {
+        $stmt = $db->prepare("
+            SELECT service_point_id,
+                   TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+            FROM service_points
+            WHERE service_point_id = ? AND is_active = 1
+        ");
+        $stmt->execute([$queueType['default_service_point_id']]);
+        $firstServicePoint = $stmt->fetch();
+    }
+
+    if (!$firstServicePoint) {
+        $stmt = $db->prepare("
+            SELECT sp.service_point_id,
+                   TRIM(CONCAT(COALESCE(sp.point_label, ''), CASE WHEN sp.point_label IS NOT NULL AND sp.point_label <> '' THEN ' ' ELSE '' END, sp.point_name)) AS display_name
+            FROM service_flows sf
+            JOIN service_points sp ON sf.to_service_point_id = sp.service_point_id
+            WHERE sf.queue_type_id = ?
+              AND sf.from_service_point_id IS NULL
+              AND sp.is_active = 1
+            ORDER BY sf.sequence_order
+            LIMIT 1
+        ");
+        $stmt->execute([$queueTypeId]);
+        $firstServicePoint = $stmt->fetch();
+    }
+
+    if (!$firstServicePoint) {
+        $stmt = $db->prepare("
+            SELECT service_point_id,
+                   TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+            FROM service_points
+            WHERE position_key = 'SCREENING_01' AND is_active = 1
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $firstServicePoint = $stmt->fetch();
+    }
+
+    if (!$firstServicePoint) {
+        $stmt = $db->prepare("
+            SELECT service_point_id,
+                   TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+            FROM service_points
+            WHERE is_active = 1
+            ORDER BY display_order, point_name
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $firstServicePoint = $stmt->fetch();
+    }
+
     if (!$firstServicePoint) {
         throw new Exception('ไม่พบจุดบริการเริ่มต้น');
     }
-    
+
     // Insert/update patient info first
     $stmt = $db->prepare("INSERT INTO patients (id_card_number) VALUES (?) ON DUPLICATE KEY UPDATE id_card_number = id_card_number");
     $stmt->execute([$idCardNumber]);
@@ -126,7 +175,9 @@ try {
             'queue_id' => $queueId,
             'queue_number' => $queueNumber,
             'queue_type_id' => $queueTypeId,
-            'service_point_name' => 'จุดคัดกรอง',
+            'service_point_name' => $firstServicePoint['display_name'] ?? 'จุดบริการ',
+            'ticket_template' => $queueType['ticket_template'] ?? 'standard',
+            'default_service_point_id' => $queueType['default_service_point_id'] ?? null,
             'creation_time' => date('Y-m-d H:i:s'),
             'kiosk_identifier' => $kioskIdentifier,
             'kiosk_name' => $kiosk['kiosk_name'],

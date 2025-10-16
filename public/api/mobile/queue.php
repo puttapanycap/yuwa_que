@@ -614,31 +614,59 @@ function createQueue($input) {
             }
         }
         
-        // Get first service point
-        $stmt = $db->prepare("
-            SELECT sp.service_point_id
-            FROM service_flows sf
-            JOIN service_points sp ON sf.to_service_point_id = sp.service_point_id
-            WHERE sf.queue_type_id = ? AND sf.from_service_point_id IS NULL
-            AND sp.is_active = 1
-            ORDER BY sf.sequence_order
-            LIMIT 1
-        ");
-        $stmt->execute([$queueTypeId]);
-        $firstServicePoint = $stmt->fetch();
-        
+        $firstServicePoint = null;
+
+        if (!empty($queueType['default_service_point_id'])) {
+            $stmt = $db->prepare("
+                SELECT service_point_id,
+                       TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+                FROM service_points
+                WHERE service_point_id = ? AND is_active = 1
+            ");
+            $stmt->execute([$queueType['default_service_point_id']]);
+            $firstServicePoint = $stmt->fetch();
+        }
+
         if (!$firstServicePoint) {
             $stmt = $db->prepare("
-                SELECT service_point_id 
-                FROM service_points 
-                WHERE is_active = 1 
-                ORDER BY display_order 
+                SELECT sp.service_point_id,
+                       TRIM(CONCAT(COALESCE(sp.point_label, ''), CASE WHEN sp.point_label IS NOT NULL AND sp.point_label <> '' THEN ' ' ELSE '' END, sp.point_name)) AS display_name
+                FROM service_flows sf
+                JOIN service_points sp ON sf.to_service_point_id = sp.service_point_id
+                WHERE sf.queue_type_id = ? AND sf.from_service_point_id IS NULL
+                  AND sp.is_active = 1
+                ORDER BY sf.sequence_order
+                LIMIT 1
+            ");
+            $stmt->execute([$queueTypeId]);
+            $firstServicePoint = $stmt->fetch();
+        }
+
+        if (!$firstServicePoint) {
+            $stmt = $db->prepare("
+                SELECT service_point_id,
+                       TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+                FROM service_points
+                WHERE position_key = 'SCREENING_01' AND is_active = 1
                 LIMIT 1
             ");
             $stmt->execute();
             $firstServicePoint = $stmt->fetch();
         }
-        
+
+        if (!$firstServicePoint) {
+            $stmt = $db->prepare("
+                SELECT service_point_id,
+                       TRIM(CONCAT(COALESCE(point_label, ''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name
+                FROM service_points
+                WHERE is_active = 1
+                ORDER BY display_order, point_name
+                LIMIT 1
+            ");
+            $stmt->execute();
+            $firstServicePoint = $stmt->fetch();
+        }
+
         if (!$firstServicePoint) {
             $db->rollBack();
             sendApiError('No active service points available', 'NO_SERVICE_POINTS');

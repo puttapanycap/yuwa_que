@@ -2023,6 +2023,8 @@ CREATE TABLE `queue_types`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
   `icon_class` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
   `prefix_char` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'A',
+  `ticket_template` enum('standard','appointment_list') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'standard',
+  `default_service_point_id` int NULL DEFAULT NULL,
   `is_active` tinyint(1) NULL DEFAULT 1,
   `current_number` int NULL DEFAULT 0,
   `last_reset_date` timestamp NULL DEFAULT NULL,
@@ -2033,16 +2035,18 @@ CREATE TABLE `queue_types`  (
   UNIQUE INDEX `type_name`(`type_name` ASC) USING BTREE,
   INDEX `idx_queue_types_active`(`is_active` ASC) USING BTREE,
   INDEX `idx_queue_types_prefix`(`prefix_char` ASC) USING BTREE,
+  INDEX `idx_queue_types_default_sp`(`default_service_point_id` ASC) USING BTREE,
   INDEX `fk_qt_reset_by`(`last_reset_by` ASC) USING BTREE,
-  CONSTRAINT `fk_qt_reset_by` FOREIGN KEY (`last_reset_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT
+  CONSTRAINT `fk_qt_reset_by` FOREIGN KEY (`last_reset_by`) REFERENCES `staff_users` (`staff_id`) ON DELETE SET NULL ON UPDATE RESTRICT,
+  CONSTRAINT `fk_qt_default_service_point` FOREIGN KEY (`default_service_point_id`) REFERENCES `service_points` (`service_point_id`) ON DELETE SET NULL ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of queue_types
 -- ----------------------------
-INSERT INTO `queue_types` VALUES (1, 'คิวทั่วไป', 'สำหรับผู้ป่วย ไม่มีนัด/ผิดนัด', 'fas fa-clipboard-list', 'A', 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
-INSERT INTO `queue_types` VALUES (2, 'คิวนัดหมาย', 'คิวสำหรับผู้ป่วยที่มีการนัดหมาย', 'fa-solid fa-calendar', 'B', 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
-INSERT INTO `queue_types` VALUES (3, 'คิวเร่งด่วน', 'คิวสำหรับผู้ป่วยเร่งด่วน', 'fas fa-clipboard-list', 'C', 0, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (1, 'คิวทั่วไป', 'สำหรับผู้ป่วย ไม่มีนัด/ผิดนัด', 'fas fa-clipboard-list', 'A', 'standard', NULL, 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (2, 'คิวนัดหมาย', 'คิวสำหรับผู้ป่วยที่มีการนัดหมาย', 'fa-solid fa-calendar', 'B', 'appointment_list', NULL, 1, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
+INSERT INTO `queue_types` VALUES (3, 'คิวเร่งด่วน', 'คิวสำหรับผู้ป่วยเร่งด่วน', 'fas fa-clipboard-list', 'C', 'standard', NULL, 0, 0, '2025-10-01 13:34:05', 1, 'manual', '2025-06-19 16:30:13');
 
 -- ----------------------------
 -- Table structure for queues
