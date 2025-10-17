@@ -1,6 +1,6 @@
 {
-  "short_name": "YQ Display",
-  "name": "Yuwa Queue Display",
+  "short_name": "YQ Staff",
+  "name": "Yuwa Queue Staff",
   "icons": [
     {
       "src": "/assets/logos/android-chrome-192x192.png",
@@ -13,7 +13,7 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "/monitor/display.php",
+  "start_url": "/staff/dashboard.php",
   "background_color": "#ffffff",
   "display": "fullscreen",
   "theme_color": "#ffffff"
