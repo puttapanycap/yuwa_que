@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 
 try {
     $db = getDB();
-    $stmt = $db->prepare("SELECT queue_type_id, type_name, description, icon_class, prefix_char FROM queue_types WHERE is_active = 1 ORDER BY queue_type_id");
+    $stmt = $db->prepare("SELECT queue_type_id, type_name, description, icon_class, prefix_char, ticket_template, default_service_point_id FROM queue_types WHERE is_active = 1 ORDER BY queue_type_id");
     $stmt->execute();
     $serviceTypes = $stmt->fetchAll();
     

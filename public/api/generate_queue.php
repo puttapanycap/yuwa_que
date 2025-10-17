@@ -46,7 +46,24 @@ try {
     if (!$queueType) {
         throw new Exception('ประเภทคิวไม่ถูกต้อง');
     }
-    
+
+    $isAppointmentTemplate = ($queueType['ticket_template'] ?? 'standard') === 'appointment_list';
+    $appointmentSchedule = [];
+    $firstAppointment = null;
+
+    if ($isAppointmentTemplate) {
+        ensureAppointmentTables();
+
+        $today = new DateTime('now', appointment_get_timezone());
+        $appointmentSchedule = fetchAppointmentsForIdCard($idCardNumber, $db, $today);
+
+        if (empty($appointmentSchedule)) {
+            throw new Exception('ไม่พบนัดหมายสำหรับวันนี้');
+        }
+
+        $firstAppointment = $appointmentSchedule[0];
+    }
+
     // Generate queue number with MySQL named lock to prevent race conditions
     $lockKey = sprintf('gen_queue_%s_%s', (int)$queueTypeId, date('Ymd'));
     $stmt = $db->prepare('SELECT GET_LOCK(?, 5)');
@@ -71,6 +88,12 @@ try {
     
     $firstServicePoint = null;
 
+    if ($isAppointmentTemplate && !empty($firstAppointment['service_point_id'])) {
+        $stmt = $db->prepare("SELECT service_point_id, TRIM(CONCAT(COALESCE(point_label,''), CASE WHEN point_label IS NOT NULL AND point_label <> '' THEN ' ' ELSE '' END, point_name)) AS display_name FROM service_points WHERE service_point_id = ? AND is_active = 1");
+        $stmt->execute([$firstAppointment['service_point_id']]);
+        $firstServicePoint = $stmt->fetch();
+    }
+
     if (!empty($queueType['default_service_point_id'])) {
         $stmt = $db->prepare("
             SELECT service_point_id,
@@ -79,7 +102,9 @@ try {
             WHERE service_point_id = ? AND is_active = 1
         ");
         $stmt->execute([$queueType['default_service_point_id']]);
-        $firstServicePoint = $stmt->fetch();
+        if (!$firstServicePoint) {
+            $firstServicePoint = $stmt->fetch();
+        }
     }
 
     if (!$firstServicePoint) {
@@ -137,11 +162,15 @@ try {
     $stmt->execute([$queueNumber, $queueTypeId, $idCardNumber, $firstServicePoint['service_point_id'], $kioskIdentifier]);
 
     $queueId = $db->lastInsertId();
-    
+
+    if ($isAppointmentTemplate && !empty($appointmentSchedule)) {
+        saveQueueAppointments($db, (int) $queueId, $appointmentSchedule);
+    }
+
     // Log queue creation in service flow history
     // Note: staff_id is NULL for kiosk-generated queues
     $stmt = $db->prepare("
-        INSERT INTO service_flow_history 
+        INSERT INTO service_flow_history
         (queue_id, from_service_point_id, to_service_point_id, staff_id, action, notes, timestamp) 
         VALUES (?, NULL, ?, NULL, 'created', 'สร้างคิวจาก Kiosk', NOW())
     ");
@@ -181,6 +210,7 @@ try {
             'creation_time' => date('Y-m-d H:i:s'),
             'kiosk_identifier' => $kioskIdentifier,
             'kiosk_name' => $kiosk['kiosk_name'],
+            'appointments' => $isAppointmentTemplate ? getQueueAppointments($db, (int) $queueId) : [],
         ]
     ]);
     

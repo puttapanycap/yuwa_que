@@ -43,6 +43,10 @@ if (!$hasAccess) {
 try {
     $db = getDB();
     $db->beginTransaction();
+    ensureAppointmentTables();
+    $graceMinutes = getAppointmentReadyGraceMinutes();
+    $activeAppointment = null;
+    $queueRow = null;
 
     switch ($action) {
         case 'call_next':
@@ -53,8 +57,10 @@ try {
                 throw new Exception('มีคิวที่กำลังให้บริการอยู่แล้ว');
             }
             // Get next queue in line with row lock to prevent race conditions
-            $stmt = $db->prepare("\n                SELECT queue_id\n                FROM queues\n                WHERE current_service_point_id = ?\n                AND current_status = 'waiting'\n                ORDER BY priority_level DESC, creation_time ASC\n                LIMIT 1\n                FOR UPDATE\n            ");
-            $stmt->execute([$servicePointId]);
+            $stmt = $db->prepare("\n                SELECT q.queue_id, q.queue_number, q.queue_type_id, q.current_service_point_id, q.current_status, qt.ticket_template\n                FROM queues q\n                JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id\n                WHERE q.current_service_point_id = ?\n                AND q.current_status = 'waiting'\n                AND (\n                    qt.ticket_template <> 'appointment_list'\n                    OR NOT EXISTS (\n                        SELECT 1 FROM appointment_queue_items aqi\n                        WHERE aqi.queue_id = q.queue_id\n                          AND aqi.status = 'pending'\n                    )\n                    OR EXISTS (\n                        SELECT 1 FROM appointment_queue_items aqi\n                        WHERE aqi.queue_id = q.queue_id\n                          AND aqi.status = 'pending'\n                          AND aqi.display_order = (\n                              SELECT MIN(display_order) FROM appointment_queue_items WHERE queue_id = q.queue_id AND status = 'pending'\n                          )\n                          AND (aqi.start_time IS NULL OR aqi.start_time <= DATE_ADD(NOW(), INTERVAL :grace MINUTE))\n                    )\n                )\n                ORDER BY q.priority_level DESC, q.creation_time ASC\n                LIMIT 1\n                FOR UPDATE\n            ");
+            $stmt->bindValue(1, $servicePointId, PDO::PARAM_INT);
+            $stmt->bindValue(':grace', $graceMinutes, PDO::PARAM_INT);
+            $stmt->execute();
             $nextQueue = $stmt->fetch();
 
             if (!$nextQueue) {
@@ -62,6 +68,7 @@ try {
             }
 
             $queueId = $nextQueue['queue_id'];
+            $queueRow = $nextQueue;
             break;
 
         case 'call_specific':
@@ -75,17 +82,20 @@ try {
                 throw new Exception('มีคิวที่กำลังให้บริการอยู่แล้ว');
             }
             // Validate queue belongs to this service point and is waiting
-            $stmt = $db->prepare("SELECT current_status, current_service_point_id FROM queues WHERE queue_id = ? FOR UPDATE");
+            $stmt = $db->prepare("SELECT q.queue_id, q.queue_number, q.queue_type_id, q.current_service_point_id, q.current_status, qt.ticket_template FROM queues q JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id WHERE q.queue_id = ? FOR UPDATE");
             $stmt->execute([$queueId]);
-            $row = $stmt->fetch();
-            if (!$row) {
+            $queueRow = $stmt->fetch();
+            if (!$queueRow) {
                 throw new Exception('ไม่พบคิว');
             }
-            if ((int)$row['current_service_point_id'] !== (int)$servicePointId) {
+            if ((int)$queueRow['current_service_point_id'] !== (int)$servicePointId) {
                 throw new Exception('คิวนี้ไม่ได้อยู่ที่จุดบริการนี้');
             }
-            if ($row['current_status'] !== 'waiting') {
+            if ($queueRow['current_status'] !== 'waiting') {
                 throw new Exception('คิวนี้ไม่พร้อมสำหรับการเรียก');
+            }
+            if (($queueRow['ticket_template'] ?? 'standard') === 'appointment_list' && !isQueueReadyForAppointment($db, (int) $queueId, $graceMinutes)) {
+                throw new Exception('ยังไม่ถึงเวลานัดหมาย');
             }
             break;
 
@@ -94,22 +104,31 @@ try {
                 throw new Exception('Queue ID required');
             }
             // Validate queue belongs to this service point and is currently called/processing
-            $stmt = $db->prepare("SELECT current_status, current_service_point_id FROM queues WHERE queue_id = ? FOR UPDATE");
+            $stmt = $db->prepare("SELECT q.queue_id, q.queue_number, q.queue_type_id, q.current_service_point_id, q.current_status, qt.ticket_template FROM queues q JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id WHERE q.queue_id = ? FOR UPDATE");
             $stmt->execute([$queueId]);
-            $row = $stmt->fetch();
-            if (!$row) {
+            $queueRow = $stmt->fetch();
+            if (!$queueRow) {
                 throw new Exception('ไม่พบคิว');
             }
-            if ((int)$row['current_service_point_id'] !== (int)$servicePointId) {
+            if ((int)$queueRow['current_service_point_id'] !== (int)$servicePointId) {
                 throw new Exception('คิวนี้ไม่ได้อยู่ที่จุดบริการนี้');
             }
-            if (!in_array($row['current_status'], ['called','processing'])) {
+            if (!in_array($queueRow['current_status'], ['called','processing'])) {
                 throw new Exception('สามารถเรียกซ้ำได้เฉพาะคิวที่กำลังให้บริการ');
             }
             break;
 
         default:
             throw new Exception('Invalid action');
+    }
+
+    if (!$queueRow) {
+        $stmt = $db->prepare("SELECT q.queue_id, q.queue_number, q.queue_type_id, q.current_service_point_id, q.current_status, qt.ticket_template FROM queues q JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id WHERE q.queue_id = ? FOR UPDATE");
+        $stmt->execute([$queueId]);
+        $queueRow = $stmt->fetch();
+        if (!$queueRow) {
+            throw new Exception('ไม่พบคิว');
+        }
     }
 
     // Update queue status
@@ -122,6 +141,10 @@ try {
     }
     if ($stmt->rowCount() === 0) {
         throw new Exception('อัปเดตสถานะคิวไม่สำเร็จ อาจมีการเปลี่ยนแปลงแล้ว');
+    }
+
+    if (($queueRow['ticket_template'] ?? 'standard') === 'appointment_list') {
+        $activeAppointment = markAppointmentAsActive($db, (int) $queueId);
     }
 
     // Log the action
@@ -154,7 +177,8 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'เรียกคิวสำเร็จ',
-        'queue_number' => $queue['queue_number']
+        'queue_number' => $queue['queue_number'],
+        'appointment' => $activeAppointment
     ]);
 
 } catch (Exception $e) {
