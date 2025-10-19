@@ -10,6 +10,11 @@ $error_message = '';
 $queue = null;
 $flowHistory = [];
 $allServicePoints = [];
+$appointmentsToday = [];
+$appointmentPatient = null;
+$appointmentPatientLine = '';
+$appointmentError = '';
+$appointmentLookupPerformed = false;
 
 // Validate queue_id parameter
 if (!$queueId) {
@@ -24,7 +29,7 @@ if (!$queueId) {
 
         // Get queue info with better error handling
         $stmt = $db->prepare("
-            SELECT q.*, qt.type_name, sp.point_label as current_service_point_label, sp.point_name as current_service_point_name
+            SELECT q.*, qt.type_name, qt.ticket_template, sp.point_label as current_service_point_label, sp.point_name as current_service_point_name
             FROM queues q
             LEFT JOIN queue_types qt ON q.queue_type_id = qt.queue_type_id
             LEFT JOIN service_points sp ON q.current_service_point_id = sp.service_point_id
@@ -48,6 +53,46 @@ if (!$queueId) {
         if (!$queue) {
             $error_message = 'ไม่พบข้อมูลคิว ID: ' . htmlspecialchars($queueId);
         } else {
+            $ticketTemplate = $queue['ticket_template'] ?? 'standard';
+            if ($ticketTemplate === 'appointment_list') {
+                $appointmentLookupPerformed = true;
+                $idCard = preg_replace('/\D/', '', $queue['patient_id_card_number'] ?? '');
+
+                if ($idCard && strlen($idCard) === 13) {
+                    try {
+                        $appointmentResult = fetchAppointmentsForIdCard($idCard, date('Y-m-d'));
+                        $appointmentsToday = $appointmentResult['appointments'] ?? [];
+                        $appointmentPatient = $appointmentResult['patient'] ?? null;
+
+                        if (!($appointmentResult['ok'] ?? false) && !empty($appointmentResult['error'])) {
+                            $appointmentError = $appointmentResult['error'];
+                        }
+                    } catch (Exception $e) {
+                        $appointmentError = $e->getMessage();
+                    }
+                } else {
+                    $appointmentError = 'ไม่พบเลขบัตรประชาชนของผู้ป่วยสำหรับการดึงข้อมูลนัดหมาย';
+                }
+
+                if (is_array($appointmentPatient)) {
+                    $patientParts = [];
+                    if (!empty($appointmentPatient['display_name'])) {
+                        $patientParts[] = $appointmentPatient['display_name'];
+                    } elseif (!empty($appointmentPatient['fullname_th'])) {
+                        $patientParts[] = $appointmentPatient['fullname_th'];
+                    }
+                    if (!empty($appointmentPatient['hn'])) {
+                        $patientParts[] = 'HN: ' . $appointmentPatient['hn'];
+                    }
+                    if (!empty($appointmentPatient['idcard'])) {
+                        $patientParts[] = 'ID: ' . $appointmentPatient['idcard'];
+                    }
+                    $appointmentPatientLine = implode(' • ', array_filter($patientParts, static function ($value) {
+                        return trim((string) $value) !== '';
+                    }));
+                }
+            }
+
             // คำนวณจำนวนคิวที่รออยู่ก่อนหน้า
             $queuePosition = 0;
             $totalQueuesAhead = 0;
@@ -728,9 +773,75 @@ if ($error_message) {
                 font-size: 1.3rem;
             }
 
-            .queue-info-label {
-                font-size: 0.75rem;
-            }
+        .queue-info-label {
+            font-size: 0.75rem;
+        }
+        }
+
+        .appointment-section {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+            padding: 1.75rem;
+            margin-top: 2rem;
+        }
+
+        .appointment-section .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .appointment-patient {
+            font-size: 0.95rem;
+            color: #495057;
+            margin-bottom: 1rem;
+        }
+
+        .appointment-list {
+            margin: 0;
+            padding: 0;
+        }
+
+        .appointment-entry {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .appointment-entry:last-child {
+            border-bottom: none;
+        }
+
+        .appointment-entry-time {
+            min-width: 90px;
+            font-weight: 600;
+            color: #0d6efd;
+            font-size: 1.05rem;
+        }
+
+        .appointment-entry-body {
+            flex: 1;
+        }
+
+        .appointment-entry-main {
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .appointment-entry-notes {
+            font-size: 0.95rem;
+            color: #495057;
+            margin-top: 0.35rem;
+            white-space: pre-wrap;
+        }
+
+        .appointment-entry-status {
+            font-size: 0.85rem;
+            color: #0d6efd;
+            margin-top: 0.35rem;
         }
     </style>
 </head>
@@ -954,6 +1065,72 @@ if ($error_message) {
                     </div>
                 <?php endif; ?>
             </div>
+
+            <?php if (($queue['ticket_template'] ?? 'standard') === 'appointment_list'): ?>
+                <div class="appointment-section">
+                    <h4 class="section-title">
+                        <i class="fas fa-calendar-check text-primary"></i>
+                        <span>รายการนัดวันนี้</span>
+                    </h4>
+
+                    <?php if ($appointmentPatientLine !== ''): ?>
+                        <div class="appointment-patient">
+                            <?php echo htmlspecialchars($appointmentPatientLine); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($appointmentsToday)): ?>
+                        <div class="appointment-list">
+                            <?php foreach ($appointmentsToday as $appointment): ?>
+                                <?php
+                                $timeText = trim((string) ($appointment['time_range'] ?? $appointment['start_time'] ?? ''));
+                                $detailParts = array_filter([
+                                    trim((string) ($appointment['department'] ?? '')),
+                                    trim((string) ($appointment['doctor'] ?? '')),
+                                    trim((string) ($appointment['cause'] ?? '')),
+                                ], static function ($part) {
+                                    return $part !== '';
+                                });
+                                $detailText = implode(' • ', $detailParts);
+                                $notesText = trim((string) ($appointment['notes'] ?? ''));
+                                $statusText = trim((string) ($appointment['status_label'] ?? ''));
+                                ?>
+                                <div class="appointment-entry">
+                                    <div class="appointment-entry-time">
+                                        <?php echo htmlspecialchars($timeText !== '' ? $timeText : '--:--'); ?>
+                                    </div>
+                                    <div class="appointment-entry-body">
+                                        <?php if ($detailText !== ''): ?>
+                                            <div class="appointment-entry-main">
+                                                <?php echo htmlspecialchars($detailText); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($notesText !== ''): ?>
+                                            <div class="appointment-entry-notes">
+                                                <?php echo nl2br(htmlspecialchars($notesText)); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($statusText !== ''): ?>
+                                            <div class="appointment-entry-status">
+                                                <?php echo htmlspecialchars($statusText); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php elseif ($appointmentError !== ''): ?>
+                        <div class="alert alert-warning d-flex align-items-start">
+                            <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+                            <div><?php echo htmlspecialchars($appointmentError); ?></div>
+                        </div>
+                    <?php elseif ($appointmentLookupPerformed): ?>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>ไม่พบรายการนัดสำหรับวันนี้
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 
             <div class="timeline-container">
                 <!-- Timeline Section -->

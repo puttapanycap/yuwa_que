@@ -168,7 +168,28 @@ try {
         $stmt = $db->prepare('DO RELEASE_LOCK(?)');
         $stmt->execute([$lockKey]);
     } catch (Exception $e) { /* ignore */ }
-    
+
+    $ticketTemplate = $queueType['ticket_template'] ?? 'standard';
+    $appointmentLookup = [
+        'ok' => false,
+        'error' => null,
+        'appointments' => [],
+        'patient' => null,
+    ];
+
+    if ($ticketTemplate === 'appointment_list') {
+        try {
+            $appointmentLookup = fetchAppointmentsForIdCard($idCardNumber, date('Y-m-d'));
+        } catch (Exception $e) {
+            $appointmentLookup = [
+                'ok' => false,
+                'error' => $e->getMessage(),
+                'appointments' => [],
+                'patient' => null,
+            ];
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'queue' => [
@@ -176,11 +197,16 @@ try {
             'queue_number' => $queueNumber,
             'queue_type_id' => $queueTypeId,
             'service_point_name' => $firstServicePoint['display_name'] ?? 'จุดบริการ',
-            'ticket_template' => $queueType['ticket_template'] ?? 'standard',
+            'ticket_template' => $ticketTemplate,
             'default_service_point_id' => $queueType['default_service_point_id'] ?? null,
             'creation_time' => date('Y-m-d H:i:s'),
             'kiosk_identifier' => $kioskIdentifier,
             'kiosk_name' => $kiosk['kiosk_name'],
+            'appointments' => $appointmentLookup['appointments'] ?? [],
+            'appointment_patient' => $appointmentLookup['patient'] ?? null,
+            'appointment_lookup_ok' => $appointmentLookup['ok'] ?? false,
+            'appointment_lookup_message' => $appointmentLookup['error'] ?? null,
+            'appointment_lookup_performed' => $ticketTemplate === 'appointment_list',
         ]
     ]);
     
