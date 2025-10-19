@@ -191,12 +191,128 @@ if ($kioskRegistered) {
             text-align: center;
             margin-top: 2rem;
         }
-        
+
         .queue-number {
             font-size: 4rem;
             font-weight: bold;
             color: #007bff;
             margin: 1rem 0;
+        }
+
+        .appointment-list-wrapper {
+            margin-top: 1.5rem;
+            text-align: left;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .appointment-list-wrapper h4 {
+            font-weight: 600;
+        }
+
+        .appointment-patient-info {
+            font-size: 0.95rem;
+            color: #495057;
+            margin-bottom: 0.75rem;
+        }
+
+        .appointment-item {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .appointment-item:last-child {
+            border-bottom: none;
+        }
+
+        .appointment-time {
+            min-width: 90px;
+            font-weight: 700;
+            color: #0d6efd;
+            font-size: 1.05rem;
+        }
+
+        .appointment-details {
+            flex: 1;
+        }
+
+        .appointment-main {
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .appointment-notes {
+            font-size: 0.95rem;
+            color: #495057;
+            margin-top: 0.25rem;
+            white-space: pre-wrap;
+        }
+
+        .appointment-status {
+            font-size: 0.85rem;
+            color: #0d6efd;
+            margin-top: 0.35rem;
+        }
+
+        .ticket-preview-appointments {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        .ticket-preview-appointments-title {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-preview-appointments-patient {
+            font-size: 0.9rem;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-preview-appointments-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .ticket-preview-appointments-item {
+            border-bottom: 1px solid #e9ecef;
+            padding: 0.5rem 0;
+        }
+
+        .ticket-preview-appointments-item:last-child {
+            border-bottom: none;
+        }
+
+        .ticket-preview-appointment-time {
+            font-weight: 600;
+            color: #0d6efd;
+        }
+
+        .ticket-preview-appointment-detail,
+        .ticket-preview-appointment-note,
+        .ticket-preview-appointment-status {
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .ticket-preview-appointment-note {
+            color: #495057;
+        }
+
+        .ticket-preview-appointment-status {
+            color: #0d6efd;
         }
         
         .qr-code {
@@ -534,7 +650,21 @@ if ($kioskRegistered) {
                         <canvas id="qrcode"></canvas>
                         <p class="mt-2">สแกน QR Code เพื่อตรวจสอบสถานะคิว</p>
                     </div>
-                    
+
+                    <div id="appointmentListWrapper" class="appointment-list-wrapper d-none">
+                        <h4 class="h5 text-primary mb-3" id="appointmentListHeading">
+                            <i class="fas fa-calendar-check me-2"></i>รายการนัดวันนี้
+                        </h4>
+                        <div id="appointmentPatientInfo" class="appointment-patient-info"></div>
+                        <div id="appointmentList"></div>
+                        <div id="appointmentEmptyMessage" class="alert alert-info d-none mt-3 mb-0">
+                            <i class="fas fa-info-circle me-2"></i>ไม่พบรายการนัดสำหรับวันนี้
+                        </div>
+                        <div id="appointmentErrorMessage" class="alert alert-warning d-none mt-3 mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i><span></span>
+                        </div>
+                    </div>
+
                     <div class="mt-4">
                         <button class="btn btn-outline-primary btn-kiosk me-3" onclick="printQueue()">
                             <i class="fas fa-print me-2"></i>พิมพ์บัตรคิว
@@ -759,6 +889,209 @@ if ($kioskRegistered) {
             return escapeHtml(text).replace(/\r?\n/g, '<br>');
         }
 
+        function joinNonEmpty(parts, separator = ' • ') {
+            return parts
+                .map((part) => {
+                    if (part === null || part === undefined) {
+                        return '';
+                    }
+                    return part.toString().trim();
+                })
+                .filter((part) => part !== '')
+                .join(separator);
+        }
+
+        function normaliseTicketPatient(patient) {
+            if (!patient || typeof patient !== 'object') {
+                return null;
+            }
+
+            const displayName = (patient.display_name || patient.fullname_th || patient.fullname || patient.fullname_en || '').toString().trim();
+            const hn = (patient.hn || '').toString().trim();
+            const idcard = (patient.idcard || '').toString().trim();
+
+            if (!displayName && !hn && !idcard) {
+                return null;
+            }
+
+            return {
+                display_name: displayName || idcard,
+                hn,
+                idcard,
+            };
+        }
+
+        function normaliseTicketAppointments(appointments) {
+            if (!Array.isArray(appointments)) {
+                return [];
+            }
+
+            return appointments.map((entry) => {
+                const data = entry && typeof entry === 'object' ? entry : {};
+                const startTime = (data.start_time || '').toString().trim();
+                const endTime = (data.end_time || '').toString().trim();
+                const timeRange = (data.time_range || data.timeRange || '').toString().trim();
+
+                return {
+                    appointment_id: (data.appointment_id || '').toString().trim(),
+                    time_range: timeRange || (startTime && endTime ? `${startTime} - ${endTime}` : startTime),
+                    start_time: startTime,
+                    end_time: endTime,
+                    department: (data.department || '').toString().trim(),
+                    clinic_name: (data.clinic_name || '').toString().trim(),
+                    doctor: (data.doctor || '').toString().trim(),
+                    status_label: (data.status_label || '').toString().trim(),
+                    notes: (data.notes || '').toString().trim(),
+                    cause: (data.cause || '').toString().trim(),
+                };
+            }).filter((item) => item.time_range || item.start_time || item.department || item.doctor || item.cause || item.notes);
+        }
+
+        function buildPreviewAppointmentSection(appointments, patient) {
+            const entries = normaliseTicketAppointments(appointments);
+            if (entries.length === 0) {
+                return '';
+            }
+
+            const patientInfo = normaliseTicketPatient(patient);
+            const patientLine = patientInfo
+                ? joinNonEmpty([
+                    patientInfo.display_name,
+                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
+                ], ' • ')
+                : '';
+
+            const itemsHtml = entries.map((entry) => {
+                const detailsParts = [];
+                if (entry.department) {
+                    detailsParts.push(entry.department);
+                }
+                if (entry.doctor) {
+                    detailsParts.push(entry.doctor);
+                }
+                if (entry.cause) {
+                    detailsParts.push(entry.cause);
+                }
+
+                const detailText = joinNonEmpty(detailsParts, ' • ');
+
+                return [
+                    '<li class="ticket-preview-appointments-item">',
+                    entry.time_range ? `<div class="ticket-preview-appointment-time">${escapeHtml(entry.time_range)}</div>` : '',
+                    detailText ? `<div class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</div>` : '',
+                    entry.notes ? `<div class="ticket-preview-appointment-note">${escapeHtml(entry.notes)}</div>` : '',
+                    entry.status_label ? `<div class="ticket-preview-appointment-status">${escapeHtml(entry.status_label)}</div>` : '',
+                    '</li>'
+                ].join('');
+            }).join('');
+
+            return [
+                '<div class="ticket-preview-appointments">',
+                '<div class="ticket-preview-appointments-title"><i class="fas fa-calendar-check"></i><span>รายการนัดวันนี้</span></div>',
+                patientLine ? `<div class="ticket-preview-appointments-patient">${escapeHtml(patientLine)}</div>` : '',
+                `<ul class="ticket-preview-appointments-list">${itemsHtml}</ul>`,
+                '</div>'
+            ].join('');
+        }
+
+        function renderAppointmentSummary(queue) {
+            const wrapper = $('#appointmentListWrapper');
+            const listContainer = $('#appointmentList');
+            const patientInfoEl = $('#appointmentPatientInfo');
+            const emptyMessage = $('#appointmentEmptyMessage');
+            const errorMessage = $('#appointmentErrorMessage');
+            const errorMessageText = $('#appointmentErrorMessage span');
+
+            listContainer.empty();
+            patientInfoEl.text('');
+            emptyMessage.addClass('d-none');
+            errorMessage.addClass('d-none');
+
+            if (!queue || queue.ticket_template !== 'appointment_list') {
+                wrapper.addClass('d-none');
+                return;
+            }
+
+            const appointments = normaliseTicketAppointments(queue.appointments);
+            const patientInfo = normaliseTicketPatient(queue.appointment_patient);
+            const lookupOk = queue.appointment_lookup_ok === true;
+            const lookupMessage = (queue.appointment_lookup_message || '').toString().trim();
+
+            if (patientInfo) {
+                const line = joinNonEmpty([
+                    patientInfo.display_name,
+                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
+                ], ' • ');
+                if (line) {
+                    patientInfoEl.text(line);
+                }
+            }
+
+            if (!lookupOk && lookupMessage) {
+                errorMessageText.text(lookupMessage);
+                errorMessage.removeClass('d-none');
+            }
+
+            if (appointments.length === 0) {
+                emptyMessage.removeClass('d-none');
+                wrapper.removeClass('d-none');
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            appointments.forEach((appointment) => {
+                const item = document.createElement('div');
+                item.className = 'appointment-item';
+
+                const time = document.createElement('div');
+                time.className = 'appointment-time';
+                time.textContent = appointment.time_range || appointment.start_time || '--:--';
+                item.appendChild(time);
+
+                const details = document.createElement('div');
+                details.className = 'appointment-details';
+
+                const detailParts = [];
+                if (appointment.department) {
+                    detailParts.push(appointment.department);
+                }
+                if (appointment.doctor) {
+                    detailParts.push(appointment.doctor);
+                }
+                if (appointment.cause) {
+                    detailParts.push(appointment.cause);
+                }
+
+                const detailText = joinNonEmpty(detailParts, ' • ');
+                if (detailText) {
+                    const mainLine = document.createElement('div');
+                    mainLine.className = 'appointment-main';
+                    mainLine.textContent = detailText;
+                    details.appendChild(mainLine);
+                }
+
+                if (appointment.notes) {
+                    const notesLine = document.createElement('div');
+                    notesLine.className = 'appointment-notes';
+                    notesLine.textContent = appointment.notes;
+                    details.appendChild(notesLine);
+                }
+
+                if (appointment.status_label) {
+                    const statusLine = document.createElement('div');
+                    statusLine.className = 'appointment-status';
+                    statusLine.textContent = appointment.status_label;
+                    details.appendChild(statusLine);
+                }
+
+                item.appendChild(details);
+                fragment.appendChild(item);
+            });
+
+            listContainer.append(fragment);
+            wrapper.removeClass('d-none');
+        }
+
         function buildTicketPreview(ticket, printCount) {
             const previewId = `ticket-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const qrElementId = `${previewId}-qr`;
@@ -775,6 +1108,7 @@ if ($kioskRegistered) {
             const additionalNote = (ticket.additionalNote || '').toString();
             const footer = (ticket.footer || '').toString();
             const qrData = (ticket.qrData || '').toString().trim();
+            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
 
             const html = [
@@ -786,6 +1120,7 @@ if ($kioskRegistered) {
                 servicePoint ? `<div class="ticket-preview-service-point">${escapeHtml(servicePoint)}</div>` : '',
                 issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
                 waitingText ? `<div class="ticket-preview-waiting">${escapeHtml(waitingText)}</div>` : '',
+                appointmentSection,
                 additionalNote ? `<div class="ticket-preview-note">${formatMultiline(additionalNote)}</div>` : '',
                 `<div class="ticket-preview-qr" id="${qrElementId}">${qrData ? '<div class="ticket-preview-qr-placeholder">&nbsp;</div>' : ''}</div>`,
                 footer ? `<div class="ticket-preview-footer">${formatMultiline(footer)}</div>` : '',
@@ -900,6 +1235,21 @@ if ($kioskRegistered) {
 
             if (typeof currentQueue?.waiting_position === 'number') {
                 ticket.waitingCount = currentQueue.waiting_position;
+            }
+
+            const ticketTemplate = (currentQueue?.ticket_template || 'standard').toString();
+            ticket.ticketTemplate = ticketTemplate;
+
+            if (ticketTemplate === 'appointment_list') {
+                const appointmentEntries = normaliseTicketAppointments(currentQueue?.appointments);
+                if (appointmentEntries.length > 0) {
+                    ticket.appointments = appointmentEntries;
+                }
+
+                const patientInfo = normaliseTicketPatient(currentQueue?.appointment_patient);
+                if (patientInfo) {
+                    ticket.appointmentPatient = patientInfo;
+                }
             }
 
             return ticket;
@@ -1144,7 +1494,7 @@ if ($kioskRegistered) {
             $('#queueDateTime').text(new Date().toLocaleString('th-TH'));
             
             const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-            
+
             if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
                 // ใช้ QRCode library (เช่น https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js)
                 QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
@@ -1159,6 +1509,8 @@ if ($kioskRegistered) {
             } else {
                 fallbackQRCode(qrData);
             }
+
+            renderAppointmentSummary(currentQueue);
         }
 
         // Fallback QR Code using pure JavaScript
@@ -1294,14 +1646,15 @@ if ($kioskRegistered) {
         function resetKiosk() {
             selectedServiceType = null;
             currentQueue = null;
-            
+
             $('#step3').addClass('d-none');
             $('#step1').removeClass('d-none');
-            
+
             $('.service-type-card').removeClass('selected');
             $('#nextBtn').prop('disabled', true);
             $('#idCardNumber').val('');
             $('#generateBtn').prop('disabled', true).html('<i class="fas fa-ticket-alt me-2"></i>รับบัตรคิว');
+            renderAppointmentSummary(null);
         }
 
         // Auto-refresh service types every 30 seconds

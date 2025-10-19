@@ -587,6 +587,333 @@ if (!function_exists('formatKioskTokenForDisplay')) {
     }
 }
 
+if (!function_exists('resolveAppointmentStatusLabel')) {
+    function resolveAppointmentStatusLabel($status)
+    {
+        $statusMap = [
+            '0' => 'ยกเลิก',
+            '1' => 'รอพบแพทย์',
+            '2' => 'สำเร็จ',
+            '3' => 'เลื่อนนัด',
+        ];
+
+        $status = (string) ($status ?? '');
+        if (isset($statusMap[$status])) {
+            return $statusMap[$status];
+        }
+
+        return trim((string) $status) !== '' ? (string) $status : 'ไม่ระบุสถานะ';
+    }
+}
+
+if (!function_exists('normaliseAppointmentDateTime')) {
+    function normaliseAppointmentDateTime(array $appointment, DateTimeZone $timezone, bool $isEnd = false): ?DateTimeImmutable
+    {
+        $key = $isEnd ? 'end_datetime' : 'datetime';
+        $value = isset($appointment[$key]) ? trim((string) $appointment[$key]) : '';
+
+        if ($value !== '') {
+            try {
+                $dateTime = new DateTimeImmutable($value);
+                return $dateTime->setTimezone($timezone);
+            } catch (Exception $e) {
+                // Ignore parsing error and fall back to metadata parsing.
+            }
+        }
+
+        $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+        $dateCandidate = $isEnd
+            ? ($metadata['enddate'] ?? $metadata['nextdate'] ?? null)
+            : ($metadata['nextdate'] ?? $metadata['vstdate'] ?? null);
+        $timeCandidate = $isEnd
+            ? ($metadata['nexttime_end'] ?? $metadata['endtime'] ?? null)
+            : ($metadata['nexttime'] ?? $metadata['entry_time'] ?? null);
+
+        $dateCandidate = is_string($dateCandidate) ? trim($dateCandidate) : '';
+        $timeCandidate = is_string($timeCandidate) ? trim($timeCandidate) : '';
+
+        if ($dateCandidate === '') {
+            return null;
+        }
+
+        if ($timeCandidate === '') {
+            $timeCandidate = '00:00:00';
+        }
+
+        $timeCandidate = substr($timeCandidate, 0, 8);
+
+        try {
+            return new DateTimeImmutable($dateCandidate . ' ' . $timeCandidate, $timezone);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+}
+
+if (!function_exists('normaliseAppointmentRecords')) {
+    function normaliseAppointmentRecords(array $appointments, DateTimeZone $timezone, ?string $targetDate = null): array
+    {
+        $targetDateString = null;
+        if ($targetDate !== null && trim($targetDate) !== '') {
+            try {
+                $target = new DateTimeImmutable($targetDate, $timezone);
+                $targetDateString = $target->format('Y-m-d');
+            } catch (Exception $e) {
+                $targetDateString = null;
+            }
+        }
+
+        $normalised = [];
+
+        foreach ($appointments as $appointment) {
+            if (!is_array($appointment)) {
+                continue;
+            }
+
+            $start = normaliseAppointmentDateTime($appointment, $timezone, false);
+            $end = normaliseAppointmentDateTime($appointment, $timezone, true);
+
+            $appointmentDate = null;
+            if ($start instanceof DateTimeImmutable) {
+                $appointmentDate = $start->format('Y-m-d');
+            } else {
+                $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+                $dateCandidate = isset($metadata['nextdate']) ? trim((string) $metadata['nextdate']) : '';
+                if ($dateCandidate !== '') {
+                    $appointmentDate = $dateCandidate;
+                }
+            }
+
+            if ($targetDateString !== null && $appointmentDate !== null && $appointmentDate !== $targetDateString) {
+                continue;
+            }
+
+            $startTimeDisplay = $start instanceof DateTimeImmutable ? $start->format('H:i') : null;
+            if ($startTimeDisplay === null) {
+                $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+                $nextTime = isset($metadata['nexttime']) ? trim((string) $metadata['nexttime']) : '';
+                if ($nextTime !== '') {
+                    $startTimeDisplay = substr($nextTime, 0, 5);
+                }
+            }
+
+            $endTimeDisplay = $end instanceof DateTimeImmutable ? $end->format('H:i') : null;
+            if ($endTimeDisplay === null) {
+                $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+                $endTime = isset($metadata['nexttime_end']) ? trim((string) $metadata['nexttime_end']) : '';
+                if ($endTime === '') {
+                    $endTime = isset($metadata['endtime']) ? trim((string) $metadata['endtime']) : '';
+                }
+                if ($endTime !== '') {
+                    $endTimeDisplay = substr($endTime, 0, 5);
+                }
+            }
+
+            if ($endTimeDisplay === '00:00') {
+                $endTimeDisplay = null;
+            }
+
+            $timeRange = null;
+            if ($startTimeDisplay !== null && $endTimeDisplay !== null) {
+                $timeRange = $startTimeDisplay . ' - ' . $endTimeDisplay;
+            } elseif ($startTimeDisplay !== null) {
+                $timeRange = $startTimeDisplay;
+            }
+
+            $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+            $department = trim((string) ($appointment['department'] ?? ($metadata['clinic_name'] ?? '')));
+            $clinicName = trim((string) ($metadata['clinic_name'] ?? ''));
+            $doctor = trim((string) ($appointment['doctor'] ?? ($metadata['userlogin'] ?? '')));
+            $notes = trim((string) ($appointment['notes'] ?? ($metadata['note_emphasized'] ?? '')));
+            $cause = trim((string) ($metadata['app_cause'] ?? ''));
+
+            $statusCode = (string) ($appointment['status'] ?? '');
+            $statusLabel = resolveAppointmentStatusLabel($statusCode);
+
+            $sortKey = null;
+            if ($start instanceof DateTimeImmutable) {
+                $sortKey = $start->format('Y-m-d H:i:s');
+            } elseif ($appointmentDate !== null) {
+                $sortKey = $appointmentDate . ' ' . ($startTimeDisplay ?? '00:00:00');
+            }
+
+            $normalised[] = [
+                'appointment_id' => trim((string) ($appointment['appointment_id'] ?? '')),
+                'time_range' => $timeRange,
+                'start_time' => $startTimeDisplay,
+                'end_time' => $endTimeDisplay,
+                'department' => $department !== '' ? $department : ($clinicName !== '' ? $clinicName : null),
+                'clinic_name' => $clinicName !== '' ? $clinicName : null,
+                'doctor' => $doctor,
+                'status' => $statusCode,
+                'status_label' => $statusLabel,
+                'notes' => $notes,
+                'cause' => $cause,
+                'duration_min' => isset($appointment['duration_min']) && is_numeric($appointment['duration_min'])
+                    ? (int) $appointment['duration_min']
+                    : null,
+                'sort_key' => $sortKey,
+            ];
+        }
+
+        usort($normalised, static function ($a, $b) {
+            $aKey = $a['sort_key'] ?? '';
+            $bKey = $b['sort_key'] ?? '';
+            return strcmp($aKey, $bKey);
+        });
+
+        foreach ($normalised as &$entry) {
+            unset($entry['sort_key']);
+        }
+        unset($entry);
+
+        return $normalised;
+    }
+}
+
+if (!function_exists('fetchAppointmentsForIdCard')) {
+    function fetchAppointmentsForIdCard(string $idCard, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $cleanId = preg_replace('/\D/', '', $idCard);
+        $cleanId = $cleanId !== null ? $cleanId : '';
+
+        if (strlen($cleanId) !== 13) {
+            return [
+                'ok' => false,
+                'error' => 'เลขบัตรประชาชนไม่ถูกต้อง',
+                'appointments' => [],
+                'patient' => null,
+                'raw' => null,
+            ];
+        }
+
+        $apiUrl = trim((string) env('APPOINTMENT_API_URL', ''));
+        $apiKey = trim((string) env('APPOINTMENT_API_KEY', ''));
+
+        if ($apiUrl === '' || $apiKey === '') {
+            return [
+                'ok' => false,
+                'error' => 'ระบบยังไม่ได้ตั้งค่า APPOINTMENT_API_URL หรือ APPOINTMENT_API_KEY',
+                'appointments' => [],
+                'patient' => null,
+                'raw' => null,
+            ];
+        }
+
+        $timezone = new DateTimeZone(env('APP_TIMEZONE', 'Asia/Bangkok'));
+        $today = new DateTimeImmutable('now', $timezone);
+
+        $from = $dateFrom !== null && trim($dateFrom) !== '' ? trim($dateFrom) : $today->format('Y-m-d');
+        $to = $dateTo !== null && trim($dateTo) !== '' ? trim($dateTo) : $from;
+
+        $payload = [
+            'idcard' => $cleanId,
+            'date_from' => $from,
+            'date_to' => $to,
+        ];
+
+        $ch = curl_init($apiUrl);
+        if ($ch === false) {
+            return [
+                'ok' => false,
+                'error' => 'ไม่สามารถเริ่มการเชื่อมต่อ cURL ได้',
+                'appointments' => [],
+                'patient' => null,
+                'raw' => null,
+            ];
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'X-API-Key: ' . $apiKey,
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+
+        $responseBody = curl_exec($ch);
+        $curlErrorNumber = curl_errno($ch);
+        $curlErrorMessage = curl_error($ch);
+        $httpCode = (int) (curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 0);
+        curl_close($ch);
+
+        if ($responseBody === false) {
+            $message = $curlErrorMessage !== '' ? $curlErrorMessage : 'ไม่สามารถเชื่อมต่อ API ได้';
+            return [
+                'ok' => false,
+                'error' => $message . ($curlErrorNumber ? " (รหัส: {$curlErrorNumber})" : ''),
+                'appointments' => [],
+                'patient' => null,
+                'raw' => null,
+            ];
+        }
+
+        $decoded = json_decode($responseBody, true);
+        if (!is_array($decoded)) {
+            return [
+                'ok' => false,
+                'error' => 'รูปแบบข้อมูลจาก API ไม่ถูกต้อง',
+                'appointments' => [],
+                'patient' => null,
+                'raw' => null,
+            ];
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $apiMessage = isset($decoded['message']) ? trim((string) $decoded['message']) : '';
+            if ($apiMessage === '') {
+                $apiMessage = 'API ตอบกลับสถานะ ' . $httpCode;
+            }
+
+            return [
+                'ok' => false,
+                'error' => $apiMessage,
+                'appointments' => [],
+                'patient' => null,
+                'raw' => $decoded,
+            ];
+        }
+
+        $success = (bool) ($decoded['ok'] ?? false);
+        $error = null;
+        if (!$success) {
+            $error = isset($decoded['message']) ? trim((string) $decoded['message']) : 'ไม่พบข้อมูลนัดหมาย';
+        }
+
+        $rawAppointments = isset($decoded['appointments']) && is_array($decoded['appointments']) ? $decoded['appointments'] : [];
+        $normalisedAppointments = normaliseAppointmentRecords($rawAppointments, $timezone, $from);
+
+        $patient = isset($decoded['patient']) && is_array($decoded['patient']) ? $decoded['patient'] : [];
+        $patientData = null;
+        if (!empty($patient)) {
+            $fullNameTh = isset($patient['fullname_th']) ? trim((string) $patient['fullname_th']) : '';
+            $fullNameEn = isset($patient['fullname_en']) ? trim((string) $patient['fullname_en']) : '';
+            $displayName = $fullNameTh !== '' ? $fullNameTh : $fullNameEn;
+
+            $patientData = [
+                'hn' => isset($patient['hn']) ? trim((string) $patient['hn']) : '',
+                'idcard' => isset($patient['idcard']) ? trim((string) $patient['idcard']) : $cleanId,
+                'fullname_th' => $fullNameTh,
+                'fullname_en' => $fullNameEn,
+                'birthday' => isset($patient['birthday']) ? trim((string) $patient['birthday']) : '',
+                'display_name' => $displayName,
+            ];
+        }
+
+        return [
+            'ok' => $success,
+            'error' => $error,
+            'appointments' => $normalisedAppointments,
+            'patient' => $patientData,
+            'raw' => $decoded,
+        ];
+    }
+}
+
 
 // Performance monitoring
 if (env('PERFORMANCE_MONITORING', false)) {
