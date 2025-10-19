@@ -191,6 +191,61 @@ if ($kioskRegistered) {
             text-align: center;
             margin-top: 2rem;
         }
+
+        #appointmentList {
+            text-align: left;
+        }
+
+        #appointmentList h5 {
+            font-weight: 600;
+        }
+
+        #appointmentList .appointment-item {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            border: 1px solid rgba(13, 110, 253, 0.1);
+            position: relative;
+        }
+
+        #appointmentList .appointment-item h6 {
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        #appointmentList .appointment-meta {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        #appointmentList .appointment-date {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        #appointmentList .appointment-time {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #0d6efd;
+        }
+
+        #appointmentList .appointment-location {
+            font-size: 0.95rem;
+            color: #495057;
+        }
+
+        #appointmentList .appointment-item.active {
+            border-color: rgba(13, 110, 253, 0.35);
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.12);
+        }
+
+        #appointmentList .appointment-item .appointment-status {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+        }
         
         .queue-number {
             font-size: 4rem;
@@ -302,6 +357,57 @@ if ($kioskRegistered) {
             color: #6c757d;
             text-align: center;
             word-break: break-word;
+        }
+
+        .ticket-preview-appointment-summary {
+            margin-top: 0.75rem;
+            font-size: 0.95rem;
+            color: #0d6efd;
+            font-weight: 600;
+        }
+
+        .ticket-preview-appointments {
+            margin-top: 0.75rem;
+            text-align: left;
+        }
+
+        .ticket-preview-appointments-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.35rem;
+        }
+
+        .ticket-preview-appointments-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .ticket-preview-appointments-item {
+            padding: 0.45rem 0;
+            border-top: 1px dashed rgba(173, 181, 189, 0.6);
+        }
+
+        .ticket-preview-appointments-item:first-child {
+            border-top: none;
+        }
+
+        .ticket-preview-appointment-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .ticket-preview-appointment-meta {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .ticket-preview-appointment-desc {
+            font-size: 0.85rem;
+            color: #495057;
+            margin-top: 0.25rem;
         }
 
         .ticket-preview-print-count {
@@ -534,7 +640,9 @@ if ($kioskRegistered) {
                         <canvas id="qrcode"></canvas>
                         <p class="mt-2">สแกน QR Code เพื่อตรวจสอบสถานะคิว</p>
                     </div>
-                    
+
+                    <div class="mt-4 d-none" id="appointmentList"></div>
+
                     <div class="mt-4">
                         <button class="btn btn-outline-primary btn-kiosk me-3" onclick="printQueue()">
                             <i class="fas fa-print me-2"></i>พิมพ์บัตรคิว
@@ -759,6 +867,157 @@ if ($kioskRegistered) {
             return escapeHtml(text).replace(/\r?\n/g, '<br>');
         }
 
+        function isAppointmentQueue() {
+            const template = (currentQueue && currentQueue.ticket_template) || (selectedServiceType && selectedServiceType.ticket_template);
+            return template === 'appointment_list';
+        }
+
+        function getCurrentAppointments() {
+            if (!currentQueue || !Array.isArray(currentQueue.appointments)) {
+                return [];
+            }
+            return currentQueue.appointments;
+        }
+
+        function getPrimaryAppointment() {
+            const appointments = getCurrentAppointments();
+            return appointments.length > 0 ? appointments[0] : null;
+        }
+
+        function parseAppointmentDate(value) {
+            if (!value) {
+                return null;
+            }
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatAppointmentWindow(appointment) {
+            if (!appointment) {
+                return '';
+            }
+            const rawWindow = (appointment.time_window || '').toString().trim();
+            if (rawWindow) {
+                return rawWindow;
+            }
+
+            const start = parseAppointmentDate(appointment.start_time_iso || appointment.start_time);
+            const end = parseAppointmentDate(appointment.end_time_iso || appointment.end_time);
+            const timeOptions = { hour: '2-digit', minute: '2-digit' };
+
+            if (start && end) {
+                return `${start.toLocaleTimeString('th-TH', timeOptions)} - ${end.toLocaleTimeString('th-TH', timeOptions)}`;
+            }
+
+            if (start) {
+                return start.toLocaleTimeString('th-TH', timeOptions);
+            }
+
+            if (end) {
+                return end.toLocaleTimeString('th-TH', timeOptions);
+            }
+
+            return '';
+        }
+
+        function formatAppointmentDateLabel(appointment, includeYear = false) {
+            if (!appointment) {
+                return '';
+            }
+
+            const date = parseAppointmentDate(appointment.start_time_iso || appointment.start_time);
+            if (!date) {
+                return '';
+            }
+
+            const options = {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+            };
+
+            if (includeYear) {
+                options.year = 'numeric';
+            }
+
+            return date.toLocaleDateString('th-TH', options);
+        }
+
+        function buildAppointmentSummary(appointment) {
+            if (!appointment) {
+                return '';
+            }
+
+            const dateLabel = formatAppointmentDateLabel(appointment, true);
+            const windowLabel = formatAppointmentWindow(appointment);
+
+            if (dateLabel && windowLabel) {
+                return `${dateLabel} เวลา ${windowLabel}`;
+            }
+
+            return dateLabel || windowLabel || '';
+        }
+
+        function buildAppointmentListEntry(appointment, index) {
+            return {
+                title: appointment?.title || `รายการนัดหมายที่ ${index + 1}`,
+                timeWindow: formatAppointmentWindow(appointment),
+                dateLabel: formatAppointmentDateLabel(appointment, true),
+                servicePoint: appointment?.service_point_name || '',
+                description: appointment?.description || ''
+            };
+        }
+
+        function renderAppointmentSchedule(queue) {
+            const container = $('#appointmentList');
+
+            if (!isAppointmentQueue()) {
+                container.addClass('d-none').empty();
+                return;
+            }
+
+            const appointments = getCurrentAppointments();
+            if (!Array.isArray(appointments) || appointments.length === 0) {
+                container.addClass('d-none').empty();
+                return;
+            }
+
+            const itemsHtml = appointments.map((appointment, index) => {
+                const title = escapeHtml(appointment.title || `รายการที่ ${index + 1}`);
+                const dateLabel = formatAppointmentDateLabel(appointment, false);
+                const timeWindow = formatAppointmentWindow(appointment);
+                const location = appointment.service_point_name || queue?.service_point_name || '';
+                const description = appointment.description ? `<div class="appointment-meta">${formatMultiline(appointment.description)}</div>` : '';
+                const statusBadge = appointment.status === 'active'
+                    ? '<span class="badge bg-success appointment-status">กำลังให้บริการ</span>'
+                    : '';
+                const dateHtml = dateLabel ? `<div class="appointment-date">${escapeHtml(dateLabel)}</div>` : '';
+                const timeHtml = timeWindow ? `<div class="appointment-time">${escapeHtml(timeWindow)}</div>` : '';
+                const locationHtml = location ? `<div class="appointment-location"><i class="fas fa-location-dot me-2"></i>${escapeHtml(location)}</div>` : '';
+
+                const itemClasses = ['appointment-item'];
+                if (appointment.status === 'active') {
+                    itemClasses.push('active');
+                }
+
+                return [
+                    `<div class="${itemClasses.join(' ')}">`,
+                    statusBadge,
+                    `<h6>${title}</h6>`,
+                    dateHtml,
+                    timeHtml,
+                    locationHtml,
+                    description,
+                    '</div>'
+                ].join('');
+            }).join('');
+
+            container.html([
+                '<h5><i class="fas fa-calendar-check me-2"></i>รายการนัดหมายวันนี้</h5>',
+                itemsHtml
+            ].join('')).removeClass('d-none');
+        }
+
         function buildTicketPreview(ticket, printCount) {
             const previewId = `ticket-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const qrElementId = `${previewId}-qr`;
@@ -776,6 +1035,36 @@ if ($kioskRegistered) {
             const footer = (ticket.footer || '').toString();
             const qrData = (ticket.qrData || '').toString().trim();
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
+            const appointmentSummary = (ticket.appointmentSummary || '').toString().trim();
+            const appointmentList = Array.isArray(ticket.appointmentList) ? ticket.appointmentList : [];
+
+            const appointmentHtml = appointmentList.length > 0
+                ? `<div class="ticket-preview-appointments">`
+                    + '<div class="ticket-preview-appointments-title">รายการนัดหมาย</div>'
+                    + '<ul class="ticket-preview-appointments-list">'
+                    + appointmentList.map((item) => {
+                        const titleText = escapeHtml((item.title || '').toString());
+                        const metaParts = [];
+                        if (item.dateLabel) {
+                            metaParts.push(escapeHtml(item.dateLabel.toString()));
+                        }
+                        if (item.timeWindow) {
+                            metaParts.push(escapeHtml(`เวลา ${item.timeWindow}`));
+                        }
+                        if (item.servicePoint) {
+                            metaParts.push(escapeHtml(item.servicePoint.toString()));
+                        }
+                        const metaHtml = metaParts.length > 0
+                            ? `<div class="ticket-preview-appointment-meta">${metaParts.join(' • ')}</div>`
+                            : '';
+                        const descriptionHtml = item.description
+                            ? `<div class="ticket-preview-appointment-desc">${formatMultiline(item.description)}</div>`
+                            : '';
+                        return `<li class="ticket-preview-appointments-item"><div class="ticket-preview-appointment-title">${titleText}</div>${metaHtml}${descriptionHtml}</li>`;
+                    }).join('')
+                    + '</ul>'
+                    + '</div>'
+                : '';
 
             const html = [
                 `<div class="ticket-preview" id="${previewId}">`,
@@ -786,6 +1075,8 @@ if ($kioskRegistered) {
                 servicePoint ? `<div class="ticket-preview-service-point">${escapeHtml(servicePoint)}</div>` : '',
                 issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
                 waitingText ? `<div class="ticket-preview-waiting">${escapeHtml(waitingText)}</div>` : '',
+                appointmentSummary ? `<div class="ticket-preview-appointment-summary">${escapeHtml(appointmentSummary)}</div>` : '',
+                appointmentHtml,
                 additionalNote ? `<div class="ticket-preview-note">${formatMultiline(additionalNote)}</div>` : '',
                 `<div class="ticket-preview-qr" id="${qrElementId}">${qrData ? '<div class="ticket-preview-qr-placeholder">&nbsp;</div>' : ''}</div>`,
                 footer ? `<div class="ticket-preview-footer">${formatMultiline(footer)}</div>` : '',
@@ -889,7 +1180,7 @@ if ($kioskRegistered) {
             const ticket = {
                 label: 'บัตรคิว',
                 hospitalName,
-                serviceType: selectedServiceType?.name || '',
+                serviceType: selectedServiceType?.type_name || '',
                 queueNumber: currentQueue?.queue_number || '',
                 servicePoint: currentQueue?.service_point_name || '',
                 issuedAt: getTicketDateTime(),
@@ -900,6 +1191,20 @@ if ($kioskRegistered) {
 
             if (typeof currentQueue?.waiting_position === 'number') {
                 ticket.waitingCount = currentQueue.waiting_position;
+            }
+
+            if (isAppointmentQueue()) {
+                const appointments = getCurrentAppointments();
+                if (appointments.length > 0) {
+                    const primary = appointments[0];
+                    ticket.label = 'ใบนัดหมาย';
+                    ticket.servicePoint = primary?.service_point_name || ticket.servicePoint;
+                    const summary = buildAppointmentSummary(primary);
+                    if (summary) {
+                        ticket.appointmentSummary = summary;
+                    }
+                    ticket.appointmentList = appointments.map((appointment, index) => buildAppointmentListEntry(appointment, index));
+                }
             }
 
             return ticket;
@@ -1024,36 +1329,40 @@ if ($kioskRegistered) {
             $.get('api/get_service_types.php', function(data) {
                 const container = $('#serviceTypes');
                 container.empty();
-                
+
                 data.forEach(function(type) {
-                    const card = `
-                        <div class="col-md-12 mb-3">
-                            <div class="service-type-card" onclick="selectServiceType(${type.queue_type_id}, '${type.type_name}')">
-                                <div class="text-center">
-                                    <i class="${type.icon_class} fa-3x text-primary mb-3"></i>
-                                    <h5>${type.type_name}</h5>
-                                    <p class="text-muted">${type.description}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    container.append(card);
+                    const col = $('<div>').addClass('col-md-12 mb-3');
+                    const card = $('<div>').addClass('service-type-card');
+                    const inner = $('<div>').addClass('text-center');
+
+                    const icon = $('<i>').addClass(`${type.icon_class || ''} fa-3x text-primary mb-3`.trim());
+                    inner.append(icon);
+                    inner.append($('<h5>').text(type.type_name || ''));
+                    inner.append($('<p>').addClass('text-muted').text(type.description || ''));
+
+                    card.append(inner);
+                    card.data('queueType', type);
+                    card.on('click', function() {
+                        selectServiceType($(this).data('queueType'), this);
+                    });
+
+                    col.append(card);
+                    container.append(col);
                 });
             }).fail(function() {
                 alert('ไม่สามารถโหลดข้อมูลประเภทคิวได้');
             });
         }
 
-        function selectServiceType(typeId, typeName) {
+        function selectServiceType(queueType, element) {
             $('.service-type-card').removeClass('selected');
-            event.currentTarget.classList.add('selected');
-            
-            selectedServiceType = {
-                id: typeId,
-                name: typeName
-            };
-            
-            $('#nextBtn').prop('disabled', false);
+            if (element) {
+                $(element).addClass('selected');
+            }
+
+            selectedServiceType = queueType || null;
+
+            $('#nextBtn').prop('disabled', !selectedServiceType);
         }
 
         function setupIdCardInput() {
@@ -1119,7 +1428,7 @@ if ($kioskRegistered) {
             $('#generateBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังสร้างคิว...');
 
             $.post('api/generate_queue.php', {
-                queue_type_id: selectedServiceType.id,
+                queue_type_id: selectedServiceType.queue_type_id,
                 id_card_number: idCard
             }, function(response) {
                 if (response.success) {
@@ -1138,13 +1447,23 @@ if ($kioskRegistered) {
         function showQueueResult() {
             $('#step2').addClass('d-none');
             $('#step3').removeClass('d-none');
-            
-            $('#queueNumber').text(currentQueue.queue_number);
-            $('#serviceTypeName').text(selectedServiceType.name);
-            $('#queueDateTime').text(new Date().toLocaleString('th-TH'));
-            
+
+            $('#queueNumber').text(currentQueue?.queue_number || '');
+            $('#serviceTypeName').text(selectedServiceType?.type_name || '');
+
+            if (isAppointmentQueue()) {
+                const primaryAppointment = getPrimaryAppointment();
+                const summary = primaryAppointment ? buildAppointmentSummary(primaryAppointment) : '';
+                const headline = summary ? `เวลานัดหมาย: ${summary}` : 'รายการนัดหมายสำหรับวันนี้';
+                $('#queueDateTime').text(headline);
+            } else {
+                $('#queueDateTime').text(getTicketDateTime());
+            }
+
+            renderAppointmentSchedule(currentQueue);
+
             const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
-            
+
             if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
                 // ใช้ QRCode library (เช่น https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js)
                 QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
@@ -1164,7 +1483,13 @@ if ($kioskRegistered) {
         // Fallback QR Code using pure JavaScript
         function fallbackQRCode(qrData) {
             const canvas = document.getElementById('qrcode');
-            const ctx = canvas.element.getContext('2d');
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return;
+            }
             
             // Set canvas size
             canvas.width = 200;
@@ -1294,10 +1619,11 @@ if ($kioskRegistered) {
         function resetKiosk() {
             selectedServiceType = null;
             currentQueue = null;
-            
+
             $('#step3').addClass('d-none');
             $('#step1').removeClass('d-none');
-            
+            $('#appointmentList').addClass('d-none').empty();
+
             $('.service-type-card').removeClass('selected');
             $('#nextBtn').prop('disabled', true);
             $('#idCardNumber').val('');
