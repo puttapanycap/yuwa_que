@@ -75,21 +75,10 @@ if (!$queueId) {
                 }
 
                 if (is_array($appointmentPatient)) {
-                    $patientParts = [];
-                    if (!empty($appointmentPatient['display_name'])) {
-                        $patientParts[] = $appointmentPatient['display_name'];
-                    } elseif (!empty($appointmentPatient['fullname_th'])) {
-                        $patientParts[] = $appointmentPatient['fullname_th'];
+                    $hnText = trim((string) ($appointmentPatient['hn'] ?? ''));
+                    if ($hnText !== '') {
+                        $appointmentPatientLine = 'HN: ' . $hnText;
                     }
-                    if (!empty($appointmentPatient['hn'])) {
-                        $patientParts[] = 'HN: ' . $appointmentPatient['hn'];
-                    }
-                    if (!empty($appointmentPatient['idcard'])) {
-                        $patientParts[] = 'ID: ' . $appointmentPatient['idcard'];
-                    }
-                    $appointmentPatientLine = implode(' • ', array_filter($patientParts, static function ($value) {
-                        return trim((string) $value) !== '';
-                    }));
                 }
             }
 
@@ -1084,16 +1073,25 @@ if ($error_message) {
                             <?php foreach ($appointmentsToday as $appointment): ?>
                                 <?php
                                 $timeText = trim((string) ($appointment['time_range'] ?? $appointment['start_time'] ?? ''));
-                                $detailParts = array_filter([
-                                    trim((string) ($appointment['department'] ?? '')),
-                                    trim((string) ($appointment['doctor'] ?? '')),
-                                    trim((string) ($appointment['cause'] ?? '')),
-                                ], static function ($part) {
+                                $patientHn = trim((string) ($appointmentPatient['hn'] ?? ''));
+                                $entryHn = trim((string) ($appointment['hn'] ?? ''));
+                                if ($entryHn === '' && $patientHn !== '') {
+                                    $entryHn = $patientHn;
+                                }
+                                $causeText = trim((string) ($appointment['cause'] ?? ''));
+                                if ($causeText === '') {
+                                    $causeText = trim((string) ($appointment['clinic_name'] ?? ($appointment['department'] ?? '')));
+                                }
+                                $detailParts = [];
+                                if ($entryHn !== '') {
+                                    $detailParts[] = 'HN ' . $entryHn;
+                                }
+                                if ($causeText !== '') {
+                                    $detailParts[] = $causeText;
+                                }
+                                $detailText = implode(' • ', array_filter($detailParts, static function ($part) {
                                     return $part !== '';
-                                });
-                                $detailText = implode(' • ', $detailParts);
-                                $notesText = trim((string) ($appointment['notes'] ?? ''));
-                                $statusText = trim((string) ($appointment['status_label'] ?? ''));
+                                }));
                                 ?>
                                 <div class="appointment-entry">
                                     <div class="appointment-entry-time">
@@ -1103,16 +1101,6 @@ if ($error_message) {
                                         <?php if ($detailText !== ''): ?>
                                             <div class="appointment-entry-main">
                                                 <?php echo htmlspecialchars($detailText); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <?php if ($notesText !== ''): ?>
-                                            <div class="appointment-entry-notes">
-                                                <?php echo nl2br(htmlspecialchars($notesText)); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <?php if ($statusText !== ''): ?>
-                                            <div class="appointment-entry-status">
-                                                <?php echo htmlspecialchars($statusText); ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>

@@ -162,19 +162,21 @@ function normaliseTicketAppointmentsForPrinter($appointments): array
         $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
         $cause = trim((string) ($appointment['cause'] ?? ($metadata['app_cause'] ?? '')));
         $clinic = trim((string) ($appointment['clinic_name'] ?? ($metadata['clinic_name'] ?? '')));
+        $hn = trim((string) ($appointment['hn'] ?? ($appointment['patient_hn'] ?? ($metadata['hn'] ?? ($metadata['HN'] ?? '')))));
         if ($clinic === '') {
             $clinic = trim((string) ($appointment['department'] ?? ''));
         }
 
         $detail = $cause !== '' ? $cause : $clinic;
 
-        if ($timeRange === '' && $detail === '') {
+        if ($timeRange === '' && $detail === '' && $hn === '') {
             continue;
         }
 
         $normalised[] = [
             'time' => $timeRange,
             'detail' => $detail,
+            'hn' => $hn,
             'notes' => '',
             'status' => '',
         ];
@@ -428,14 +430,33 @@ function buildTicketImageResource(array $ticket, array $options)
         foreach ($appointmentEntries as $entry) {
             $time = isset($entry['time']) ? trim((string) $entry['time']) : '';
             $detail = isset($entry['detail']) ? trim((string) $entry['detail']) : '';
+            $hn = isset($entry['hn']) ? trim((string) $entry['hn']) : '';
 
-            if ($time === '' && $detail === '') {
+            $detailSegments = [];
+            if ($hn !== '') {
+                $detailSegments[] = 'HN ' . $hn;
+            }
+            if ($detail !== '') {
+                $detailSegments[] = $detail;
+            }
+
+            $detailLine = implode(' ', array_filter($detailSegments, static function ($segment) {
+                return $segment !== '';
+            }));
+
+            $lineParts = [];
+            if ($time !== '') {
+                $lineParts[] = $time;
+            }
+            if ($detailLine !== '') {
+                $lineParts[] = $detailLine;
+            }
+
+            if (empty($lineParts)) {
                 continue;
             }
 
-            $line = $time !== '' && $detail !== ''
-                ? $time . ' ' . $detail
-                : ($time !== '' ? $time : $detail);
+            $line = implode(' ', $lineParts);
 
             $y = drawCenteredTextBlock($canvas, [$line], $fontRegular, 22, $black, $y, 10, 16);
             $maxY = max($maxY, $y);

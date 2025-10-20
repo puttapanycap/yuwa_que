@@ -911,22 +911,38 @@ if ($kioskRegistered) {
                 .join(separator);
         }
 
-        function normaliseTicketAppointments(appointments) {
+        function toTrimmedString(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+
+            try {
+                return value.toString().trim();
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function normaliseTicketAppointments(appointments, patient = null) {
             if (!Array.isArray(appointments)) {
                 return [];
             }
+
+            const patientData = patient && typeof patient === 'object' ? patient : {};
+            const patientHn = toTrimmedString(patientData.hn || patientData.HN || patientData.patient_hn);
 
             return appointments.map((entry) => {
                 const data = entry && typeof entry === 'object' ? entry : {};
                 const metadata = data && typeof data.metadata === 'object' && data.metadata !== null
                     ? data.metadata
                     : {};
-                const startTime = (data.start_time || '').toString().trim();
-                const endTime = (data.end_time || '').toString().trim();
-                const timeRange = (data.time_range || data.timeRange || '').toString().trim();
-                const clinicName = (data.clinic_name || metadata.clinic_name || '').toString().trim();
-                const department = (data.department || '').toString().trim();
-                const cause = (data.cause || metadata.app_cause || '').toString().trim();
+                const startTime = toTrimmedString(data.start_time);
+                const endTime = toTrimmedString(data.end_time);
+                const timeRange = toTrimmedString(data.time_range || data.timeRange);
+                const clinicName = toTrimmedString(data.clinic_name || metadata.clinic_name);
+                const department = toTrimmedString(data.department);
+                const cause = toTrimmedString(data.cause || metadata.app_cause);
+                const hn = toTrimmedString(data.hn || metadata.hn || metadata.HN || data.patient_hn || patientHn);
 
                 return {
                     appointment_id: (data.appointment_id || '').toString().trim(),
@@ -939,8 +955,9 @@ if ($kioskRegistered) {
                     status_label: (data.status_label || '').toString().trim(),
                     notes: (data.notes || '').toString().trim(),
                     cause,
+                    hn,
                 };
-            }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes);
+            }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes || item.hn);
         }
 
         function buildPreviewAppointmentSection(appointments) {
@@ -951,9 +968,14 @@ if ($kioskRegistered) {
 
             const itemsHtml = entries.map((entry) => {
                 const detailText = (entry.cause || entry.clinic_name || entry.department || '').toString().trim();
+                const hnText = (entry.hn || '').toString().trim();
+                const combinedDetail = joinNonEmpty([
+                    hnText ? `HN ${hnText}` : '',
+                    detailText,
+                ]);
                 const timeText = (entry.time_range || entry.start_time || '').toString().trim();
 
-                if (!timeText && !detailText) {
+                if (!timeText && !combinedDetail) {
                     return '';
                 }
 
@@ -961,8 +983,8 @@ if ($kioskRegistered) {
                 if (timeText) {
                     lineParts.push(`<span class="ticket-preview-appointment-time">${escapeHtml(timeText)}</span>`);
                 }
-                if (detailText) {
-                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</span>`);
+                if (combinedDetail) {
+                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(combinedDetail)}</span>`);
                 }
 
                 return [
@@ -998,7 +1020,13 @@ if ($kioskRegistered) {
                 return;
             }
 
-            const appointments = normaliseTicketAppointments(queue.appointments);
+            const patient = queue && typeof queue.appointment_patient === 'object' ? queue.appointment_patient : null;
+            const patientHn = toTrimmedString(patient?.hn || patient?.HN || patient?.patient_hn);
+            if (patientHn) {
+                patientInfoEl.text(`HN: ${patientHn}`);
+            }
+
+            const appointments = normaliseTicketAppointments(queue.appointments, patient);
             const lookupOk = queue.appointment_lookup_ok === true;
             const lookupMessage = (queue.appointment_lookup_message || '').toString().trim();
 
@@ -1026,11 +1054,18 @@ if ($kioskRegistered) {
                 const details = document.createElement('div');
                 details.className = 'appointment-details';
 
+                const appointmentHn = toTrimmedString(appointment.hn);
+                const hnText = appointmentHn !== '' ? appointmentHn : patientHn;
                 const detailText = (appointment.cause || appointment.clinic_name || appointment.department || '').toString().trim();
-                if (detailText) {
+                const detailLine = joinNonEmpty([
+                    hnText ? `HN ${hnText}` : '',
+                    detailText,
+                ]);
+
+                if (detailLine) {
                     const mainLine = document.createElement('div');
                     mainLine.className = 'appointment-main';
-                    mainLine.textContent = detailText;
+                    mainLine.textContent = detailLine;
                     details.appendChild(mainLine);
                 }
 
@@ -1191,7 +1226,10 @@ if ($kioskRegistered) {
             ticket.ticketTemplate = ticketTemplate;
 
             if (ticketTemplate === 'appointment_list') {
-                const appointmentEntries = normaliseTicketAppointments(currentQueue?.appointments);
+                const appointmentEntries = normaliseTicketAppointments(
+                    currentQueue?.appointments,
+                    currentQueue?.appointment_patient
+                );
                 if (appointmentEntries.length > 0) {
                     ticket.appointments = appointmentEntries;
                 }
