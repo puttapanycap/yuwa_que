@@ -300,7 +300,10 @@ if ($kioskRegistered) {
             color: #0d6efd;
         }
 
-        .ticket-preview-appointment-detail,
+        .ticket-preview-appointment-detail {
+            font-size: 0.9rem;
+        }
+
         .ticket-preview-appointment-note,
         .ticket-preview-appointment-status {
             font-size: 0.9rem;
@@ -314,7 +317,14 @@ if ($kioskRegistered) {
         .ticket-preview-appointment-status {
             color: #0d6efd;
         }
-        
+
+        .ticket-preview-appointment-line {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
         .qr-code {
             margin: 1rem 0;
         }
@@ -908,21 +918,27 @@ if ($kioskRegistered) {
 
             return appointments.map((entry) => {
                 const data = entry && typeof entry === 'object' ? entry : {};
+                const metadata = data && typeof data.metadata === 'object' && data.metadata !== null
+                    ? data.metadata
+                    : {};
                 const startTime = (data.start_time || '').toString().trim();
                 const endTime = (data.end_time || '').toString().trim();
                 const timeRange = (data.time_range || data.timeRange || '').toString().trim();
+                const clinicName = (data.clinic_name || metadata.clinic_name || '').toString().trim();
+                const department = (data.department || '').toString().trim();
+                const cause = (data.cause || metadata.app_cause || '').toString().trim();
 
                 return {
                     appointment_id: (data.appointment_id || '').toString().trim(),
                     time_range: timeRange || (startTime && endTime ? `${startTime} - ${endTime}` : startTime),
                     start_time: startTime,
                     end_time: endTime,
-                    department: (data.department || '').toString().trim(),
-                    clinic_name: (data.clinic_name || '').toString().trim(),
+                    department,
+                    clinic_name: clinicName,
                     doctor: (data.doctor || '').toString().trim(),
                     status_label: (data.status_label || '').toString().trim(),
                     notes: (data.notes || '').toString().trim(),
-                    cause: (data.cause || '').toString().trim(),
+                    cause,
                 };
             }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes);
         }
@@ -934,13 +950,24 @@ if ($kioskRegistered) {
             }
 
             const itemsHtml = entries.map((entry) => {
-                const clinicText = entry.clinic_name || entry.department || '';
-                const detailText = clinicText.toString().trim();
+                const detailText = (entry.cause || entry.clinic_name || entry.department || '').toString().trim();
+                const timeText = (entry.time_range || entry.start_time || '').toString().trim();
+
+                if (!timeText && !detailText) {
+                    return '';
+                }
+
+                const lineParts = [];
+                if (timeText) {
+                    lineParts.push(`<span class="ticket-preview-appointment-time">${escapeHtml(timeText)}</span>`);
+                }
+                if (detailText) {
+                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</span>`);
+                }
 
                 return [
                     '<li class="ticket-preview-appointments-item">',
-                    entry.time_range ? `<div class="ticket-preview-appointment-time">${escapeHtml(entry.time_range)}</div>` : '',
-                    detailText ? `<div class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</div>` : '',
+                    `<div class="ticket-preview-appointment-line">${lineParts.join(' ')}</div>`,
                     '</li>'
                 ].join('');
             }).join('');
@@ -999,7 +1026,7 @@ if ($kioskRegistered) {
                 const details = document.createElement('div');
                 details.className = 'appointment-details';
 
-                const detailText = (appointment.clinic_name || appointment.department || '').toString().trim();
+                const detailText = (appointment.cause || appointment.clinic_name || appointment.department || '').toString().trim();
                 if (detailText) {
                     const mainLine = document.createElement('div');
                     mainLine.className = 'appointment-main';

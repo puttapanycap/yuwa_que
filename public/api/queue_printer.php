@@ -159,18 +159,22 @@ function normaliseTicketAppointmentsForPrinter($appointments): array
             }
         }
 
-        $clinic = trim((string) ($appointment['clinic_name'] ?? ''));
+        $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+        $cause = trim((string) ($appointment['cause'] ?? ($metadata['app_cause'] ?? '')));
+        $clinic = trim((string) ($appointment['clinic_name'] ?? ($metadata['clinic_name'] ?? '')));
         if ($clinic === '') {
             $clinic = trim((string) ($appointment['department'] ?? ''));
         }
 
-        if ($timeRange === '' && $clinic === '') {
+        $detail = $cause !== '' ? $cause : $clinic;
+
+        if ($timeRange === '' && $detail === '') {
             continue;
         }
 
         $normalised[] = [
             'time' => $timeRange,
-            'detail' => $clinic,
+            'detail' => $detail,
             'notes' => '',
             'status' => '',
         ];
@@ -422,21 +426,19 @@ function buildTicketImageResource(array $ticket, array $options)
         $maxY = max($maxY, $y);
 
         foreach ($appointmentEntries as $entry) {
-            $lines = [];
             $time = isset($entry['time']) ? trim((string) $entry['time']) : '';
             $detail = isset($entry['detail']) ? trim((string) $entry['detail']) : '';
 
-            if ($time !== '') {
-                $lines[] = $time;
-            }
-            if ($detail !== '') {
-                $lines[] = $detail;
+            if ($time === '' && $detail === '') {
+                continue;
             }
 
-            if (!empty($lines)) {
-                $y = drawCenteredTextBlock($canvas, $lines, $fontRegular, 22, $black, $y, 10, 16);
-                $maxY = max($maxY, $y);
-            }
+            $line = $time !== '' && $detail !== ''
+                ? $time . ' ' . $detail
+                : ($time !== '' ? $time : $detail);
+
+            $y = drawCenteredTextBlock($canvas, [$line], $fontRegular, 22, $black, $y, 10, 16);
+            $maxY = max($maxY, $y);
         }
     }
 
