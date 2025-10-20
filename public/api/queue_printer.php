@@ -492,7 +492,7 @@ function buildTicketImageResource(array $ticket, array $options)
             return $line !== '';
         });
         if (!empty($noteLines)) {
-            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, 24, $black, $y, 12, 18);
+            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, 22, $black, $y, 10, 16);
             $maxY = max($maxY, $y);
         }
     }

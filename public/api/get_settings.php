@@ -43,7 +43,10 @@ try {
         'queue_printer_profile' => getSetting('queue_printer_profile', 'default'),
         'queue_printer_code_table' => getSetting('queue_printer_code_table', '21'),
         'bixolon_ticket_footer' => getSetting('bixolon_ticket_footer', 'สแกน QR Code เพื่อตรวจสอบสถานะคิว'),
-        'bixolon_additional_note' => getSetting('bixolon_additional_note', 'กรุณารอเรียกคิวจากเจ้าหน้าที่'),
+        'bixolon_additional_note' => getSetting(
+            'bixolon_additional_note',
+            "เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก"
+        ),
         'last_updated' => date('Y-m-d H:i:s')
     ];
     

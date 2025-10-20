@@ -207,7 +207,7 @@ curl -X POST http://localhost/api/queue_printer.php \
           "issuedAt": "2024-05-01 08:30",
           "waitingCount": 3,
           "qrData": "https://example.com/check_status.php?queue_id=1",
-          "additionalNote": "กรุณารอเรียกคิวจากเจ้าหน้าที่",
+          "additionalNote": "เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก",
           "footer": "สแกน QR Code เพื่อตรวจสอบสถานะคิว"
         }
       }'

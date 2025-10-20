@@ -267,7 +267,7 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
   const servicePoint = sanitizeLine(ticket.servicePoint || ticket.counterName);
   const issuedAt = sanitizeLine(ticket.issuedAt || ticket.datetime || ticket.createdAt);
   const waitingCount = typeof ticket.waitingCount === 'number' ? ticket.waitingCount : ticket.waiting;
-  const additionalNote = sanitizeLine(ticket.additionalNote || ticket.note);
+  const additionalNoteLines = sanitizeMultiline(ticket.additionalNote || ticket.note);
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
   const qrData = typeof ticket.qrData === 'string' && ticket.qrData.trim() ? ticket.qrData.trim() : null;
 
@@ -310,8 +310,10 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
     printer.text(`รอคิวก่อนหน้า ${waitingCount}`);
   }
 
-  if (additionalNote) {
-    printer.text(additionalNote);
+  if (additionalNoteLines.length > 0) {
+    additionalNoteLines.forEach((line) => {
+      printer.text(line);
+    });
   }
 
   if (qrData) {
@@ -779,6 +781,17 @@ function clampInt(value, min, max, fallback) {
     return clamped;
   }
   return fallback;
+}
+
+function sanitizeMultiline(value) {
+  if (typeof value !== 'string') {
+    return [];
+  }
+
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0);
 }
 
 function sanitizeLine(value) {
