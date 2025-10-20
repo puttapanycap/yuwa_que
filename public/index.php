@@ -399,6 +399,11 @@ if ($kioskRegistered) {
             border-top: 1px dashed #dee2e6;
         }
 
+        .ticket-preview-note--compact {
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+
         .ticket-preview-footer {
             color: #adb5bd;
         }
@@ -1113,6 +1118,11 @@ if ($kioskRegistered) {
             const qrData = (ticket.qrData || '').toString().trim();
             const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
+            const ticketTemplate = (ticket.ticketTemplate || '').toString().trim();
+            const noteClassNames = ['ticket-preview-note'];
+            if (ticketTemplate === APPOINTMENT_LIST_TEMPLATE) {
+                noteClassNames.push('ticket-preview-note--compact');
+            }
 
             const html = [
                 `<div class="ticket-preview" id="${previewId}">`,
@@ -1124,7 +1134,7 @@ if ($kioskRegistered) {
                 issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
                 waitingText ? `<div class="ticket-preview-waiting">${escapeHtml(waitingText)}</div>` : '',
                 appointmentSection,
-                additionalNote ? `<div class="ticket-preview-note">${formatMultiline(additionalNote)}</div>` : '',
+                additionalNote ? `<div class="${noteClassNames.join(' ')}">${formatMultiline(additionalNote)}</div>` : '',
                 `<div class="ticket-preview-qr" id="${qrElementId}">${qrData ? '<div class="ticket-preview-qr-placeholder">&nbsp;</div>' : ''}</div>`,
                 footer ? `<div class="ticket-preview-footer">${formatMultiline(footer)}</div>` : '',
                 `<div class="ticket-preview-print-count">จำนวนสำเนา: <strong>${escapeHtml(copiesText)}</strong></div>`,

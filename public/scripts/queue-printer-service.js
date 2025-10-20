@@ -326,9 +326,19 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
   }
 
   if (additionalNoteLines.length > 0) {
+    const useCompactNoteLayout = ticketTemplate === APPOINTMENT_LIST_TICKET_TEMPLATE;
+
+    if (useCompactNoteLayout) {
+      printer.font('B');
+    }
+
     additionalNoteLines.forEach((line) => {
       printer.text(line);
     });
+
+    if (useCompactNoteLayout) {
+      printer.font('A');
+    }
   }
 
   if (qrData) {

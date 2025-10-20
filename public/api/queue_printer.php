@@ -520,7 +520,17 @@ function buildTicketImageResource(array $ticket, array $options)
             return $line !== '';
         });
         if (!empty($noteLines)) {
-            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, 22, $black, $y, 10, 16);
+            $noteFontSize = 22;
+            $noteLineSpacing = 10;
+            $noteBlockSpacing = 16;
+
+            if ($ticket['ticketTemplate'] === 'appointment_list') {
+                $noteFontSize = 20;
+                $noteLineSpacing = 8;
+                $noteBlockSpacing = 14;
+            }
+
+            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, $noteFontSize, $black, $y, $noteLineSpacing, $noteBlockSpacing);
             $maxY = max($maxY, $y);
         }
     }
