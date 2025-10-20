@@ -75,21 +75,13 @@ if (!$queueId) {
                 }
 
                 if (is_array($appointmentPatient)) {
-                    $patientParts = [];
-                    if (!empty($appointmentPatient['display_name'])) {
-                        $patientParts[] = $appointmentPatient['display_name'];
-                    } elseif (!empty($appointmentPatient['fullname_th'])) {
-                        $patientParts[] = $appointmentPatient['fullname_th'];
+                    $hnText = trim((string) ($appointmentPatient['hn'] ?? ''));
+                    if ($hnText === '') {
+                        $hnText = trim((string) ($appointmentPatient['HN'] ?? $appointmentPatient['patient_hn'] ?? ''));
                     }
-                    if (!empty($appointmentPatient['hn'])) {
-                        $patientParts[] = 'HN: ' . $appointmentPatient['hn'];
+                    if ($hnText !== '') {
+                        $appointmentPatientLine = 'HN ' . $hnText;
                     }
-                    if (!empty($appointmentPatient['idcard'])) {
-                        $patientParts[] = 'ID: ' . $appointmentPatient['idcard'];
-                    }
-                    $appointmentPatientLine = implode(' • ', array_filter($patientParts, static function ($value) {
-                        return trim((string) $value) !== '';
-                    }));
                 }
             }
 
@@ -805,8 +797,6 @@ if ($error_message) {
         }
 
         .appointment-entry {
-            display: flex;
-            gap: 1rem;
             padding: 0.75rem 0;
             border-bottom: 1px solid #e9ecef;
         }
@@ -815,18 +805,20 @@ if ($error_message) {
             border-bottom: none;
         }
 
+        .appointment-entry-line {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
         .appointment-entry-time {
-            min-width: 90px;
             font-weight: 600;
             color: #0d6efd;
             font-size: 1.05rem;
         }
 
-        .appointment-entry-body {
-            flex: 1;
-        }
-
-        .appointment-entry-main {
+        .appointment-entry-detail {
             font-weight: 600;
             color: #212529;
         }
@@ -1075,7 +1067,7 @@ if ($error_message) {
 
                     <?php if ($appointmentPatientLine !== ''): ?>
                         <div class="appointment-patient">
-                            <?php echo htmlspecialchars($appointmentPatientLine); ?>
+                            <strong><?php echo htmlspecialchars($appointmentPatientLine); ?></strong>
                         </div>
                     <?php endif; ?>
 
@@ -1084,36 +1076,18 @@ if ($error_message) {
                             <?php foreach ($appointmentsToday as $appointment): ?>
                                 <?php
                                 $timeText = trim((string) ($appointment['time_range'] ?? $appointment['start_time'] ?? ''));
-                                $detailParts = array_filter([
-                                    trim((string) ($appointment['department'] ?? '')),
-                                    trim((string) ($appointment['doctor'] ?? '')),
-                                    trim((string) ($appointment['cause'] ?? '')),
-                                ], static function ($part) {
-                                    return $part !== '';
-                                });
-                                $detailText = implode(' • ', $detailParts);
-                                $notesText = trim((string) ($appointment['notes'] ?? ''));
-                                $statusText = trim((string) ($appointment['status_label'] ?? ''));
+                                $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+                                $clinicText = trim((string) ($metadata['clinic_name'] ?? ($appointment['clinic_name'] ?? ($appointment['department'] ?? ''))));
+                                $causeText = trim((string) ($metadata['app_cause'] ?? ($appointment['cause'] ?? '')));
+                                $detailText = trim(implode(' ', array_filter([$clinicText, $causeText], static function ($part) {
+                                    return trim((string) $part) !== '';
+                                })));
                                 ?>
                                 <div class="appointment-entry">
-                                    <div class="appointment-entry-time">
-                                        <?php echo htmlspecialchars($timeText !== '' ? $timeText : '--:--'); ?>
-                                    </div>
-                                    <div class="appointment-entry-body">
+                                    <div class="appointment-entry-line">
+                                        <span class="appointment-entry-time"><?php echo htmlspecialchars($timeText !== '' ? $timeText : '--:--'); ?></span>
                                         <?php if ($detailText !== ''): ?>
-                                            <div class="appointment-entry-main">
-                                                <?php echo htmlspecialchars($detailText); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <?php if ($notesText !== ''): ?>
-                                            <div class="appointment-entry-notes">
-                                                <?php echo nl2br(htmlspecialchars($notesText)); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <?php if ($statusText !== ''): ?>
-                                            <div class="appointment-entry-status">
-                                                <?php echo htmlspecialchars($statusText); ?>
-                                            </div>
+                                            <span class="appointment-entry-detail"><?php echo htmlspecialchars($detailText); ?></span>
                                         <?php endif; ?>
                                     </div>
                                 </div>
