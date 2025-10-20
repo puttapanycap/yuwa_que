@@ -713,6 +713,10 @@ if ($kioskRegistered) {
             queue_print_count: 1
         };
 
+        const STANDARD_TICKET_NOTE_DEFAULT = 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
+        const APPOINTMENT_LIST_TICKET_NOTE = 'เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก';
+        const APPOINTMENT_LIST_TEMPLATE = 'appointment_list';
+
         function isKioskLocked() {
             return !kioskConfig || kioskConfig.isRegistered !== true;
         }
@@ -1220,6 +1224,13 @@ if ($kioskRegistered) {
 
         function buildTicketForPrinting() {
             const hospitalName = (appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์').trim();
+            const ticketTemplate = toTrimmedString(currentQueue?.ticket_template) || 'standard';
+            const configuredAdditionalNote = toTrimmedString(appSettings.bixolon_additional_note);
+            const additionalNote = ticketTemplate === APPOINTMENT_LIST_TEMPLATE
+                ? APPOINTMENT_LIST_TICKET_NOTE
+                : (configuredAdditionalNote || STANDARD_TICKET_NOTE_DEFAULT);
+            const footerNote = toTrimmedString(appSettings.bixolon_ticket_footer);
+
             const ticket = {
                 label: 'บัตรคิว',
                 hospitalName,
@@ -1227,8 +1238,8 @@ if ($kioskRegistered) {
                 queueNumber: currentQueue?.queue_number || '',
                 servicePoint: currentQueue?.service_point_name || '',
                 issuedAt: getTicketDateTime(),
-                additionalNote: (appSettings.bixolon_additional_note || '').trim() || '',
-                footer: (appSettings.bixolon_ticket_footer || '').trim() || '',
+                additionalNote,
+                footer: footerNote,
                 qrData: `${window.location.origin}/check_status.php?queue_id=${currentQueue?.queue_id || ''}`
             };
 
@@ -1236,10 +1247,9 @@ if ($kioskRegistered) {
                 ticket.waitingCount = currentQueue.waiting_position;
             }
 
-            const ticketTemplate = (currentQueue?.ticket_template || 'standard').toString();
             ticket.ticketTemplate = ticketTemplate;
 
-            if (ticketTemplate === 'appointment_list') {
+            if (ticketTemplate === APPOINTMENT_LIST_TEMPLATE) {
                 const patientData = currentQueue?.appointment_patient;
                 const patientHn = toTrimmedString(patientData?.hn || patientData?.HN || patientData?.patient_hn);
 

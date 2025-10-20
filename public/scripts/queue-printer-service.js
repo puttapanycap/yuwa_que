@@ -79,6 +79,9 @@ const DEFAULT_QR_CORRECTION = normalizeQrCorrection(process.env.QUEUE_PRINTER_QR
 const ALLOWED_ORIGIN = process.env.QUEUE_PRINTER_ALLOWED_ORIGIN || '*';
 const DRIVER_MODULE = (process.env.QUEUE_PRINTER_DRIVER || '').trim() || null;
 const TICKET_COLUMNS = clampInt(process.env.QUEUE_PRINTER_COLUMNS, 24, 64, DEFAULT_TYPE === 'star' ? 42 : 48);
+const STANDARD_TICKET_NOTE_DEFAULT = 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
+const APPOINTMENT_LIST_TICKET_TEMPLATE = 'appointment_list';
+const APPOINTMENT_LIST_TICKET_NOTE = 'เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก';
 
 let optionalDriver = null;
 if (DRIVER_MODULE) {
@@ -267,7 +270,19 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
   const servicePoint = sanitizeLine(ticket.servicePoint || ticket.counterName);
   const issuedAt = sanitizeLine(ticket.issuedAt || ticket.datetime || ticket.createdAt);
   const waitingCount = typeof ticket.waitingCount === 'number' ? ticket.waitingCount : ticket.waiting;
-  const additionalNoteLines = sanitizeMultiline(ticket.additionalNote || ticket.note);
+  const ticketTemplateRaw = typeof ticket.ticketTemplate === 'string'
+    ? ticket.ticketTemplate
+    : (typeof ticket.template === 'string' ? ticket.template : '');
+  const ticketTemplate = sanitizeLine(ticketTemplateRaw) || 'standard';
+  const providedAdditionalNote = typeof ticket.additionalNote === 'string' && ticket.additionalNote.trim().length > 0
+    ? ticket.additionalNote
+    : (typeof ticket.note === 'string' ? ticket.note : '');
+  const resolvedAdditionalNote = ticketTemplate === APPOINTMENT_LIST_TICKET_TEMPLATE
+    ? APPOINTMENT_LIST_TICKET_NOTE
+    : (providedAdditionalNote && providedAdditionalNote.trim().length > 0
+      ? providedAdditionalNote
+      : STANDARD_TICKET_NOTE_DEFAULT);
+  const additionalNoteLines = sanitizeMultiline(resolvedAdditionalNote);
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
   const qrData = typeof ticket.qrData === 'string' && ticket.qrData.trim() ? ticket.qrData.trim() : null;
 

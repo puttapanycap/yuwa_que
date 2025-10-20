@@ -45,7 +45,7 @@ try {
         'bixolon_ticket_footer' => getSetting('bixolon_ticket_footer', 'สแกน QR Code เพื่อตรวจสอบสถานะคิว'),
         'bixolon_additional_note' => getSetting(
             'bixolon_additional_note',
-            "เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก"
+            'กรุณารอเรียกคิวจากเจ้าหน้าที่'
         ),
         'last_updated' => date('Y-m-d H:i:s')
     ];
