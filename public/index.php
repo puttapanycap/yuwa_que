@@ -901,26 +901,6 @@ if ($kioskRegistered) {
                 .join(separator);
         }
 
-        function normaliseTicketPatient(patient) {
-            if (!patient || typeof patient !== 'object') {
-                return null;
-            }
-
-            const displayName = (patient.display_name || patient.fullname_th || patient.fullname || patient.fullname_en || '').toString().trim();
-            const hn = (patient.hn || '').toString().trim();
-            const idcard = (patient.idcard || '').toString().trim();
-
-            if (!displayName && !hn && !idcard) {
-                return null;
-            }
-
-            return {
-                display_name: displayName || idcard,
-                hn,
-                idcard,
-            };
-        }
-
         function normaliseTicketAppointments(appointments) {
             if (!Array.isArray(appointments)) {
                 return [];
@@ -944,43 +924,23 @@ if ($kioskRegistered) {
                     notes: (data.notes || '').toString().trim(),
                     cause: (data.cause || '').toString().trim(),
                 };
-            }).filter((item) => item.time_range || item.start_time || item.department || item.doctor || item.cause || item.notes);
+            }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes);
         }
 
-        function buildPreviewAppointmentSection(appointments, patient) {
+        function buildPreviewAppointmentSection(appointments) {
             const entries = normaliseTicketAppointments(appointments);
             if (entries.length === 0) {
                 return '';
             }
 
-            const patientInfo = normaliseTicketPatient(patient);
-            const patientLine = patientInfo
-                ? joinNonEmpty([
-                    patientInfo.display_name,
-                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
-                ], ' • ')
-                : '';
-
             const itemsHtml = entries.map((entry) => {
-                const detailsParts = [];
-                if (entry.department) {
-                    detailsParts.push(entry.department);
-                }
-                if (entry.doctor) {
-                    detailsParts.push(entry.doctor);
-                }
-                if (entry.cause) {
-                    detailsParts.push(entry.cause);
-                }
-
-                const detailText = joinNonEmpty(detailsParts, ' • ');
+                const clinicText = entry.clinic_name || entry.department || '';
+                const detailText = clinicText.toString().trim();
 
                 return [
                     '<li class="ticket-preview-appointments-item">',
                     entry.time_range ? `<div class="ticket-preview-appointment-time">${escapeHtml(entry.time_range)}</div>` : '',
                     detailText ? `<div class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</div>` : '',
-                    entry.notes ? `<div class="ticket-preview-appointment-note">${escapeHtml(entry.notes)}</div>` : '',
-                    entry.status_label ? `<div class="ticket-preview-appointment-status">${escapeHtml(entry.status_label)}</div>` : '',
                     '</li>'
                 ].join('');
             }).join('');
@@ -988,7 +948,6 @@ if ($kioskRegistered) {
             return [
                 '<div class="ticket-preview-appointments">',
                 '<div class="ticket-preview-appointments-title"><i class="fas fa-calendar-check"></i><span>รายการนัดวันนี้</span></div>',
-                patientLine ? `<div class="ticket-preview-appointments-patient">${escapeHtml(patientLine)}</div>` : '',
                 `<ul class="ticket-preview-appointments-list">${itemsHtml}</ul>`,
                 '</div>'
             ].join('');
@@ -1013,19 +972,8 @@ if ($kioskRegistered) {
             }
 
             const appointments = normaliseTicketAppointments(queue.appointments);
-            const patientInfo = normaliseTicketPatient(queue.appointment_patient);
             const lookupOk = queue.appointment_lookup_ok === true;
             const lookupMessage = (queue.appointment_lookup_message || '').toString().trim();
-
-            if (patientInfo) {
-                const line = joinNonEmpty([
-                    patientInfo.display_name,
-                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
-                ], ' • ');
-                if (line) {
-                    patientInfoEl.text(line);
-                }
-            }
 
             if (!lookupOk && lookupMessage) {
                 errorMessageText.text(lookupMessage);
@@ -1051,37 +999,12 @@ if ($kioskRegistered) {
                 const details = document.createElement('div');
                 details.className = 'appointment-details';
 
-                const detailParts = [];
-                if (appointment.department) {
-                    detailParts.push(appointment.department);
-                }
-                if (appointment.doctor) {
-                    detailParts.push(appointment.doctor);
-                }
-                if (appointment.cause) {
-                    detailParts.push(appointment.cause);
-                }
-
-                const detailText = joinNonEmpty(detailParts, ' • ');
+                const detailText = (appointment.clinic_name || appointment.department || '').toString().trim();
                 if (detailText) {
                     const mainLine = document.createElement('div');
                     mainLine.className = 'appointment-main';
                     mainLine.textContent = detailText;
                     details.appendChild(mainLine);
-                }
-
-                if (appointment.notes) {
-                    const notesLine = document.createElement('div');
-                    notesLine.className = 'appointment-notes';
-                    notesLine.textContent = appointment.notes;
-                    details.appendChild(notesLine);
-                }
-
-                if (appointment.status_label) {
-                    const statusLine = document.createElement('div');
-                    statusLine.className = 'appointment-status';
-                    statusLine.textContent = appointment.status_label;
-                    details.appendChild(statusLine);
                 }
 
                 item.appendChild(details);
@@ -1108,7 +1031,7 @@ if ($kioskRegistered) {
             const additionalNote = (ticket.additionalNote || '').toString();
             const footer = (ticket.footer || '').toString();
             const qrData = (ticket.qrData || '').toString().trim();
-            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
+            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
 
             const html = [
@@ -1246,10 +1169,7 @@ if ($kioskRegistered) {
                     ticket.appointments = appointmentEntries;
                 }
 
-                const patientInfo = normaliseTicketPatient(currentQueue?.appointment_patient);
-                if (patientInfo) {
-                    ticket.appointmentPatient = patientInfo;
-                }
+                // Kiosk tickets display only appointment time and clinic details.
             }
 
             return ticket;
