@@ -108,11 +108,6 @@ function defaultStandardTicketNote(): string
     return 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
 }
 
-function appointmentListTicketNote(): string
-{
-    return "เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก";
-}
-
 function extractTicket($ticket): array
 {
     if (!is_array($ticket)) {
@@ -130,7 +125,7 @@ function extractTicket($ticket): array
     if ($ticketTemplate === 'appointment_list') {
         $additionalNote = $normalisedAdditionalNote !== ''
             ? $normalisedAdditionalNote
-            : normaliseMultiline(appointmentListTicketNote());
+            : '';
     } else {
         $additionalNote = $normalisedAdditionalNote !== ''
             ? $normalisedAdditionalNote

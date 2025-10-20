@@ -719,7 +719,6 @@ if ($kioskRegistered) {
         };
 
         const STANDARD_TICKET_NOTE_DEFAULT = 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
-        const APPOINTMENT_LIST_TICKET_NOTE = 'เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก';
         const APPOINTMENT_LIST_TEMPLATE = 'appointment_list';
 
         function isKioskLocked() {
@@ -1236,9 +1235,9 @@ if ($kioskRegistered) {
             const hospitalName = (appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์').trim();
             const ticketTemplate = toTrimmedString(currentQueue?.ticket_template) || 'standard';
             const configuredAdditionalNote = toTrimmedString(appSettings.bixolon_additional_note);
-            const additionalNote = ticketTemplate === APPOINTMENT_LIST_TEMPLATE
-                ? APPOINTMENT_LIST_TICKET_NOTE
-                : (configuredAdditionalNote || STANDARD_TICKET_NOTE_DEFAULT);
+            const trimmedConfiguredNote = (configuredAdditionalNote || '').trim();
+            const additionalNote = trimmedConfiguredNote
+                || (ticketTemplate === APPOINTMENT_LIST_TEMPLATE ? '' : STANDARD_TICKET_NOTE_DEFAULT);
             const footerNote = toTrimmedString(appSettings.bixolon_ticket_footer);
 
             const ticket = {
