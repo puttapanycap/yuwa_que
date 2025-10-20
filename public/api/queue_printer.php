@@ -122,7 +122,6 @@ function extractTicket($ticket): array
         'qrData' => trim((string) ($ticket['qrData'] ?? '')),
         'ticketTemplate' => trim((string) ($ticket['ticketTemplate'] ?? '')),
         'appointments' => normaliseTicketAppointmentsForPrinter($ticket['appointments'] ?? []),
-        'appointmentPatient' => normaliseTicketPatientForPrinter($ticket['appointmentPatient'] ?? null),
     ];
 }
 
@@ -134,27 +133,6 @@ function normaliseMultiline($text): string
     }
 
     return preg_replace('/\r\n?/', "\n", $sanitised);
-}
-
-function normaliseTicketPatientForPrinter($patient): ?array
-{
-    if (!is_array($patient)) {
-        return null;
-    }
-
-    $displayName = trim((string) ($patient['display_name'] ?? $patient['fullname_th'] ?? $patient['fullname'] ?? ''));
-    $hn = trim((string) ($patient['hn'] ?? ''));
-    $idCard = trim((string) ($patient['idcard'] ?? ''));
-
-    if ($displayName === '' && $hn === '' && $idCard === '') {
-        return null;
-    }
-
-    return [
-        'display' => $displayName !== '' ? $displayName : $idCard,
-        'hn' => $hn,
-        'idcard' => $idCard,
-    ];
 }
 
 function normaliseTicketAppointmentsForPrinter($appointments): array
@@ -181,42 +159,26 @@ function normaliseTicketAppointmentsForPrinter($appointments): array
             }
         }
 
-        $detailParts = [];
-        $department = trim((string) ($appointment['department'] ?? ''));
-        $clinic = trim((string) ($appointment['clinic_name'] ?? ''));
-        $doctor = trim((string) ($appointment['doctor'] ?? ''));
-        $cause = trim((string) ($appointment['cause'] ?? ''));
-
-        if ($department !== '') {
-            $detailParts[] = $department;
-        } elseif ($clinic !== '') {
-            $detailParts[] = $clinic;
+        $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+        $cause = trim((string) ($appointment['cause'] ?? ($metadata['app_cause'] ?? '')));
+        $clinic = trim((string) ($appointment['clinic_name'] ?? ($metadata['clinic_name'] ?? '')));
+        $hn = trim((string) ($appointment['hn'] ?? ($appointment['patient_hn'] ?? ($metadata['hn'] ?? ($metadata['HN'] ?? '')))));
+        if ($clinic === '') {
+            $clinic = trim((string) ($appointment['department'] ?? ''));
         }
 
-        if ($doctor !== '') {
-            $detailParts[] = $doctor;
-        }
+        $detail = $cause !== '' ? $cause : $clinic;
 
-        if ($cause !== '') {
-            $detailParts[] = $cause;
-        }
-
-        $detail = implode(' • ', array_filter($detailParts, static function ($part) {
-            return trim((string) $part) !== '';
-        }));
-
-        $notes = trim((string) ($appointment['notes'] ?? ''));
-        $status = trim((string) ($appointment['status_label'] ?? ''));
-
-        if ($timeRange === '' && $detail === '' && $notes === '') {
+        if ($timeRange === '' && $detail === '' && $hn === '') {
             continue;
         }
 
         $normalised[] = [
             'time' => $timeRange,
             'detail' => $detail,
-            'notes' => $notes,
-            'status' => $status,
+            'hn' => $hn,
+            'notes' => '',
+            'status' => '',
         ];
     }
 
@@ -460,60 +422,44 @@ function buildTicketImageResource(array $ticket, array $options)
     $appointmentEntries = isset($ticket['appointments']) && is_array($ticket['appointments'])
         ? $ticket['appointments']
         : [];
-    $appointmentPatient = isset($ticket['appointmentPatient']) && is_array($ticket['appointmentPatient'])
-        ? $ticket['appointmentPatient']
-        : null;
 
     if (!empty($appointmentEntries)) {
         $y = drawCenteredTextBlock($canvas, ['รายการนัดวันนี้'], $fontBold, 24, $black, $y, 12, 18);
         $maxY = max($maxY, $y);
 
-        if ($appointmentPatient) {
-            $patientParts = [];
-            if (!empty($appointmentPatient['display'])) {
-                $patientParts[] = $appointmentPatient['display'];
-            }
-            if (!empty($appointmentPatient['hn'])) {
-                $patientParts[] = 'HN: ' . $appointmentPatient['hn'];
-            }
-            if (!empty($appointmentPatient['idcard'])) {
-                $patientParts[] = 'ID: ' . $appointmentPatient['idcard'];
-            }
-
-            $patientLine = implode(' • ', array_filter($patientParts, static function ($part) {
-                return trim((string) $part) !== '';
-            }));
-
-            if ($patientLine !== '') {
-                $y = drawCenteredTextBlock($canvas, [$patientLine], $fontRegular, 22, $black, $y, 8, 16);
-                $maxY = max($maxY, $y);
-            }
-        }
-
         foreach ($appointmentEntries as $entry) {
-            $lines = [];
             $time = isset($entry['time']) ? trim((string) $entry['time']) : '';
             $detail = isset($entry['detail']) ? trim((string) $entry['detail']) : '';
-            $notes = isset($entry['notes']) ? trim((string) $entry['notes']) : '';
-            $status = isset($entry['status']) ? trim((string) $entry['status']) : '';
+            $hn = isset($entry['hn']) ? trim((string) $entry['hn']) : '';
 
-            if ($time !== '') {
-                $lines[] = $time;
+            $detailSegments = [];
+            if ($hn !== '') {
+                $detailSegments[] = 'HN ' . $hn;
             }
             if ($detail !== '') {
-                $lines[] = $detail;
-            }
-            if ($notes !== '') {
-                $lines[] = $notes;
-            }
-            if ($status !== '') {
-                $lines[] = $status;
+                $detailSegments[] = $detail;
             }
 
-            if (!empty($lines)) {
-                $y = drawCenteredTextBlock($canvas, $lines, $fontRegular, 22, $black, $y, 10, 16);
-                $maxY = max($maxY, $y);
+            $detailLine = implode(' ', array_filter($detailSegments, static function ($segment) {
+                return $segment !== '';
+            }));
+
+            $lineParts = [];
+            if ($time !== '') {
+                $lineParts[] = $time;
             }
+            if ($detailLine !== '') {
+                $lineParts[] = $detailLine;
+            }
+
+            if (empty($lineParts)) {
+                continue;
+            }
+
+            $line = implode(' ', $lineParts);
+
+            $y = drawCenteredTextBlock($canvas, [$line], $fontRegular, 22, $black, $y, 10, 16);
+            $maxY = max($maxY, $y);
         }
     }
 

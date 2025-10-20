@@ -749,6 +749,7 @@ if (!function_exists('normaliseAppointmentRecords')) {
                 'status_label' => $statusLabel,
                 'notes' => $notes,
                 'cause' => $cause,
+                'hn' => trim((string) ($appointment['hn'] ?? ($metadata['hn'] ?? ''))),
                 'duration_min' => isset($appointment['duration_min']) && is_numeric($appointment['duration_min'])
                     ? (int) $appointment['duration_min']
                     : null,
