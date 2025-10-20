@@ -944,7 +944,7 @@ if ($kioskRegistered) {
                     notes: (data.notes || '').toString().trim(),
                     cause: (data.cause || '').toString().trim(),
                 };
-            }).filter((item) => item.time_range || item.start_time || item.department || item.doctor || item.cause || item.notes);
+            }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes);
         }
 
         function buildPreviewAppointmentSection(appointments, patient) {
@@ -962,25 +962,13 @@ if ($kioskRegistered) {
                 : '';
 
             const itemsHtml = entries.map((entry) => {
-                const detailsParts = [];
-                if (entry.department) {
-                    detailsParts.push(entry.department);
-                }
-                if (entry.doctor) {
-                    detailsParts.push(entry.doctor);
-                }
-                if (entry.cause) {
-                    detailsParts.push(entry.cause);
-                }
-
-                const detailText = joinNonEmpty(detailsParts, ' • ');
+                const clinicText = entry.clinic_name || entry.department || '';
+                const detailText = clinicText.toString().trim();
 
                 return [
                     '<li class="ticket-preview-appointments-item">',
                     entry.time_range ? `<div class="ticket-preview-appointment-time">${escapeHtml(entry.time_range)}</div>` : '',
                     detailText ? `<div class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</div>` : '',
-                    entry.notes ? `<div class="ticket-preview-appointment-note">${escapeHtml(entry.notes)}</div>` : '',
-                    entry.status_label ? `<div class="ticket-preview-appointment-status">${escapeHtml(entry.status_label)}</div>` : '',
                     '</li>'
                 ].join('');
             }).join('');
@@ -1051,37 +1039,12 @@ if ($kioskRegistered) {
                 const details = document.createElement('div');
                 details.className = 'appointment-details';
 
-                const detailParts = [];
-                if (appointment.department) {
-                    detailParts.push(appointment.department);
-                }
-                if (appointment.doctor) {
-                    detailParts.push(appointment.doctor);
-                }
-                if (appointment.cause) {
-                    detailParts.push(appointment.cause);
-                }
-
-                const detailText = joinNonEmpty(detailParts, ' • ');
+                const detailText = (appointment.clinic_name || appointment.department || '').toString().trim();
                 if (detailText) {
                     const mainLine = document.createElement('div');
                     mainLine.className = 'appointment-main';
                     mainLine.textContent = detailText;
                     details.appendChild(mainLine);
-                }
-
-                if (appointment.notes) {
-                    const notesLine = document.createElement('div');
-                    notesLine.className = 'appointment-notes';
-                    notesLine.textContent = appointment.notes;
-                    details.appendChild(notesLine);
-                }
-
-                if (appointment.status_label) {
-                    const statusLine = document.createElement('div');
-                    statusLine.className = 'appointment-status';
-                    statusLine.textContent = appointment.status_label;
-                    details.appendChild(statusLine);
                 }
 
                 item.appendChild(details);
