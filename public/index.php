@@ -300,7 +300,10 @@ if ($kioskRegistered) {
             color: #0d6efd;
         }
 
-        .ticket-preview-appointment-detail,
+        .ticket-preview-appointment-detail {
+            font-size: 0.9rem;
+        }
+
         .ticket-preview-appointment-note,
         .ticket-preview-appointment-status {
             font-size: 0.9rem;
@@ -314,7 +317,14 @@ if ($kioskRegistered) {
         .ticket-preview-appointment-status {
             color: #0d6efd;
         }
-        
+
+        .ticket-preview-appointment-line {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
         .qr-code {
             margin: 1rem 0;
         }
@@ -901,26 +911,6 @@ if ($kioskRegistered) {
                 .join(separator);
         }
 
-        function normaliseTicketPatient(patient) {
-            if (!patient || typeof patient !== 'object') {
-                return null;
-            }
-
-            const displayName = (patient.display_name || patient.fullname_th || patient.fullname || patient.fullname_en || '').toString().trim();
-            const hn = (patient.hn || '').toString().trim();
-            const idcard = (patient.idcard || '').toString().trim();
-
-            if (!displayName && !hn && !idcard) {
-                return null;
-            }
-
-            return {
-                display_name: displayName || idcard,
-                hn,
-                idcard,
-            };
-        }
-
         function normaliseTicketAppointments(appointments) {
             if (!Array.isArray(appointments)) {
                 return [];
@@ -928,59 +918,56 @@ if ($kioskRegistered) {
 
             return appointments.map((entry) => {
                 const data = entry && typeof entry === 'object' ? entry : {};
+                const metadata = data && typeof data.metadata === 'object' && data.metadata !== null
+                    ? data.metadata
+                    : {};
                 const startTime = (data.start_time || '').toString().trim();
                 const endTime = (data.end_time || '').toString().trim();
                 const timeRange = (data.time_range || data.timeRange || '').toString().trim();
+                const clinicName = (data.clinic_name || metadata.clinic_name || '').toString().trim();
+                const department = (data.department || '').toString().trim();
+                const cause = (data.cause || metadata.app_cause || '').toString().trim();
 
                 return {
                     appointment_id: (data.appointment_id || '').toString().trim(),
                     time_range: timeRange || (startTime && endTime ? `${startTime} - ${endTime}` : startTime),
                     start_time: startTime,
                     end_time: endTime,
-                    department: (data.department || '').toString().trim(),
-                    clinic_name: (data.clinic_name || '').toString().trim(),
+                    department,
+                    clinic_name: clinicName,
                     doctor: (data.doctor || '').toString().trim(),
                     status_label: (data.status_label || '').toString().trim(),
                     notes: (data.notes || '').toString().trim(),
-                    cause: (data.cause || '').toString().trim(),
+                    cause,
                 };
-            }).filter((item) => item.time_range || item.start_time || item.department || item.doctor || item.cause || item.notes);
+            }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes);
         }
 
-        function buildPreviewAppointmentSection(appointments, patient) {
+        function buildPreviewAppointmentSection(appointments) {
             const entries = normaliseTicketAppointments(appointments);
             if (entries.length === 0) {
                 return '';
             }
 
-            const patientInfo = normaliseTicketPatient(patient);
-            const patientLine = patientInfo
-                ? joinNonEmpty([
-                    patientInfo.display_name,
-                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
-                ], ' • ')
-                : '';
-
             const itemsHtml = entries.map((entry) => {
-                const detailsParts = [];
-                if (entry.department) {
-                    detailsParts.push(entry.department);
-                }
-                if (entry.doctor) {
-                    detailsParts.push(entry.doctor);
-                }
-                if (entry.cause) {
-                    detailsParts.push(entry.cause);
+                const detailText = (entry.cause || entry.clinic_name || entry.department || '').toString().trim();
+                const timeText = (entry.time_range || entry.start_time || '').toString().trim();
+
+                if (!timeText && !detailText) {
+                    return '';
                 }
 
-                const detailText = joinNonEmpty(detailsParts, ' • ');
+                const lineParts = [];
+                if (timeText) {
+                    lineParts.push(`<span class="ticket-preview-appointment-time">${escapeHtml(timeText)}</span>`);
+                }
+                if (detailText) {
+                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</span>`);
+                }
 
                 return [
                     '<li class="ticket-preview-appointments-item">',
-                    entry.time_range ? `<div class="ticket-preview-appointment-time">${escapeHtml(entry.time_range)}</div>` : '',
-                    detailText ? `<div class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</div>` : '',
-                    entry.notes ? `<div class="ticket-preview-appointment-note">${escapeHtml(entry.notes)}</div>` : '',
-                    entry.status_label ? `<div class="ticket-preview-appointment-status">${escapeHtml(entry.status_label)}</div>` : '',
+                    `<div class="ticket-preview-appointment-line">${lineParts.join(' ')}</div>`,
                     '</li>'
                 ].join('');
             }).join('');
@@ -988,7 +975,6 @@ if ($kioskRegistered) {
             return [
                 '<div class="ticket-preview-appointments">',
                 '<div class="ticket-preview-appointments-title"><i class="fas fa-calendar-check"></i><span>รายการนัดวันนี้</span></div>',
-                patientLine ? `<div class="ticket-preview-appointments-patient">${escapeHtml(patientLine)}</div>` : '',
                 `<ul class="ticket-preview-appointments-list">${itemsHtml}</ul>`,
                 '</div>'
             ].join('');
@@ -1013,19 +999,8 @@ if ($kioskRegistered) {
             }
 
             const appointments = normaliseTicketAppointments(queue.appointments);
-            const patientInfo = normaliseTicketPatient(queue.appointment_patient);
             const lookupOk = queue.appointment_lookup_ok === true;
             const lookupMessage = (queue.appointment_lookup_message || '').toString().trim();
-
-            if (patientInfo) {
-                const line = joinNonEmpty([
-                    patientInfo.display_name,
-                    patientInfo.hn ? `HN: ${patientInfo.hn}` : '',
-                ], ' • ');
-                if (line) {
-                    patientInfoEl.text(line);
-                }
-            }
 
             if (!lookupOk && lookupMessage) {
                 errorMessageText.text(lookupMessage);
@@ -1051,37 +1026,12 @@ if ($kioskRegistered) {
                 const details = document.createElement('div');
                 details.className = 'appointment-details';
 
-                const detailParts = [];
-                if (appointment.department) {
-                    detailParts.push(appointment.department);
-                }
-                if (appointment.doctor) {
-                    detailParts.push(appointment.doctor);
-                }
-                if (appointment.cause) {
-                    detailParts.push(appointment.cause);
-                }
-
-                const detailText = joinNonEmpty(detailParts, ' • ');
+                const detailText = (appointment.cause || appointment.clinic_name || appointment.department || '').toString().trim();
                 if (detailText) {
                     const mainLine = document.createElement('div');
                     mainLine.className = 'appointment-main';
                     mainLine.textContent = detailText;
                     details.appendChild(mainLine);
-                }
-
-                if (appointment.notes) {
-                    const notesLine = document.createElement('div');
-                    notesLine.className = 'appointment-notes';
-                    notesLine.textContent = appointment.notes;
-                    details.appendChild(notesLine);
-                }
-
-                if (appointment.status_label) {
-                    const statusLine = document.createElement('div');
-                    statusLine.className = 'appointment-status';
-                    statusLine.textContent = appointment.status_label;
-                    details.appendChild(statusLine);
                 }
 
                 item.appendChild(details);
@@ -1108,7 +1058,7 @@ if ($kioskRegistered) {
             const additionalNote = (ticket.additionalNote || '').toString();
             const footer = (ticket.footer || '').toString();
             const qrData = (ticket.qrData || '').toString().trim();
-            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
+            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
 
             const html = [
@@ -1246,10 +1196,7 @@ if ($kioskRegistered) {
                     ticket.appointments = appointmentEntries;
                 }
 
-                const patientInfo = normaliseTicketPatient(currentQueue?.appointment_patient);
-                if (patientInfo) {
-                    ticket.appointmentPatient = patientInfo;
-                }
+                // Kiosk tickets display only appointment time and clinic details.
             }
 
             return ticket;
