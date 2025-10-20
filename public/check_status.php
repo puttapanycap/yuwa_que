@@ -76,8 +76,11 @@ if (!$queueId) {
 
                 if (is_array($appointmentPatient)) {
                     $hnText = trim((string) ($appointmentPatient['hn'] ?? ''));
+                    if ($hnText === '') {
+                        $hnText = trim((string) ($appointmentPatient['HN'] ?? $appointmentPatient['patient_hn'] ?? ''));
+                    }
                     if ($hnText !== '') {
-                        $appointmentPatientLine = 'HN: ' . $hnText;
+                        $appointmentPatientLine = 'HN ' . $hnText;
                     }
                 }
             }
@@ -794,8 +797,6 @@ if ($error_message) {
         }
 
         .appointment-entry {
-            display: flex;
-            gap: 1rem;
             padding: 0.75rem 0;
             border-bottom: 1px solid #e9ecef;
         }
@@ -804,18 +805,20 @@ if ($error_message) {
             border-bottom: none;
         }
 
+        .appointment-entry-line {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
         .appointment-entry-time {
-            min-width: 90px;
             font-weight: 600;
             color: #0d6efd;
             font-size: 1.05rem;
         }
 
-        .appointment-entry-body {
-            flex: 1;
-        }
-
-        .appointment-entry-main {
+        .appointment-entry-detail {
             font-weight: 600;
             color: #212529;
         }
@@ -1064,7 +1067,7 @@ if ($error_message) {
 
                     <?php if ($appointmentPatientLine !== ''): ?>
                         <div class="appointment-patient">
-                            <?php echo htmlspecialchars($appointmentPatientLine); ?>
+                            <strong><?php echo htmlspecialchars($appointmentPatientLine); ?></strong>
                         </div>
                     <?php endif; ?>
 
@@ -1073,35 +1076,18 @@ if ($error_message) {
                             <?php foreach ($appointmentsToday as $appointment): ?>
                                 <?php
                                 $timeText = trim((string) ($appointment['time_range'] ?? $appointment['start_time'] ?? ''));
-                                $patientHn = trim((string) ($appointmentPatient['hn'] ?? ''));
-                                $entryHn = trim((string) ($appointment['hn'] ?? ''));
-                                if ($entryHn === '' && $patientHn !== '') {
-                                    $entryHn = $patientHn;
-                                }
-                                $causeText = trim((string) ($appointment['cause'] ?? ''));
-                                if ($causeText === '') {
-                                    $causeText = trim((string) ($appointment['clinic_name'] ?? ($appointment['department'] ?? '')));
-                                }
-                                $detailParts = [];
-                                if ($entryHn !== '') {
-                                    $detailParts[] = 'HN ' . $entryHn;
-                                }
-                                if ($causeText !== '') {
-                                    $detailParts[] = $causeText;
-                                }
-                                $detailText = implode(' • ', array_filter($detailParts, static function ($part) {
-                                    return $part !== '';
-                                }));
+                                $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
+                                $clinicText = trim((string) ($metadata['clinic_name'] ?? ($appointment['clinic_name'] ?? ($appointment['department'] ?? ''))));
+                                $causeText = trim((string) ($metadata['app_cause'] ?? ($appointment['cause'] ?? '')));
+                                $detailText = trim(implode(' ', array_filter([$clinicText, $causeText], static function ($part) {
+                                    return trim((string) $part) !== '';
+                                })));
                                 ?>
                                 <div class="appointment-entry">
-                                    <div class="appointment-entry-time">
-                                        <?php echo htmlspecialchars($timeText !== '' ? $timeText : '--:--'); ?>
-                                    </div>
-                                    <div class="appointment-entry-body">
+                                    <div class="appointment-entry-line">
+                                        <span class="appointment-entry-time"><?php echo htmlspecialchars($timeText !== '' ? $timeText : '--:--'); ?></span>
                                         <?php if ($detailText !== ''): ?>
-                                            <div class="appointment-entry-main">
-                                                <?php echo htmlspecialchars($detailText); ?>
-                                            </div>
+                                            <span class="appointment-entry-detail"><?php echo htmlspecialchars($detailText); ?></span>
                                         <?php endif; ?>
                                     </div>
                                 </div>

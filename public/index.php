@@ -219,8 +219,6 @@ if ($kioskRegistered) {
         }
 
         .appointment-item {
-            display: flex;
-            gap: 1rem;
             padding: 0.75rem 0;
             border-bottom: 1px solid #e9ecef;
         }
@@ -229,18 +227,20 @@ if ($kioskRegistered) {
             border-bottom: none;
         }
 
+        .appointment-line {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
         .appointment-time {
-            min-width: 90px;
             font-weight: 700;
             color: #0d6efd;
             font-size: 1.05rem;
         }
 
-        .appointment-details {
-            flex: 1;
-        }
-
-        .appointment-main {
+        .appointment-detail {
             font-weight: 600;
             color: #212529;
         }
@@ -939,9 +939,11 @@ if ($kioskRegistered) {
                 const startTime = toTrimmedString(data.start_time);
                 const endTime = toTrimmedString(data.end_time);
                 const timeRange = toTrimmedString(data.time_range || data.timeRange);
-                const clinicName = toTrimmedString(data.clinic_name || metadata.clinic_name);
+                const metadataClinicName = toTrimmedString(metadata.clinic_name);
+                const metadataCause = toTrimmedString(metadata.app_cause);
+                const clinicName = metadataClinicName || toTrimmedString(data.clinic_name || data.department);
                 const department = toTrimmedString(data.department);
-                const cause = toTrimmedString(data.cause || metadata.app_cause);
+                const cause = metadataCause || toTrimmedString(data.cause);
                 const hn = toTrimmedString(data.hn || metadata.hn || metadata.HN || data.patient_hn || patientHn);
 
                 return {
@@ -956,26 +958,30 @@ if ($kioskRegistered) {
                     notes: (data.notes || '').toString().trim(),
                     cause,
                     hn,
+                    metadata: {
+                        clinic_name: metadataClinicName,
+                        app_cause: metadataCause,
+                    },
                 };
             }).filter((item) => item.time_range || item.start_time || item.clinic_name || item.department || item.doctor || item.cause || item.notes || item.hn);
         }
 
-        function buildPreviewAppointmentSection(appointments) {
-            const entries = normaliseTicketAppointments(appointments);
+        function buildPreviewAppointmentSection(appointments, patient = null) {
+            const entries = normaliseTicketAppointments(appointments, patient);
             if (entries.length === 0) {
                 return '';
             }
 
-            const itemsHtml = entries.map((entry) => {
-                const detailText = (entry.cause || entry.clinic_name || entry.department || '').toString().trim();
-                const hnText = (entry.hn || '').toString().trim();
-                const combinedDetail = joinNonEmpty([
-                    hnText ? `HN ${hnText}` : '',
-                    detailText,
-                ]);
-                const timeText = (entry.time_range || entry.start_time || '').toString().trim();
+            const patientData = patient && typeof patient === 'object' ? patient : null;
+            const patientHn = toTrimmedString(patientData?.hn || patientData?.HN || patientData?.patient_hn);
 
-                if (!timeText && !combinedDetail) {
+            const itemsHtml = entries.map((entry) => {
+                const timeText = (entry.time_range || entry.start_time || '').toString().trim();
+                const clinicText = toTrimmedString(entry.metadata?.clinic_name || entry.clinic_name || entry.department);
+                const causeText = toTrimmedString(entry.metadata?.app_cause || entry.cause);
+                const detailText = joinNonEmpty([clinicText, causeText], ' ');
+
+                if (!timeText && !detailText) {
                     return '';
                 }
 
@@ -983,8 +989,8 @@ if ($kioskRegistered) {
                 if (timeText) {
                     lineParts.push(`<span class="ticket-preview-appointment-time">${escapeHtml(timeText)}</span>`);
                 }
-                if (combinedDetail) {
-                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(combinedDetail)}</span>`);
+                if (detailText) {
+                    lineParts.push(`<span class="ticket-preview-appointment-detail">${escapeHtml(detailText)}</span>`);
                 }
 
                 return [
@@ -994,9 +1000,14 @@ if ($kioskRegistered) {
                 ].join('');
             }).join('');
 
+            const patientHtml = patientHn
+                ? `<div class="ticket-preview-appointments-patient"><strong>HN ${escapeHtml(patientHn)}</strong></div>`
+                : '';
+
             return [
                 '<div class="ticket-preview-appointments">',
                 '<div class="ticket-preview-appointments-title"><i class="fas fa-calendar-check"></i><span>รายการนัดวันนี้</span></div>',
+                patientHtml,
                 `<ul class="ticket-preview-appointments-list">${itemsHtml}</ul>`,
                 '</div>'
             ].join('');
@@ -1011,7 +1022,7 @@ if ($kioskRegistered) {
             const errorMessageText = $('#appointmentErrorMessage span');
 
             listContainer.empty();
-            patientInfoEl.text('');
+            patientInfoEl.empty();
             emptyMessage.addClass('d-none');
             errorMessage.addClass('d-none');
 
@@ -1023,7 +1034,7 @@ if ($kioskRegistered) {
             const patient = queue && typeof queue.appointment_patient === 'object' ? queue.appointment_patient : null;
             const patientHn = toTrimmedString(patient?.hn || patient?.HN || patient?.patient_hn);
             if (patientHn) {
-                patientInfoEl.text(`HN: ${patientHn}`);
+                patientInfoEl.html(`<strong>HN ${escapeHtml(patientHn)}</strong>`);
             }
 
             const appointments = normaliseTicketAppointments(queue.appointments, patient);
@@ -1043,33 +1054,36 @@ if ($kioskRegistered) {
 
             const fragment = document.createDocumentFragment();
             appointments.forEach((appointment) => {
+                const timeText = toTrimmedString(appointment.time_range || appointment.start_time || '--:--');
+                const clinicText = toTrimmedString(appointment.metadata?.clinic_name || appointment.clinic_name || appointment.department);
+                const causeText = toTrimmedString(appointment.metadata?.app_cause || appointment.cause);
+                const detailText = joinNonEmpty([clinicText, causeText], ' ');
+
+                if (!timeText && !detailText) {
+                    return;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'appointment-item';
 
-                const time = document.createElement('div');
-                time.className = 'appointment-time';
-                time.textContent = appointment.time_range || appointment.start_time || '--:--';
-                item.appendChild(time);
+                const line = document.createElement('div');
+                line.className = 'appointment-line';
 
-                const details = document.createElement('div');
-                details.className = 'appointment-details';
-
-                const appointmentHn = toTrimmedString(appointment.hn);
-                const hnText = appointmentHn !== '' ? appointmentHn : patientHn;
-                const detailText = (appointment.cause || appointment.clinic_name || appointment.department || '').toString().trim();
-                const detailLine = joinNonEmpty([
-                    hnText ? `HN ${hnText}` : '',
-                    detailText,
-                ]);
-
-                if (detailLine) {
-                    const mainLine = document.createElement('div');
-                    mainLine.className = 'appointment-main';
-                    mainLine.textContent = detailLine;
-                    details.appendChild(mainLine);
+                if (timeText) {
+                    const timeEl = document.createElement('span');
+                    timeEl.className = 'appointment-time';
+                    timeEl.textContent = timeText;
+                    line.appendChild(timeEl);
                 }
 
-                item.appendChild(details);
+                if (detailText) {
+                    const detailEl = document.createElement('span');
+                    detailEl.className = 'appointment-detail';
+                    detailEl.textContent = detailText;
+                    line.appendChild(detailEl);
+                }
+
+                item.appendChild(line);
                 fragment.appendChild(item);
             });
 
@@ -1093,7 +1107,7 @@ if ($kioskRegistered) {
             const additionalNote = (ticket.additionalNote || '').toString();
             const footer = (ticket.footer || '').toString();
             const qrData = (ticket.qrData || '').toString().trim();
-            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments);
+            const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
 
             const html = [
@@ -1226,6 +1240,13 @@ if ($kioskRegistered) {
             ticket.ticketTemplate = ticketTemplate;
 
             if (ticketTemplate === 'appointment_list') {
+                const patientData = currentQueue?.appointment_patient;
+                const patientHn = toTrimmedString(patientData?.hn || patientData?.HN || patientData?.patient_hn);
+
+                if (patientHn) {
+                    ticket.appointmentPatient = { hn: patientHn };
+                }
+
                 const appointmentEntries = normaliseTicketAppointments(
                     currentQueue?.appointments,
                     currentQueue?.appointment_patient

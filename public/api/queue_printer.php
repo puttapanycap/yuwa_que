@@ -122,6 +122,7 @@ function extractTicket($ticket): array
         'qrData' => trim((string) ($ticket['qrData'] ?? '')),
         'ticketTemplate' => trim((string) ($ticket['ticketTemplate'] ?? '')),
         'appointments' => normaliseTicketAppointmentsForPrinter($ticket['appointments'] ?? []),
+        'appointmentPatient' => normaliseTicketPatient($ticket['appointmentPatient'] ?? null),
     ];
 }
 
@@ -160,29 +161,51 @@ function normaliseTicketAppointmentsForPrinter($appointments): array
         }
 
         $metadata = isset($appointment['metadata']) && is_array($appointment['metadata']) ? $appointment['metadata'] : [];
-        $cause = trim((string) ($appointment['cause'] ?? ($metadata['app_cause'] ?? '')));
-        $clinic = trim((string) ($appointment['clinic_name'] ?? ($metadata['clinic_name'] ?? '')));
-        $hn = trim((string) ($appointment['hn'] ?? ($appointment['patient_hn'] ?? ($metadata['hn'] ?? ($metadata['HN'] ?? '')))));
-        if ($clinic === '') {
-            $clinic = trim((string) ($appointment['department'] ?? ''));
-        }
+        $metadataClinic = trim((string) ($metadata['clinic_name'] ?? ''));
+        $metadataCause = trim((string) ($metadata['app_cause'] ?? ''));
+        $clinic = $metadataClinic !== ''
+            ? $metadataClinic
+            : trim((string) ($appointment['clinic_name'] ?? ($appointment['department'] ?? '')));
+        $cause = $metadataCause !== ''
+            ? $metadataCause
+            : trim((string) ($appointment['cause'] ?? ''));
 
-        $detail = $cause !== '' ? $cause : $clinic;
+        $detail = trim(implode(' ', array_filter([$clinic, $cause], static function ($part) {
+            return trim((string) $part) !== '';
+        })));
 
-        if ($timeRange === '' && $detail === '' && $hn === '') {
+        if ($timeRange === '' && $detail === '') {
             continue;
         }
 
         $normalised[] = [
             'time' => $timeRange,
             'detail' => $detail,
-            'hn' => $hn,
+            'clinic' => $clinic,
+            'cause' => $cause,
             'notes' => '',
             'status' => '',
         ];
     }
 
     return $normalised;
+}
+
+function normaliseTicketPatient($patient): array
+{
+    if (!is_array($patient)) {
+        return [];
+    }
+
+    $hn = trim((string) ($patient['hn'] ?? ($patient['HN'] ?? ($patient['patient_hn'] ?? ''))));
+
+    if ($hn === '') {
+        return [];
+    }
+
+    return [
+        'hn' => $hn,
+    ];
 }
 
 function normaliseOptions(array $options, array $payload): array
@@ -427,29 +450,30 @@ function buildTicketImageResource(array $ticket, array $options)
         $y = drawCenteredTextBlock($canvas, ['รายการนัดวันนี้'], $fontBold, 24, $black, $y, 12, 18);
         $maxY = max($maxY, $y);
 
+        $patientHn = isset($ticket['appointmentPatient']['hn']) ? trim((string) $ticket['appointmentPatient']['hn']) : '';
+        if ($patientHn !== '') {
+            $y = drawCenteredTextBlock($canvas, ['HN ' . $patientHn], $fontBold, 22, $black, $y, 8, 16);
+            $maxY = max($maxY, $y);
+        }
+
         foreach ($appointmentEntries as $entry) {
             $time = isset($entry['time']) ? trim((string) $entry['time']) : '';
+            $clinic = isset($entry['clinic']) ? trim((string) $entry['clinic']) : '';
+            $cause = isset($entry['cause']) ? trim((string) $entry['cause']) : '';
             $detail = isset($entry['detail']) ? trim((string) $entry['detail']) : '';
-            $hn = isset($entry['hn']) ? trim((string) $entry['hn']) : '';
 
-            $detailSegments = [];
-            if ($hn !== '') {
-                $detailSegments[] = 'HN ' . $hn;
+            if ($detail === '') {
+                $detail = trim(implode(' ', array_filter([$clinic, $cause], static function ($segment) {
+                    return trim((string) $segment) !== '';
+                })));
             }
-            if ($detail !== '') {
-                $detailSegments[] = $detail;
-            }
-
-            $detailLine = implode(' ', array_filter($detailSegments, static function ($segment) {
-                return $segment !== '';
-            }));
 
             $lineParts = [];
             if ($time !== '') {
                 $lineParts[] = $time;
             }
-            if ($detailLine !== '') {
-                $lineParts[] = $detailLine;
+            if ($detail !== '') {
+                $lineParts[] = $detail;
             }
 
             if (empty($lineParts)) {
