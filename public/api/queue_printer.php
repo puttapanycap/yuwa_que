@@ -103,10 +103,38 @@ function decodeJsonInput(?string $raw): array
     return $decoded;
 }
 
+function defaultStandardTicketNote(): string
+{
+    return 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
+}
+
+function appointmentListTicketNote(): string
+{
+    return "เวลานัดเป็นเวลาโดยประมาณ กรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก";
+}
+
 function extractTicket($ticket): array
 {
     if (!is_array($ticket)) {
         throw new \InvalidArgumentException('Missing or invalid ticket payload');
+    }
+
+    $ticketTemplate = trim((string) ($ticket['ticketTemplate'] ?? ''));
+    if ($ticketTemplate === '') {
+        $ticketTemplate = 'standard';
+    }
+
+    $providedAdditionalNote = $ticket['additionalNote'] ?? '';
+    $normalisedAdditionalNote = normaliseMultiline($providedAdditionalNote);
+
+    if ($ticketTemplate === 'appointment_list') {
+        $additionalNote = $normalisedAdditionalNote !== ''
+            ? $normalisedAdditionalNote
+            : normaliseMultiline(appointmentListTicketNote());
+    } else {
+        $additionalNote = $normalisedAdditionalNote !== ''
+            ? $normalisedAdditionalNote
+            : normaliseMultiline(defaultStandardTicketNote());
     }
 
     return [
@@ -117,10 +145,10 @@ function extractTicket($ticket): array
         'servicePoint' => trim((string) ($ticket['servicePoint'] ?? '')),
         'issuedAt' => trim((string) ($ticket['issuedAt'] ?? '')),
         'waitingCount' => filter_var($ticket['waitingCount'] ?? null, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE),
-        'additionalNote' => normaliseMultiline($ticket['additionalNote'] ?? ''),
+        'additionalNote' => $additionalNote,
         'footer' => normaliseMultiline($ticket['footer'] ?? ''),
         'qrData' => trim((string) ($ticket['qrData'] ?? '')),
-        'ticketTemplate' => trim((string) ($ticket['ticketTemplate'] ?? '')),
+        'ticketTemplate' => $ticketTemplate,
         'appointments' => normaliseTicketAppointmentsForPrinter($ticket['appointments'] ?? []),
         'appointmentPatient' => normaliseTicketPatient($ticket['appointmentPatient'] ?? null),
     ];
@@ -492,7 +520,17 @@ function buildTicketImageResource(array $ticket, array $options)
             return $line !== '';
         });
         if (!empty($noteLines)) {
-            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, 24, $black, $y, 12, 18);
+            $noteFontSize = 22;
+            $noteLineSpacing = 10;
+            $noteBlockSpacing = 16;
+
+            if ($ticket['ticketTemplate'] === 'appointment_list') {
+                $noteFontSize = 20;
+                $noteLineSpacing = 8;
+                $noteBlockSpacing = 14;
+            }
+
+            $y = drawCenteredTextBlock($canvas, $noteLines, $fontRegular, $noteFontSize, $black, $y, $noteLineSpacing, $noteBlockSpacing);
             $maxY = max($maxY, $y);
         }
     }
