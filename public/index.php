@@ -337,7 +337,7 @@ if ($kioskRegistered) {
             text-align: center;
             color: #212529;
             box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.05);
-            max-width: 280px;
+            /* max-width: 280px; */
             margin: 0 auto;
         }
 
