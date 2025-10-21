@@ -337,7 +337,7 @@ if ($kioskRegistered) {
             text-align: center;
             color: #212529;
             box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.05);
-            /* max-width: 280px; */
+            max-width: 280px;
             margin: 0 auto;
         }
 
@@ -1235,10 +1235,13 @@ if ($kioskRegistered) {
         function buildTicketForPrinting() {
             const hospitalName = (appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์').trim();
             const ticketTemplate = toTrimmedString(currentQueue?.ticket_template) || 'standard';
-            const configuredAdditionalNote = toTrimmedString(appSettings.bixolon_additional_note);
-            const trimmedConfiguredNote = (configuredAdditionalNote || '').trim();
-            const additionalNote = trimmedConfiguredNote
-                || (ticketTemplate === APPOINTMENT_LIST_TEMPLATE
+            const hasCustomAdditionalNote = appSettings.bixolon_additional_note_is_custom === true;
+            const configuredAdditionalNote = hasCustomAdditionalNote
+                ? toTrimmedString(appSettings.bixolon_additional_note)
+                : '';
+            const additionalNote = hasCustomAdditionalNote
+                ? configuredAdditionalNote
+                : (ticketTemplate === APPOINTMENT_LIST_TEMPLATE
                     ? APPOINTMENT_LIST_NOTE_DEFAULT
                     : STANDARD_TICKET_NOTE_DEFAULT);
             const footerNote = toTrimmedString(appSettings.bixolon_ticket_footer);

@@ -14,6 +14,26 @@ header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
 try {
+    $additionalNoteValue = null;
+    $additionalNoteIsCustom = false;
+
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1");
+        $stmt->execute(['bixolon_additional_note']);
+        $additionalNoteRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($additionalNoteRow !== false) {
+            $additionalNoteIsCustom = true;
+            $storedValue = $additionalNoteRow['setting_value'] ?? null;
+            $additionalNoteValue = $storedValue === null ? null : (string) $storedValue;
+        }
+    } catch (Exception $additionalNoteError) {
+        Logger::error('Failed to load bixolon_additional_note setting', [
+            'error' => $additionalNoteError->getMessage()
+        ]);
+    }
+
     // Get all current settings
     $settings = [
         'hospital_name' => getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์'),
@@ -43,10 +63,8 @@ try {
         'queue_printer_profile' => getSetting('queue_printer_profile', 'default'),
         'queue_printer_code_table' => getSetting('queue_printer_code_table', '21'),
         'bixolon_ticket_footer' => getSetting('bixolon_ticket_footer', 'สแกน QR Code เพื่อตรวจสอบสถานะคิว'),
-        'bixolon_additional_note' => getSetting(
-            'bixolon_additional_note',
-            'กรุณารอเรียกคิวจากเจ้าหน้าที่'
-        ),
+        'bixolon_additional_note' => $additionalNoteValue,
+        'bixolon_additional_note_is_custom' => $additionalNoteIsCustom,
         'last_updated' => date('Y-m-d H:i:s')
     ];
     
