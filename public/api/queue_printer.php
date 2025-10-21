@@ -103,8 +103,12 @@ function decodeJsonInput(?string $raw): array
     return $decoded;
 }
 
-function defaultStandardTicketNote(): string
+function defaultTicketNote(string $ticketTemplate): string
 {
+    if ($ticketTemplate === 'appointment_list') {
+        return "เวลานัดเป็นเวลาโดยประมาณ\nกรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก";
+    }
+
     return 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
 }
 
@@ -122,14 +126,10 @@ function extractTicket($ticket): array
     $providedAdditionalNote = $ticket['additionalNote'] ?? '';
     $normalisedAdditionalNote = normaliseMultiline($providedAdditionalNote);
 
-    if ($ticketTemplate === 'appointment_list') {
-        $additionalNote = $normalisedAdditionalNote !== ''
-            ? $normalisedAdditionalNote
-            : '';
+    if ($normalisedAdditionalNote !== '') {
+        $additionalNote = $normalisedAdditionalNote;
     } else {
-        $additionalNote = $normalisedAdditionalNote !== ''
-            ? $normalisedAdditionalNote
-            : normaliseMultiline(defaultStandardTicketNote());
+        $additionalNote = normaliseMultiline(defaultTicketNote($ticketTemplate));
     }
 
     return [

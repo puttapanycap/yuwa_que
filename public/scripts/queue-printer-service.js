@@ -80,6 +80,7 @@ const ALLOWED_ORIGIN = process.env.QUEUE_PRINTER_ALLOWED_ORIGIN || '*';
 const DRIVER_MODULE = (process.env.QUEUE_PRINTER_DRIVER || '').trim() || null;
 const TICKET_COLUMNS = clampInt(process.env.QUEUE_PRINTER_COLUMNS, 24, 64, DEFAULT_TYPE === 'star' ? 42 : 48);
 const STANDARD_TICKET_NOTE_DEFAULT = 'กรุณารอเรียกคิวจากเจ้าหน้าที่';
+const APPOINTMENT_LIST_TICKET_NOTE_DEFAULT = 'เวลานัดเป็นเวลาโดยประมาณ\nกรุณามาล่วงหน้าและเตรียมรอคิว\nเนื่องจากมีผู้ใช้บริการจำนวนมาก';
 const APPOINTMENT_LIST_TICKET_TEMPLATE = 'appointment_list';
 
 let optionalDriver = null;
@@ -279,7 +280,7 @@ function applyTicketLayout(printer, ticket, { qr, trailingFeed, cutType }) {
   const resolvedAdditionalNote = (providedAdditionalNote && providedAdditionalNote.trim().length > 0)
     ? providedAdditionalNote
     : (ticketTemplate === APPOINTMENT_LIST_TICKET_TEMPLATE
-      ? ''
+      ? APPOINTMENT_LIST_TICKET_NOTE_DEFAULT
       : STANDARD_TICKET_NOTE_DEFAULT);
   const additionalNoteLines = sanitizeMultiline(resolvedAdditionalNote);
   const footer = sanitizeLine(ticket.footer || ticket.footerNote);
