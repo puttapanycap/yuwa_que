@@ -1,12 +1,25 @@
 <?php
 require_once dirname(__DIR__, 2) . '/config/config.php';
 
-const HN_LOOKUP_ENDPOINT = 'https://apm.ycap.go.th/api/patients/hn-by-idcard';
-const HN_LOOKUP_API_KEY = '6551218f86f99972e1294ca2a152109957e32be0cfb7c161258e8189a7f928db';
-
 function fetchPatientHnByIdCard(string $idCardNumber): ?string
 {
     if (!preg_match('/^\d{13}$/', $idCardNumber)) {
+        return null;
+    }
+
+    $endpoint = env('HN_LOOKUP_ENDPOINT');
+    $apiKey = env('HN_LOOKUP_API_KEY');
+
+    $endpoint = is_string($endpoint) ? trim($endpoint) : '';
+    $apiKey = is_string($apiKey) ? trim($apiKey) : '';
+
+    if ($endpoint === '') {
+        error_log('HN lookup skipped: endpoint is not configured.');
+        return null;
+    }
+
+    if ($apiKey === '') {
+        error_log('HN lookup skipped: API key is not configured.');
         return null;
     }
 
@@ -20,7 +33,7 @@ function fetchPatientHnByIdCard(string $idCardNumber): ?string
         return null;
     }
 
-    $ch = curl_init(HN_LOOKUP_ENDPOINT);
+    $ch = curl_init($endpoint);
     if ($ch === false) {
         return null;
     }
@@ -31,7 +44,7 @@ function fetchPatientHnByIdCard(string $idCardNumber): ?string
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_HTTPHEADER => [
             'Content-Type: application/json',
-            'X-API-Key: ' . HN_LOOKUP_API_KEY,
+            'X-API-Key: ' . $apiKey,
         ],
         CURLOPT_TIMEOUT => 10,
         CURLOPT_CONNECTTIMEOUT => 5,
