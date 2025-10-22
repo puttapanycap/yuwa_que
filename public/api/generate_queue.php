@@ -1,6 +1,100 @@
 <?php
 require_once dirname(__DIR__, 2) . '/config/config.php';
 
+const HN_LOOKUP_ENDPOINT = 'https://apm.ycap.go.th/api/patients/hn-by-idcard';
+const HN_LOOKUP_API_KEY = '6551218f86f99972e1294ca2a152109957e32be0cfb7c161258e8189a7f928db';
+
+function fetchPatientHnByIdCard(string $idCardNumber): ?string
+{
+    if (!preg_match('/^\d{13}$/', $idCardNumber)) {
+        return null;
+    }
+
+    if (!function_exists('curl_init')) {
+        error_log('HN lookup skipped: cURL extension is not available.');
+        return null;
+    }
+
+    $payload = json_encode(['idcard' => $idCardNumber]);
+    if ($payload === false) {
+        return null;
+    }
+
+    $ch = curl_init(HN_LOOKUP_ENDPOINT);
+    if ($ch === false) {
+        return null;
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'X-API-Key: ' . HN_LOOKUP_API_KEY,
+        ],
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_CONNECTTIMEOUT => 5,
+    ]);
+
+    $responseBody = curl_exec($ch);
+    if ($responseBody === false) {
+        error_log('HN lookup request failed: ' . curl_error($ch));
+        curl_close($ch);
+        return null;
+    }
+
+    $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($statusCode < 200 || $statusCode >= 300) {
+        error_log(sprintf('HN lookup returned HTTP %d: %s', $statusCode, $responseBody));
+        return null;
+    }
+
+    $decoded = json_decode($responseBody, true);
+    if (!is_array($decoded)) {
+        error_log('HN lookup returned invalid JSON.');
+        return null;
+    }
+
+    $hn = extractHnFromResponse($decoded);
+    if ($hn === null) {
+        error_log('HN lookup response did not include HN value.');
+    }
+
+    return $hn;
+}
+
+function extractHnFromResponse($data, int $depth = 0): ?string
+{
+    if ($depth > 5 || !is_array($data)) {
+        return null;
+    }
+
+    foreach (['hn', 'HN', 'patient_hn'] as $key) {
+        if (!array_key_exists($key, $data)) {
+            continue;
+        }
+
+        $value = trim((string) $data[$key]);
+        if ($value !== '') {
+            return $value;
+        }
+    }
+
+    foreach ($data as $value) {
+        if (is_array($value)) {
+            $hn = extractHnFromResponse($value, $depth + 1);
+            if ($hn !== null && $hn !== '') {
+                return $hn;
+            }
+        }
+    }
+
+    return null;
+}
+
 ensureKioskDevicesTableExists();
 
 header('Content-Type: application/json');
@@ -170,6 +264,16 @@ try {
     } catch (Exception $e) { /* ignore */ }
 
     $ticketTemplate = $queueType['ticket_template'] ?? 'standard';
+    $patientHn = null;
+
+    if ($ticketTemplate === 'standard') {
+        try {
+            $patientHn = fetchPatientHnByIdCard($idCardNumber);
+        } catch (Exception $e) {
+            error_log('HN lookup error: ' . $e->getMessage());
+            $patientHn = null;
+        }
+    }
     $appointmentLookup = [
         'ok' => false,
         'error' => null,
@@ -202,6 +306,7 @@ try {
             'creation_time' => date('Y-m-d H:i:s'),
             'kiosk_identifier' => $kioskIdentifier,
             'kiosk_name' => $kiosk['kiosk_name'],
+            'patient_hn' => $patientHn,
             'appointments' => $appointmentLookup['appointments'] ?? [],
             'appointment_patient' => $appointmentLookup['patient'] ?? null,
             'appointment_lookup_ok' => $appointmentLookup['ok'] ?? false,

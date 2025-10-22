@@ -146,6 +146,7 @@ function extractTicket($ticket): array
         'ticketTemplate' => $ticketTemplate,
         'appointments' => normaliseTicketAppointmentsForPrinter($ticket['appointments'] ?? []),
         'appointmentPatient' => normaliseTicketPatient($ticket['appointmentPatient'] ?? null),
+        'patient' => normaliseTicketPatient($ticket['patient'] ?? null),
     ];
 }
 
@@ -427,6 +428,9 @@ function buildTicketImageResource(array $ticket, array $options)
 
     $y = 15.0;
     $maxY = $y;
+    $ticketTemplate = isset($ticket['ticketTemplate'])
+        ? strtolower(trim((string) $ticket['ticketTemplate']))
+        : 'standard';
 
     $hospitalName = trim($ticket['hospitalName']);
     if ($hospitalName !== '') {
@@ -442,6 +446,18 @@ function buildTicketImageResource(array $ticket, array $options)
     if ($ticket['serviceType'] !== '') {
         $y = drawCenteredTextBlock($canvas, [$ticket['serviceType']], $fontRegular, 30, $black, $y, 10, 18);
         $maxY = max($maxY, $y);
+    }
+
+    if ($ticketTemplate !== 'appointment_list') {
+        $patientHn = '';
+        if (isset($ticket['patient']) && is_array($ticket['patient'])) {
+            $patientHn = trim((string) ($ticket['patient']['hn'] ?? ''));
+        }
+
+        if ($patientHn !== '') {
+            $y = drawCenteredTextBlock($canvas, ['HN ' . $patientHn], $fontBold, 28, $black, $y, 8, 18);
+            $maxY = max($maxY, $y);
+        }
     }
 
     if ($ticket['queueNumber'] !== '') {

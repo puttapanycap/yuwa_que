@@ -199,6 +199,13 @@ if ($kioskRegistered) {
             margin: 1rem 0;
         }
 
+        .queue-patient-hn {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0d6efd;
+            margin-bottom: 0.75rem;
+        }
+
         .appointment-list-wrapper {
             margin-top: 1.5rem;
             text-align: left;
@@ -360,6 +367,13 @@ if ($kioskRegistered) {
             font-size: 1.1rem;
             font-weight: 600;
             margin-top: 0.75rem;
+        }
+
+        .ticket-preview-patient {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #0d6efd;
+            margin-top: 0.5rem;
         }
 
         .ticket-preview-queue {
@@ -659,6 +673,7 @@ if ($kioskRegistered) {
                     </h3>
                     <div class="queue-number" id="queueNumber">A001</div>
                     <div class="h5 mb-3" id="serviceTypeName">คิวทั่วไป</div>
+                    <div class="queue-patient-hn d-none" id="queuePatientHn"></div>
                     <div class="text-muted mb-3" id="queueDateTime"></div>
                     
                     <div class="qr-code">
@@ -932,6 +947,49 @@ if ($kioskRegistered) {
             }
         }
 
+        function resolveQueuePatientHn(queue) {
+            if (!queue || typeof queue !== 'object') {
+                return '';
+            }
+
+            const template = toTrimmedString(queue.ticket_template || queue.ticketTemplate).toLowerCase();
+            if (template === APPOINTMENT_LIST_TEMPLATE) {
+                const patient = queue.appointment_patient || queue.appointmentPatient;
+                if (patient && typeof patient === 'object') {
+                    return toTrimmedString(patient.hn || patient.HN || patient.patient_hn);
+                }
+                return '';
+            }
+
+            const directHn = toTrimmedString(queue.patient_hn || queue.patientHn);
+            if (directHn) {
+                return directHn;
+            }
+
+            const patient = queue.patient;
+            if (patient && typeof patient === 'object') {
+                return toTrimmedString(patient.hn || patient.HN || patient.patient_hn);
+            }
+
+            return '';
+        }
+
+        function resolveTicketPatientHn(ticket) {
+            if (!ticket || typeof ticket !== 'object') {
+                return '';
+            }
+
+            const patient = ticket.patient;
+            if (patient && typeof patient === 'object') {
+                const patientHn = toTrimmedString(patient.hn || patient.HN || patient.patient_hn);
+                if (patientHn) {
+                    return patientHn;
+                }
+            }
+
+            return toTrimmedString(ticket.patient_hn || ticket.patientHn);
+        }
+
         function normaliseTicketAppointments(appointments, patient = null) {
             if (!Array.isArray(appointments)) {
                 return [];
@@ -1118,17 +1176,22 @@ if ($kioskRegistered) {
             const qrData = (ticket.qrData || '').toString().trim();
             const appointmentSection = buildPreviewAppointmentSection(ticket.appointments, ticket.appointmentPatient);
             const copiesText = String(Math.max(1, parseInt(printCount, 10) || 1));
-            const ticketTemplate = (ticket.ticketTemplate || '').toString().trim();
+            const ticketTemplate = (ticket.ticketTemplate || '').toString().trim().toLowerCase();
+            const patientHn = resolveTicketPatientHn(ticket);
             const noteClassNames = ['ticket-preview-note'];
             if (ticketTemplate === APPOINTMENT_LIST_TEMPLATE) {
                 noteClassNames.push('ticket-preview-note--compact');
             }
+            const patientLine = patientHn && ticketTemplate !== APPOINTMENT_LIST_TEMPLATE
+                ? `<div class="ticket-preview-patient"><strong>HN ${escapeHtml(patientHn)}</strong></div>`
+                : '';
 
             const html = [
                 `<div class="ticket-preview" id="${previewId}">`,
                 hospitalName ? `<div class="ticket-preview-hospital">${escapeHtml(hospitalName.toLocaleUpperCase('th-TH'))}</div>` : '',
                 label ? `<div class="ticket-preview-label">${escapeHtml(label)}</div>` : '',
                 serviceType ? `<div class="ticket-preview-service">${escapeHtml(serviceType)}</div>` : '',
+                patientLine,
                 queueNumber ? `<div class="ticket-preview-queue">${escapeHtml(queueNumber)}</div>` : '',
                 servicePoint ? `<div class="ticket-preview-service-point">${escapeHtml(servicePoint)}</div>` : '',
                 issuedAt ? `<div class="ticket-preview-issued-at">${escapeHtml(issuedAt)}</div>` : '',
@@ -1234,7 +1297,8 @@ if ($kioskRegistered) {
 
         function buildTicketForPrinting() {
             const hospitalName = (appSettings.hospital_name || 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์').trim();
-            const ticketTemplate = toTrimmedString(currentQueue?.ticket_template) || 'standard';
+            const rawTicketTemplate = toTrimmedString(currentQueue?.ticket_template);
+            const ticketTemplate = rawTicketTemplate ? rawTicketTemplate.toLowerCase() : 'standard';
             const hasCustomAdditionalNote = appSettings.bixolon_additional_note_is_custom === true;
             const configuredAdditionalNote = hasCustomAdditionalNote
                 ? toTrimmedString(appSettings.bixolon_additional_note)
@@ -1263,6 +1327,13 @@ if ($kioskRegistered) {
             }
 
             ticket.ticketTemplate = ticketTemplate;
+
+            if (ticketTemplate !== APPOINTMENT_LIST_TEMPLATE) {
+                const patientHn = resolveQueuePatientHn(currentQueue);
+                if (patientHn) {
+                    ticket.patient = { hn: patientHn };
+                }
+            }
 
             if (ticketTemplate === APPOINTMENT_LIST_TEMPLATE) {
                 const patientData = currentQueue?.appointment_patient;
@@ -1523,7 +1594,16 @@ if ($kioskRegistered) {
             $('#queueNumber').text(currentQueue.queue_number);
             $('#serviceTypeName').text(selectedServiceType.name);
             $('#queueDateTime').text(new Date().toLocaleString('th-TH'));
-            
+
+            const patientHn = resolveQueuePatientHn(currentQueue);
+            const isAppointmentTemplate = toTrimmedString(currentQueue.ticket_template).toLowerCase() === APPOINTMENT_LIST_TEMPLATE;
+            const queuePatientHnEl = $('#queuePatientHn');
+            if (patientHn && !isAppointmentTemplate) {
+                queuePatientHnEl.text(`HN ${patientHn}`).removeClass('d-none');
+            } else {
+                queuePatientHnEl.text('').addClass('d-none');
+            }
+
             const qrData = `${window.location.origin}/check_status.php?queue_id=${currentQueue.queue_id}`;
 
             if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
@@ -1685,6 +1765,7 @@ if ($kioskRegistered) {
             $('#nextBtn').prop('disabled', true);
             $('#idCardNumber').val('');
             $('#generateBtn').prop('disabled', true).html('<i class="fas fa-ticket-alt me-2"></i>รับบัตรคิว');
+            $('#queuePatientHn').addClass('d-none').text('');
             renderAppointmentSummary(null);
         }
 
