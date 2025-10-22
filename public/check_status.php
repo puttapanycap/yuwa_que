@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 
+ensureQueuePatientHnColumnExists();
+
 // Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -13,6 +15,7 @@ $allServicePoints = [];
 $appointmentsToday = [];
 $appointmentPatient = null;
 $appointmentPatientLine = '';
+$queuePatientLine = '';
 $appointmentError = '';
 $appointmentLookupPerformed = false;
 
@@ -54,6 +57,40 @@ if (!$queueId) {
             $error_message = 'ไม่พบข้อมูลคิว ID: ' . htmlspecialchars($queueId);
         } else {
             $ticketTemplate = $queue['ticket_template'] ?? 'standard';
+
+            $storedHn = trim((string)($queue['patient_hn'] ?? ''));
+            $patientHnValue = $storedHn;
+
+            if ($patientHnValue === '' && $ticketTemplate === 'standard') {
+                $idCardRaw = (string)($queue['patient_id_card_number'] ?? '');
+                $idCard = preg_replace('/\D/', '', $idCardRaw);
+
+                if (strlen($idCard) === 13) {
+                    try {
+                        $lookupHn = fetchPatientHnByIdCard($idCard);
+                        if (is_string($lookupHn) && trim($lookupHn) !== '') {
+                            $patientHnValue = trim($lookupHn);
+                        }
+                    } catch (\Throwable $lookupError) {
+                        error_log('HN lookup error (check_status): ' . $lookupError->getMessage());
+                    }
+                }
+            }
+
+            if ($patientHnValue !== '') {
+                $queuePatientLine = 'HN ' . $patientHnValue;
+
+                if ($storedHn === '') {
+                    try {
+                        $updateStmt = $db->prepare('UPDATE queues SET patient_hn = ? WHERE queue_id = ?');
+                        $updateStmt->execute([$patientHnValue, $queueId]);
+                        $queue['patient_hn'] = $patientHnValue;
+                    } catch (Exception $updateError) {
+                        error_log('Failed to persist patient HN: ' . $updateError->getMessage());
+                    }
+                }
+            }
+
             if ($ticketTemplate === 'appointment_list') {
                 $appointmentLookupPerformed = true;
                 $idCard = preg_replace('/\D/', '', $queue['patient_id_card_number'] ?? '');
@@ -377,6 +414,13 @@ if ($error_message) {
             font-size: 3rem;
             font-weight: bold;
             color: #007bff;
+        }
+
+        .queue-patient-hn {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #0d6efd;
+            margin-top: 0.35rem;
         }
 
         .status-badge {
@@ -844,6 +888,9 @@ if ($error_message) {
             <div class="queue-header">
                 <h1 class="h3 text-primary mb-2">โรงพยาบาลยุวประสาทไวทโยปถัมภ์</h1>
                 <div class="queue-number"><?php echo htmlspecialchars($queue['queue_number']); ?></div>
+                <?php if ($queuePatientLine !== ''): ?>
+                    <div class="queue-patient-hn"><?php echo htmlspecialchars($queuePatientLine); ?></div>
+                <?php endif; ?>
                 <div class="h5 text-muted"><?php echo htmlspecialchars($queue['type_name']); ?></div>
                 <div class="mt-3">
                     <?php

@@ -48,6 +48,134 @@ foreach ($directories as $dir) {
     }
 }
 
+if (!function_exists('ensureQueuePatientHnColumnExists')) {
+    function ensureQueuePatientHnColumnExists()
+    {
+        try {
+            $db = getDB();
+            $stmt = $db->query("SHOW COLUMNS FROM queues LIKE 'patient_hn'");
+            $columnExists = $stmt !== false && $stmt->fetch();
+
+            if (!$columnExists) {
+                $db->exec("ALTER TABLE queues ADD COLUMN patient_hn VARCHAR(20) NULL DEFAULT NULL AFTER patient_id_card_number");
+            }
+        } catch (Exception $e) {
+            error_log('Failed to ensure queues.patient_hn column exists: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('extractHnFromResponse')) {
+    function extractHnFromResponse($data, int $depth = 0): ?string
+    {
+        if ($depth > 5 || !is_array($data)) {
+            return null;
+        }
+
+        foreach (['hn', 'HN', 'patient_hn'] as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+
+            $value = trim((string) $data[$key]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($data as $value) {
+            if (is_array($value)) {
+                $hn = extractHnFromResponse($value, $depth + 1);
+                if ($hn !== null && $hn !== '') {
+                    return $hn;
+                }
+            }
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('fetchPatientHnByIdCard')) {
+    function fetchPatientHnByIdCard(string $idCardNumber): ?string
+    {
+        if (!preg_match('/^\d{13}$/', $idCardNumber)) {
+            return null;
+        }
+
+        $endpoint = env('HN_LOOKUP_ENDPOINT');
+        $apiKey = env('HN_LOOKUP_API_KEY');
+
+        $endpoint = is_string($endpoint) ? trim($endpoint) : '';
+        $apiKey = is_string($apiKey) ? trim($apiKey) : '';
+
+        if ($endpoint === '') {
+            error_log('HN lookup skipped: endpoint is not configured.');
+            return null;
+        }
+
+        if ($apiKey === '') {
+            error_log('HN lookup skipped: API key is not configured.');
+            return null;
+        }
+
+        if (!function_exists('curl_init')) {
+            error_log('HN lookup skipped: cURL extension is not available.');
+            return null;
+        }
+
+        $payload = json_encode(['idcard' => $idCardNumber]);
+        if ($payload === false) {
+            return null;
+        }
+
+        $ch = curl_init($endpoint);
+        if ($ch === false) {
+            return null;
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'X-API-Key: ' . $apiKey,
+            ],
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+
+        $responseBody = curl_exec($ch);
+        if ($responseBody === false) {
+            error_log('HN lookup request failed: ' . curl_error($ch));
+            curl_close($ch);
+            return null;
+        }
+
+        $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            error_log(sprintf('HN lookup returned HTTP %d: %s', $statusCode, $responseBody));
+            return null;
+        }
+
+        $decoded = json_decode($responseBody, true);
+        if (!is_array($decoded)) {
+            error_log('HN lookup returned invalid JSON.');
+            return null;
+        }
+
+        $hn = extractHnFromResponse($decoded);
+        if ($hn === null) {
+            error_log('HN lookup response did not include HN value.');
+        }
+
+        return $hn;
+    }
+}
+
 // Logging class
 class Logger {
     private static $logPath;
