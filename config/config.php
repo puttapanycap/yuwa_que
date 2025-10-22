@@ -103,8 +103,8 @@ if (!function_exists('fetchPatientHnByIdCard')) {
             return null;
         }
 
-        $endpoint = env('HN_LOOKUP_ENDPOINT');
-        $apiKey = env('HN_LOOKUP_API_KEY');
+        $endpoint = env('HN_LOOKUP_ENDPOINT', 'https://apm.ycap.go.th/api/patients/hn-by-idcard');
+        $apiKey = env('HN_LOOKUP_API_KEY', '6551218f86f99972e1294ca2a152109957e32be0cfb7c161258e8189a7f928db');
 
         $endpoint = is_string($endpoint) ? trim($endpoint) : '';
         $apiKey = is_string($apiKey) ? trim($apiKey) : '';
