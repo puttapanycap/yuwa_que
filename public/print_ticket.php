@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 
+ensureQueuePatientHnColumnExists();
+
 $queue_id = filter_input(INPUT_GET, 'queue_id', FILTER_VALIDATE_INT);
 
 if (!$queue_id) {
@@ -13,6 +15,8 @@ try {
         SELECT
             q.queue_number,
             q.creation_time AS created_at,
+            q.patient_hn,
+            q.patient_id_card_number,
             qt.type_name,
             qt.prefix_char AS prefix,
             (
@@ -35,6 +39,25 @@ try {
 
     // ดึงชื่อโรงพยาบาลจากการตั้งค่า
     $hospitalName = getSetting('hospital_name', 'โรงพยาบาลยุวประสาทไวทโยปถัมภ์');
+
+    $patientHn = trim((string)($ticket['patient_hn'] ?? ''));
+    if ($patientHn === '' && !empty($ticket['patient_id_card_number'])) {
+        $idCard = preg_replace('/\D/', '', (string)$ticket['patient_id_card_number']);
+        if (strlen($idCard) === 13) {
+            try {
+                $lookupHn = fetchPatientHnByIdCard($idCard);
+                if (is_string($lookupHn) && trim($lookupHn) !== '') {
+                    $patientHn = trim($lookupHn);
+
+                    $updateStmt = $db->prepare('UPDATE queues SET patient_hn = ? WHERE queue_id = ?');
+                    $updateStmt->execute([$patientHn, $queue_id]);
+                    $ticket['patient_hn'] = $patientHn;
+                }
+            } catch (\Throwable $lookupError) {
+                error_log('HN lookup error (print_ticket): ' . $lookupError->getMessage());
+            }
+        }
+    }
 
 } catch (Exception $e) {
     die('เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: ' . $e->getMessage());
@@ -148,6 +171,13 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
             font-size: 4em;
             font-weight: 700;
             margin: 5px 0;
+        }
+
+        .ticket-body .patient-hn {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #0d6efd;
+            margin: 6px 0;
         }
 
         .ticket-body .waiting-count {
@@ -294,6 +324,9 @@ $qrCodeUrl = BASE_URL . '/check_status.php?queue_id=' . $queue_id;
         <div class="ticket-body">
             <div class="service-type"><?php echo htmlspecialchars($ticket['type_name']); ?></div>
             <div class="queue-number"><?php echo htmlspecialchars($ticket['queue_number']); ?></div>
+            <?php if ($patientHn !== ''): ?>
+                <div class="patient-hn">HN <?php echo htmlspecialchars($patientHn); ?></div>
+            <?php endif; ?>
             <div class="waiting-count">จำนวนคิวรอ: <?php echo $ticket['waiting_count']; ?> คิว</div>
         </div>
         <hr>

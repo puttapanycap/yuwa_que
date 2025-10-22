@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 
 ensureKioskDevicesTableExists();
+ensureQueuePatientHnColumnExists();
 $kioskToken = ensureKioskCookie();
 $kioskRecord = findKioskByToken($kioskToken);
 $kioskRegistered = $kioskRecord && (int) $kioskRecord['is_active'] === 1;

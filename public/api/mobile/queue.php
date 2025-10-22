@@ -525,6 +525,7 @@ function createQueue($input) {
         
         $db = getDB();
         $db->beginTransaction();
+        ensureQueuePatientHnColumnExists();
         
         // Validate queue type
         $stmt = $db->prepare("SELECT * FROM queue_types WHERE queue_type_id = ? AND is_active = 1");
@@ -535,6 +536,9 @@ function createQueue($input) {
             $db->rollBack();
             sendApiError('Invalid queue type', 'INVALID_QUEUE_TYPE');
         }
+
+        $ticketTemplate = $queueType['ticket_template'] ?? 'standard';
+        $patientHn = null;
         
         // Check working hours
         if (!isWithinWorkingHours()) {
@@ -590,7 +594,7 @@ function createQueue($input) {
             $stmt = $db->prepare("SELECT patient_id FROM patients WHERE id_card_number = ?");
             $stmt->execute([$patientIdCard]);
             $existingPatient = $stmt->fetch();
-            
+
             if ($existingPatient) {
                 $patientId = $existingPatient['patient_id'];
                 
@@ -606,11 +610,20 @@ function createQueue($input) {
                 }
             } else {
                 $stmt = $db->prepare("
-                    INSERT INTO patients (id_card_number, name, phone) 
+                    INSERT INTO patients (id_card_number, name, phone)
                     VALUES (?, ?, ?)
                 ");
                 $stmt->execute([$patientIdCard, $patientName, $patientPhone]);
                 $patientId = $db->lastInsertId();
+            }
+
+            if ($ticketTemplate === 'standard') {
+                try {
+                    $patientHn = fetchPatientHnByIdCard($patientIdCard);
+                } catch (\Throwable $lookupError) {
+                    error_log('HN lookup error: ' . $lookupError->getMessage());
+                    $patientHn = null;
+                }
             }
         }
         
@@ -677,15 +690,16 @@ function createQueue($input) {
         $kioskId = 'mobile_app_' . ($session['mobile_user_id'] ?? 'unknown');
         
         $stmt = $db->prepare("
-            INSERT INTO queues 
-            (queue_number, queue_type_id, patient_id_card_number, kiosk_id, 
+            INSERT INTO queues
+            (queue_number, queue_type_id, patient_id_card_number, patient_hn, kiosk_id,
              current_service_point_id, priority_level, appointment_time, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $queueNumber,
             $queueTypeId,
             $patientIdCard,
+            $patientHn,
             $kioskId,
             $firstServicePoint['service_point_id'],
             $priorityLevel,
@@ -730,7 +744,8 @@ function createQueue($input) {
                 'service_point_id' => $firstServicePoint['service_point_id'],
                 'status' => 'waiting',
                 'created_at' => date('Y-m-d H:i:s'),
-                'check_status_url' => BASE_URL . '/check_status.php?queue=' . $queueNumber
+                'check_status_url' => BASE_URL . '/check_status.php?queue=' . $queueNumber,
+                'patient_hn' => $patientHn,
             ]
         ], 201);
         
